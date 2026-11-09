@@ -1,8 +1,14 @@
 // Toda a arte do jogo é pixel art original gerada por código: não há arquivo externo.
-import { ITEMS, MOBS } from '../shared/data';
+import { classOf, ITEMS, MOBS } from '../shared/data';
 import { T, Obj } from '../shared/world';
 
 export type Cv = HTMLCanvasElement;
+const glowCache = new Map<string, Cv>();
+/** Luz radial suave; desenhar com composição 'lighter' (ou normal, para sombras). */
+export function glowSprite(col: string): Cv {
+  let c = glowCache.get(col); if (c) return c; c = cv(64, 64); const g = c.getContext('2d')!, n = parseInt(col.slice(1), 16), rgb = `${n >> 16},${n >> 8 & 255},${n & 255}`, gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(.45, `rgba(${rgb},.42)`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowCache.set(col, c); return c;
+}
 type G = CanvasRenderingContext2D;
 export function cv(w: number, h: number): Cv { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 const ctx = (c: Cv) => c.getContext('2d', { willReadFrequently: true })!;
@@ -27,12 +33,12 @@ export function tile(t: number, v: number, frame: number): Cv {
   c = cv(32, 32); const g = ctx(c), R = rng(t * 991 + v * 113 + 7);
   const speck = (n: number, cols: string[], s = 2) => { for (let i = 0; i < n; i++) r(g, R() * 32 | 0, R() * 32 | 0, s, s === 2 ? 1 : s, cols[R() * cols.length | 0]); };
   if (t === T.GRASS) {
-    r(g, 0, 0, 32, 32, '#4c8a3f'); speck(40, ['#58994a', '#437c37', '#5fa350']);
-    for (let i = 0; i < 5; i++) { const x = R() * 29 | 0, y = 3 + R() * 26 | 0; r(g, x, y, 1, 3, '#6bb45a'); r(g, x + 2, y + 1, 1, 2, '#6bb45a'); }
+    r(g, 0, 0, 32, 32, '#4a8440'); speck(34, ['#508b45', '#45793b', '#569449']);
+    for (let i = 0; i < 3; i++) { const x = R() * 29 | 0, y = 3 + R() * 26 | 0; r(g, x, y, 1, 3, '#6bb45a'); r(g, x + 2, y + 1, 1, 2, '#6bb45a'); }
     if (v === 3) for (let i = 0; i < 4; i++) { const x = 3 + R() * 25 | 0, y = 3 + R() * 25 | 0, f = ['#f4e36b', '#f2a0c0', '#fff'][i % 3]; r(g, x, y, 2, 2, f); }
   } else if (t === T.STONE) {
-    r(g, 0, 0, 32, 32, '#6e675c');
-    for (let row = 0; row < 3; row++) for (let i = -1; i < 3; i++) { const x = i * 15 + (row % 2) * 7 + 1, y = row * 11, sh = ['#a29a8b', '#958d7f', '#ada596', '#8c8476'][R() * 4 | 0]; r(g, x, y, 14, 10, sh); r(g, x, y, 14, 1, '#bdb5a5'); r(g, x, y + 9, 14, 1, '#7d7568'); }
+    r(g, 0, 0, 32, 32, '#7f786c');
+    for (let row = 0; row < 3; row++) for (let i = -1; i < 3; i++) { const x = i * 15 + (row % 2) * 7 + 1, y = row * 11, sh = ['#9c9486', '#968e80', '#a1998b', '#92897c'][R() * 4 | 0]; r(g, x, y, 14, 10, sh); r(g, x, y, 14, 1, '#aca495'); r(g, x, y + 9, 14, 1, '#878074'); }
   } else if (t === T.DIRT) {
     r(g, 0, 0, 32, 32, '#94734b'); speck(44, ['#a5845a', '#826340', '#7a5c3a']);
   } else if (t === T.SNOW) {
@@ -49,6 +55,36 @@ export function tile(t: number, v: number, frame: number): Cv {
   tileCache.set(k, c); return c;
 }
 
+const PRIO = [1, 3, 0, 3, 1, 2]; // GRASS, STONE, WATER, SNOW, ICE, DIRT
+export const tilePrio = (t: number) => PRIO[t];
+const edgeCache = new Map<number, Cv>();
+/** Borda irregular do terreno vizinho (0 cima, 1 baixo, 2 esquerda, 3 direita) sobre este tile. */
+export function edge(t: number, side: number, water: boolean): Cv {
+  const k = t * 100 + side * 10 + (water ? 1 : 0); let c = edgeCache.get(k); if (c) return c;
+  c = cv(32, 32); const g = ctx(c), src = tile(t, 1, 0), R = rng(k + 3), rim = water ? '#d6eefb' : t === T.STONE ? '#5f584e' : t === T.DIRT ? '#6f5535' : t === T.SNOW ? '#b7c9de' : '#3b6c33';
+  let d = 4;
+  for (let i = 0; i < 32; i++) {
+    if (i % 3 === 0) d = Math.max(2, Math.min(8, d + Math.round(R() * 4 - 2)));
+    if (side === 0) { g.drawImage(src, i, 0, 1, d, i, 0, 1, d); r(g, i, d, 1, 1, rim); }
+    else if (side === 1) { g.drawImage(src, i, 32 - d, 1, d, i, 32 - d, 1, d); r(g, i, 31 - d, 1, 1, rim); }
+    else if (side === 2) { g.drawImage(src, 0, i, d, 1, 0, i, d, 1); r(g, d, i, 1, 1, rim); }
+    else { g.drawImage(src, 32 - d, i, d, 1, 32 - d, i, d, 1); r(g, 31 - d, i, 1, 1, rim); }
+  }
+  edgeCache.set(k, c); return c;
+}
+export function archSprite(): Cv { return memo('arch', () => { const c = cv(84, 96), g = ctx(c); for (const x of [6, 64]) { r(g, x, 22, 14, 70, '#7a7c92'); r(g, x, 22, 4, 70, '#a2a4bb'); r(g, x + 10, 22, 4, 70, '#585a70'); for (let y = 34; y < 88; y += 13) r(g, x + 5, y, 4, 6, '#c9a4ff'); r(g, x - 3, 86, 20, 8, '#5f6178'); } for (let i = 0; i < 84; i++) { const h = Math.round(Math.sin(i / 83 * Math.PI) * 18); r(g, i, 22 - h, 1, 14, i % 12 < 1 ? '#585a70' : '#7a7c92'); r(g, i, 22 - h, 1, 3, '#a2a4bb'); } r(g, 37, 2, 10, 12, '#e4d3ff'); return outline(c); }); }
+export function crystalSprite(v: number): Cv { return memo('cr' + v, () => { const c = cv(36, 44), g = ctx(c); for (const [x, y, w, col] of [[14, 2 + v * 2, 9, '#7fe3ff'], [5, 18, 8, '#5bb6e6'], [24, 14, 8, '#a4eeff']] as [number, number, number, string][]) { r(g, x, y + 3, w, 40 - y, col); r(g, x + 1, y, w - 2, 3, col); r(g, x + 1, y + 3, 2, 34 - y, '#e8fbff'); r(g, x + w - 2, y + 3, 2, 37 - y, shade(col, -40)); } return outline(c, [20, 50, 90, 255]); }); }
+export function skillIcon(kind: string, col: string): Cv {
+  const c = cv(32, 32), g = ctx(c), a = col || '#ffd76a'; r(g, 0, 0, 32, 32, shade(a, -105));
+  if (kind === 'spin') { for (let t = 0; t < 40; t++) { const q = t / 40 * 9, R0 = 3 + t * .28; r(g, 16 + Math.cos(q) * R0, 16 + Math.sin(q) * R0, 3, 3, a); } }
+  else if (kind === 'dash') { for (let i = 0; i < 3; i++) { r(g, 5 + i * 8, 13, 7, 6, i === 2 ? '#fff' : a); r(g, 11 + i * 8, 15, 3, 2, a); } r(g, 4, 8, 12, 2, shade(a, -50)); r(g, 4, 23, 12, 2, shade(a, -50)); }
+  else if (kind === 'splash') { ell(g, 16, 18, 10, 10, a); ell(g, 15, 18, 6, 6, '#ffe9a8'); r(g, 12, 4, 3, 7, a); r(g, 19, 2, 3, 8, a); r(g, 7, 8, 3, 5, a); r(g, 24, 8, 3, 5, a); }
+  else if (kind === 'multi') { for (let i = 0; i < 3; i++) { const x = 6 + i * 8; r(g, x + 2, 4 + i % 2 * 3, 3, 20, a); r(g, x, 21 + i % 2 * 3, 7, 3, '#fff'); r(g, x + 1, 24 + i % 2 * 3, 5, 2, a); } }
+  else if (kind === 'summon') { ell(g, 16, 16, 12, 12, shade(a, -60)); ell(g, 16, 14, 7, 7, a); r(g, 12, 12, 3, 3, '#14102a'); r(g, 18, 12, 3, 3, '#14102a'); r(g, 9, 23, 14, 3, a); }
+  else { ell(g, 16, 16, 11, 11, a); ell(g, 16, 16, 7, 7, '#1d1030'); r(g, 13, 12, 2, 8, a); r(g, 18, 12, 2, 8, a); }
+  return c;
+}
+
 // ---------- objetos ----------
 const objCache = new Map<string, Cv>();
 function memo(k: string, f: () => Cv) { let c = objCache.get(k); if (!c) { c = f(); objCache.set(k, c); } return c; }
@@ -56,6 +92,9 @@ export function objSprite(o: Obj): { c: Cv; ox: number; oy: number; sway: number
   if (o.k === 'tree') return { c: memo('tree' + o.v, () => { const c = cv(56, 72), g = ctx(c), pal = [['#2f6b34', '#3f8740', '#59a652'], ['#2c6440', '#3a7f55', '#58a374'], ['#4f7430', '#6c9238', '#8fb14a']][o.v], R = rng(o.v + 5); r(g, 24, 46, 9, 22, '#5b3d24'); r(g, 24, 46, 3, 22, '#7a5533'); ell(g, 28, 30, 24, 22, pal[0]); ell(g, 25, 26, 19, 17, pal[1]); ell(g, 21, 21, 11, 9, pal[2]); for (let i = 0; i < 26; i++) r(g, 8 + R() * 40 | 0, 12 + R() * 34 | 0, 3, 2, pal[R() * 3 | 0]); return outline(c); }), ox: -12, oy: -40, sway: 1 };
   if (o.k === 'pine') return { c: memo('pine' + o.v, () => { const c = cv(48, 72), g = ctx(c), R = rng(o.v * 7 + 3); r(g, 21, 56, 7, 13, '#4f3a2a'); for (let t = 0; t < 4; t++) { const y = 8 + t * 13, w = 8 + t * 5; for (let i = 0; i < 20; i++) { const hw = Math.round(w * i / 19); r(g, 24 - hw, y + i, hw * 2, 1, i < 7 ? '#eef5fb' : (i + t) % 5 ? '#23584f' : '#1b4a44'); } for (let i = 0; i < 5; i++) r(g, 24 - w * .55 + R() * w * 1.1 | 0, y + 8 + R() * 8 | 0, 3, 2, '#dfeaf4'); } return outline(c); }), ox: -8, oy: -40, sway: 1 };
   if (o.k === 'rock') return { c: memo('rock' + o.v, () => { const c = cv(36, 32), g = ctx(c); ell(g, 18, 18, 15, 11, '#6f7c8c'); ell(g, 16, 15, 11, 8, '#8c9aab'); ell(g, 15, 11, 9, 4, '#eef5fb'); r(g, 20, 21, 7, 1, '#556170'); return outline(c); }), ox: -2, oy: -4, sway: 0 };
+  if (o.k === 'lamp') return { c: memo('lamp', () => { const c = cv(24, 66), g = ctx(c); r(g, 10, 16, 4, 46, '#3c3a48'); r(g, 11, 16, 1, 46, '#646272'); r(g, 6, 60, 12, 5, '#3c3a48'); r(g, 5, 8, 14, 12, '#3c3a48'); r(g, 7, 10, 10, 8, '#ffd98a'); r(g, 8, 11, 3, 5, '#fff3c8'); r(g, 3, 5, 18, 3, '#2b2a36'); r(g, 9, 1, 6, 4, '#2b2a36'); return outline(c); }), ox: 4, oy: -36, sway: 0 };
+  if (o.k === 'barrel') return { c: memo('barrel' + o.v, () => { const c = cv(30, 36), g = ctx(c), w = o.v ? '#8a5f36' : '#74502e'; r(g, 4, 6, 22, 28, w); r(g, 2, 12, 26, 16, shade(w, 12)); r(g, 2, 12, 26, 3, '#5c5a66'); r(g, 2, 25, 26, 3, '#5c5a66'); ell(g, 15, 6, 11, 4, shade(w, 30)); for (let x = 8; x < 26; x += 5) r(g, x, 10, 1, 24, shade(w, -30)); return outline(c); }), ox: 1, oy: -6, sway: 0 };
+  if (o.k === 'stall') return { c: memo('stall' + o.v, () => { const c = cv(104, 92), g = ctx(c), a = o.v ? '#c4593d' : '#3e86b0'; for (const x of [6, 92]) r(g, x, 28, 5, 60, '#5b3d24'); r(g, 2, 58, 100, 26, '#7a5533'); r(g, 2, 58, 100, 4, '#a4784c'); for (let x = 0; x < 13; x++) { r(g, 2 + x * 8, 4, 8, 28, x % 2 ? a : '#efe6d2'); r(g, 2 + x * 8, 32, 8, 4 + x % 2 * 2, x % 2 ? shade(a, -30) : '#cfc5ae'); } const it = o.v ? ['#d9483b', '#e0a93a', '#79b94a'] : ['#8fd0ff', '#e0425a', '#b58cff']; for (let i = 0; i < 11; i++) { ell(g, 11 + i * 8, 53 + i % 2, 4, 4, it[i % 3]); r(g, 9 + i * 8, 50 + i % 2, 2, 2, '#fff'); } return outline(c); }), ox: 0, oy: -28, sway: 0 };
   if (o.k === 'wall') return { c: memo('wall', () => { const c = cv(32, 56), g = ctx(c); r(g, 0, 8, 32, 48, '#8b8478'); for (let y = 0; y < 5; y++) for (let x = -1; x < 2; x++) { const bx = x * 16 + (y % 2) * 8; r(g, bx + 1, 13 + y * 9, 14, 8, y % 3 ? '#a39b8c' : '#978f81'); } r(g, 0, 8, 32, 5, '#c0b8a8'); r(g, 2, 0, 11, 9, '#b2aa9a'); r(g, 19, 0, 11, 9, '#b2aa9a'); return c; }), ox: 0, oy: -24, sway: 0 };
   if (o.k === 'fountain') return { c: memo('fount', () => { const c = cv(112, 124), g = ctx(c); const a = 8; for (const [x, y, w, h] of [[a, 28, 96, 8], [a, 116, 96, 8], [a, 28, 8, 96], [a + 88, 28, 8, 96]]) { r(g, x, y, w, h, '#a39b8c'); r(g, x, y, w, 2, '#d0c8b8'); } r(g, 48, 40, 16, 30, '#b5ad9d'); r(g, 50, 40, 4, 30, '#d0c8b8'); ell(g, 56, 70, 13, 4, '#8c8476'); ell(g, 56, 40, 22, 8, '#b5ad9d'); ell(g, 56, 38, 18, 5, '#5ba3dc'); ell(g, 56, 18, 9, 11, '#c8c0b0'); r(g, 54, 2, 4, 8, '#7fd0ff'); return outline(c); }), ox: -8, oy: -28, sway: 0 };
   // casa: telhado + fachada
@@ -74,10 +113,11 @@ export function objSprite(o: Obj): { c: Cv; ox: number; oy: number; sway: number
 }
 
 // ---------- personagens ----------
-export interface Look { hc: string; hs: number; helm?: string | null; armor?: string | null; pants?: string | null; boots?: string | null; weapon?: string | null; robe?: string }
-export const FRAME_W = 40, FRAME_H = 48;
+export interface Look { cls?: string; hc: string; hs: number; helm?: string | null; armor?: string | null; pants?: string | null; boots?: string | null; weapon?: string | null; robe?: string }
+export const FRAME_W = 40, FRAME_H = 56;
 function heroFrame(dir: number, f: number, o: Look): Cv {
   const c = cv(FRAME_W, FRAME_H), g = ctx(c), X = 4; // desloca o sprite 32 px para caber a arma
+  g.translate(0, 8); // folga para chapéus e cajados
   if (f === 5) { // caído
     r(g, X + 3, 36, 26, 8, o.armor ?? '#4d5873'); r(g, X + 24, 34, 9, 9, '#e8b88f'); r(g, X + 25, 33, 8, 5, o.hc); r(g, X - 2, 38, 6, 5, o.boots ?? '#2c2632'); return outline(c);
   }
@@ -86,11 +126,16 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
   const wd = o.weapon ? ITEMS[o.weapon] : null, blade = wd?.blade ?? '#cfd8e3', isAxe = o.weapon === 'iron_axe';
   const sword = (x: number, y: number, horiz: boolean, s = 1) => {
     if (!wd) return;
+    if (wd.wtype === 'staff') { if (horiz) { r(g, x, y + 3, 18, 2, '#7a5533'); r(g, x + 16, y, 7, 7, blade); r(g, x + 18, y + 2, 2, 2, '#fff'); } else { r(g, x + 1, y - 4, 2, 26, '#7a5533'); r(g, x - 2, y - 10, 8, 8, blade); r(g, x, y - 8, 2, 2, '#fff'); } return; }
+    if (wd.wtype === 'bow') { const yy = horiz ? y - 8 : y - 3; for (let i = 0; i < 24; i++) { const b = Math.round(Math.sin(i / 23 * Math.PI) * 5); r(g, x + b, yy + i, 2, 1, blade); } r(g, x, yy, 1, 24, '#e8e6df'); return; }
     if (horiz) { r(g, x, y + 3, 3 * s > 0 ? 4 : 4, 2, '#6b4a2b'); const bx = s > 0 ? x + 4 : x - 12; r(g, bx, y + 2, 12, 4, blade); r(g, bx, y + 2, 12, 1, '#fff'); if (isAxe) r(g, s > 0 ? x + 10 : x - 12, y - 2, 6, 12, blade); }
     else { r(g, x + 1, y + 13, 2, 5, '#6b4a2b'); r(g, x - 2, y + 12, 8, 2, '#c9a44c'); r(g, x, y, 4, 12, blade); r(g, x, y, 1, 12, '#fff'); if (isAxe) r(g, x + 3, y, 7, 8, blade); if (o.weapon === 'frost_blade') r(g, x + 1, y - 3, 2, 3, '#d9f7ff'); }
   };
   const Y = 2 - bob;
   if (dir === 1 && !atk) sword(X + 24, Y + 18, false);
+  const cloak = o.cls === 'dark_warrior' ? '#8c2433' : o.cls === 'spell_knight' ? '#4d2a78' : null, robed = o.cls === 'arcane_wizard' || o.cls === 'shadow_summoner';
+  if (cloak && dir === 0) { r(g, X + 6, Y + 22, 3, 20, shade(cloak, -30)); r(g, X + 24, Y + 22, 3, 20, shade(cloak, -30)); }
+  if (cloak && dir === 2) { r(g, X + 5, Y + 21, 7, 21 + step, cloak); r(g, X + 5, Y + 21, 2, 21 + step, shade(cloak, 25)); }
   // pernas
   if (dir === 2) {
     r(g, X + 12 + step * 3, Y + 32, 7, 8, pants); r(g, X + 12 + step * 3, Y + 39, 9, 4, boots);
@@ -100,13 +145,18 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
     r(g, X + 10, Y + 32, 6, 9 - l, pants); r(g, X + 10, Y + 40 - l, 6, 4, boots);
     r(g, X + 17, Y + 32, 6, 9 - rr, pants); r(g, X + 17, Y + 40 - rr, 6, 4, boots);
   }
+  if (robed) { const rx = dir === 2 ? 9 : 7, rw = dir === 2 ? 15 : 19; r(g, X + rx, Y + 31, rw, 11, armor); r(g, X + rx, Y + 40, rw, 2, armD); for (let i = 3; i < rw; i += 5) r(g, X + rx + i, Y + 32, 1, 8, armD); }
   // tronco
   const tx = dir === 2 ? 10 : 8, tw = dir === 2 ? 13 : 17;
   r(g, X + tx, Y + 20, tw, 13, armor); r(g, X + tx, Y + 20, tw, 2, armL); r(g, X + tx, Y + 31, tw, 2, armD); r(g, X + tx, Y + 29, tw, 2, '#b08a3c');
-  if (dir === 0) { r(g, X + 15, Y + 22, 3, 7, armL); }
+  r(g, X + tx, Y + 22, 2, 7, armL); r(g, X + tx + tw - 2, Y + 22, 2, 7, armD);
+  if (dir === 0) { r(g, X + 15, Y + 22, 3, 7, armL); r(g, X + 15, Y + 29, 3, 2, '#f0d27a'); }
+  if (cloak && dir === 1) { r(g, X + 7, Y + 21, 19, 21 + Math.abs(step), cloak); r(g, X + 7, Y + 21, 3, 21, shade(cloak, 25)); r(g, X + 23, Y + 21, 3, 21, shade(cloak, -30)); }
+  if (o.cls === 'mystic_archer' && dir !== 0) { r(g, X + (dir === 1 ? 19 : 7), Y + 16, 6, 18, '#6b4a2b'); for (let i = 0; i < 3; i++) r(g, X + (dir === 1 ? 19 : 7) + i * 2, Y + 11, 1, 5, '#f1e3b8'); }
   // braços
   const sw = atk ? 0 : step * 2;
   if (dir !== 2) { r(g, X + 4, Y + 21 + sw, 4, 11, armD); r(g, X + 4, Y + 31 + sw, 4, 3, skin); if (!atk) { r(g, X + 25, Y + 21 - sw, 4, 11, armD); r(g, X + 25, Y + 31 - sw, 4, 3, skin); } }
+  if (cloak) { const ps = o.cls === 'spell_knight' ? '#c9a4ff' : '#aab3c4'; if (dir !== 2) { r(g, X + 3, Y + 19, 7, 5, ps); r(g, X + 23, Y + 19, 7, 5, ps); r(g, X + 3, Y + 19, 7, 1, '#fff'); r(g, X + 23, Y + 19, 7, 1, '#fff'); } else { r(g, X + 12, Y + 19, 8, 5, ps); r(g, X + 12, Y + 19, 8, 1, '#fff'); } }
   // cabeça
   const hx = dir === 2 ? 9 : 8, hw = dir === 2 ? 14 : 17;
   r(g, X + hx, Y + 8, hw, 13, skin); r(g, X + hx, Y + 19, hw, 2, skinD);
@@ -120,6 +170,9 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
     if (dir === 1) r(g, X + hx - 1, Y + 8, hw + 2, 12, hair);
     if (dir === 2) r(g, X + hx - 1, Y + 8, 7, 10, hair);
     if (o.hs === 1) for (let i = 0; i < 4; i++) r(g, X + hx + i * 5 - 1, Y + 1 + (i % 2) * 2, 4, 4, hair);
+    if (o.cls === 'arcane_wizard') { r(g, X + hx - 5, Y + 7, hw + 10, 3, armD); r(g, X + hx - 2, Y + 4, hw + 4, 3, armor); for (let i = 0; i < 12; i++) { const w = Math.round((hw + 2) * (1 - i / 13)); r(g, X + hx + hw / 2 - w / 2 + (i > 8 ? 2 : 0), Y + 4 - i, w, 1, i % 4 === 2 ? armL : armor); } }
+    if (o.cls === 'mystic_archer') { r(g, X + hx - 2, Y + 2, hw + 4, 8, armor); r(g, X + hx - 2, Y + 2, hw + 4, 2, armL); r(g, X + hx - 2, Y + 8, 3, 13, armD); if (dir !== 2) r(g, X + hx + hw - 1, Y + 8, 3, 13, armD); if (dir === 1) r(g, X + hx - 2, Y + 8, hw + 4, 13, armor); }
+    if (o.cls === 'shadow_summoner') { r(g, X + hx - 1, Y + 2, hw + 2, 8, armD); r(g, X + hx - 3, Y - 4, 3, 8, '#e8dcc8'); r(g, X + hx + hw, Y - 4, 3, 8, '#e8dcc8'); r(g, X + hx - 3, Y - 6, 2, 3, '#b06bff'); r(g, X + hx + hw + 1, Y - 6, 2, 3, '#b06bff'); if (dir === 1) r(g, X + hx - 1, Y + 8, hw + 2, 13, armD); }
     if (o.hs === 2) { r(g, X + hx - 2, Y + 10, 4, 17, hair); if (dir !== 2) r(g, X + hx + hw - 2, Y + 10, 4, 17, hair); else r(g, X + hx, Y + 10, 5, 16, hairD); if (dir === 1) r(g, X + hx - 1, Y + 8, hw + 2, 19, hair); }
   }
   // arma
@@ -135,9 +188,10 @@ export function heroSprites(o: Look): Cv[][] {
   const S = [0, 1, 2, 3, 4, 5].map(f => heroFrame(0, f, o)), N = [0, 1, 2, 3, 4, 5].map(f => heroFrame(1, f, o)), E = [0, 1, 2, 3, 4, 5].map(f => heroFrame(2, f, o));
   s = [S, N, E, E.map(flip)]; heroCache.set(k, s); return s;
 }
-export function lookFromGear(hc: string, hs: number, e: { helm?: string | null; armor?: string | null; pants?: string | null; boots?: string | null; weapon?: string | null }): Look {
+export function lookFromGear(cls: string | undefined, hc: string, hs: number, e: { helm?: string | null; armor?: string | null; pants?: string | null; boots?: string | null; weapon?: string | null }): Look {
   const t = (k?: string | null) => k ? ITEMS[k]?.tint ?? null : null;
-  return { hc, hs, helm: t(e.helm), armor: t(e.armor), pants: t(e.pants), boots: t(e.boots), weapon: e.weapon ?? null };
+  const c = classOf(cls);
+  return { cls: c.key, hc, hs, helm: t(e.helm), armor: t(e.armor) ?? c.color, pants: t(e.pants) ?? c.pants, boots: t(e.boots), weapon: e.weapon ?? null };
 }
 
 // ---------- monstros: [quadro][direita/esquerda] ----------
@@ -146,9 +200,11 @@ function slime(f: number) { const c = cv(36, 30), g = ctx(c), h = f ? 10 : 12, w
 function wolf(f: number) { const c = cv(48, 38), g = ctx(c), b = '#8ea3b8', d = '#64788e', l = '#c8d6e3', s = f ? 3 : -3; r(g, 10, 14, 24, 13, b); r(g, 10, 14, 24, 4, l); r(g, 4, 11, 7, 5, b); r(g, 2, 8, 4, 5, l); r(g, 30, 8, 12, 12, b); r(g, 38, 13, 8, 5, l); r(g, 44, 13, 2, 2, '#1d2230'); r(g, 37, 11, 2, 2, '#ff6b4a'); r(g, 31, 3, 4, 7, d); r(g, 37, 3, 3, 6, d); for (const [x, o] of [[11, s], [17, -s], [26, -s], [31, s]]) r(g, x + o, 26, 4, 10, d); return outline(c); }
 function golem(f: number) { const c = cv(56, 62), g = ctx(c), a = '#7f9fbe', b = '#a8c6e0', d = '#567595', s = f ? 2 : 0; r(g, 14 + s, 44, 12, 15, d); r(g, 31 - s, 44, 12, 15, d); r(g, 12, 18, 33, 28, a); r(g, 12, 18, 33, 5, b); r(g, 3, 20 + s, 10, 27, d); r(g, 44, 20 - s, 10, 27, d); r(g, 19, 6, 19, 14, a); r(g, 19, 6, 19, 3, b); r(g, 23, 12, 4, 3, '#7ff0ff'); r(g, 31, 12, 4, 3, '#7ff0ff'); for (const [x, y, h] of [[16, 11, 8], [41, 12, 7], [8, 13, 8], [48, 14, 7], [28, 25, 11]]) { r(g, x, y, 4, h, '#d6f5ff'); r(g, x + 1, y - 3, 2, 3, '#effcff'); } return outline(c); }
 function boss(f: number) { const c = cv(92, 110), g = ctx(c), s = f ? 2 : 0, rb = '#3f5fa8', rb2 = '#6186d4'; for (let y = 0; y < 62; y++) { const w = 14 + y * .42 | 0; r(g, 46 - w, 42 + y, w * 2, 1, y % 9 < 2 ? rb2 : rb); } r(g, 33, 42, 26, 16, '#88a8e2'); r(g, 37, 22, 18, 20, '#dfeaf7'); r(g, 41, 30, 3, 4, '#2552c9'); r(g, 49, 30, 3, 4, '#2552c9'); r(g, 34, 20, 24, 8, '#f3f8ff'); r(g, 33, 24, 5, 42, '#f3f8ff'); r(g, 54, 24, 5, 42, '#f3f8ff'); for (const [x, h] of [[35, 8], [41, 12], [46, 16], [51, 12], [56, 8]]) r(g, x, 20 - h, 3, h, '#7fe3ff'); r(g, 75, 12, 4, 92, '#a4e8ff'); ell(g, 77, 12 + s, 8, 8, '#d9f7ff'); r(g, 67, 56, 10, 4, '#88a8e2'); for (const [x, y] of [[12, 30 + s], [8, 62 - s], [20, 14 - s]]) { r(g, x, y, 5, 10, '#7fe3ff'); r(g, x + 1, y, 1, 10, '#fff'); } return outline(c); }
+function wisp(f: number) { const c = cv(28, 30), g = ctx(c), s = f ? 2 : 0; ell(g, 14, 13 + s, 8, 8, '#8dffb0'); ell(g, 12, 11 + s, 4, 4, '#e6ffe9'); r(g, 3, 8 - s, 6, 8, '#c6ffd6'); r(g, 19, 8 - s, 6, 8, '#c6ffd6'); r(g, 11, 13 + s, 2, 3, '#14432a'); r(g, 16, 13 + s, 2, 3, '#14432a'); return outline(c); }
+function shadeMob(f: number) { const c = cv(36, 46), g = ctx(c), s = f ? 2 : 0; for (let y = 0; y < 26; y++) { const w = 8 + y * .35 | 0; r(g, 18 - w, 16 + y, w * 2, 1, y % 6 < 2 ? '#3a2358' : '#2a1743'); } for (let x = 0; x < 5; x++) r(g, 7 + x * 5, 40 + (x % 2) * 3 + s, 4, 3, '#2a1743'); ell(g, 18, 12, 9, 9, '#2a1743'); r(g, 13, 11, 3, 3, '#e06bff'); r(g, 20, 11, 3, 3, '#e06bff'); return outline(c, [60, 20, 100, 255]); }
 export function mobSprites(key: string): Cv[][] {
   let s = mobCache.get(key); if (s) return s;
-  const f = key === 'slime' ? slime : key === 'wolf' ? wolf : key === 'golem' ? golem : boss;
+  const f = key === 'wisp' ? wisp : key === 'shade' ? shadeMob : key === 'slime' ? slime : key === 'wolf' ? wolf : key === 'golem' ? golem : boss;
   s = [0, 1].map(i => { const c = f(i); return [c, flip(c)]; }); mobCache.set(key, s); return s;
 }
 export const mobSize = (k: string) => (MOBS[k]?.boss ? 96 : k === 'golem' ? 56 : k === 'wolf' ? 36 : 28);
@@ -161,6 +217,8 @@ export function icon(key: string | null): Cv {
   if (!d) { for (const [x, y] of [[6, 14], [14, 14], [10, 8]]) { ell(g, x + 4, y + 4, 5, 4, '#e0b03a'); ell(g, x + 3, y + 3, 3, 2, '#ffe28a'); } }
   else if (d.kind === 'potion') { const col = d.heal ? '#e0425a' : '#3f7fe8'; r(g, 11, 3, 6, 3, '#a87b4a'); r(g, 11, 6, 6, 4, '#cfe3ee'); ell(g, 14, 17, 8, 7, col); ell(g, 11, 14, 3, 2, '#fff'); }
   else if (d.kind === 'material') { for (const [x, y, h] of [[8, 9, 13], [13, 5, 18], [18, 11, 11]]) { r(g, x, y, 4, h, '#8fe2ff'); r(g, x, y, 1, h, '#fff'); } }
+  else if (d.wtype === 'staff') { r(g, 13, 8, 3, 18, '#7a5533'); ell(g, 14, 7, 5, 5, d.blade!); r(g, 12, 5, 2, 2, '#fff'); }
+  else if (d.wtype === 'bow') { for (let i = 0; i < 22; i++) r(g, 8 + Math.round(Math.sin(i / 21 * Math.PI) * 11), 3 + i, 2, 1, d.blade!); r(g, 8, 3, 1, 22, '#e8e6df'); }
   else if (d.kind === 'weapon') { const b = d.blade!; if (key === 'iron_axe') { r(g, 13, 5, 3, 20, '#6b4a2b'); ell(g, 18, 9, 6, 6, b); ell(g, 19, 8, 3, 3, '#dbe4ee'); } else { r(g, 13, 3, 4, 16, b); r(g, 13, 3, 1, 16, '#fff'); r(g, 9, 19, 12, 2, '#c9a44c'); r(g, 13, 21, 4, 5, '#6b4a2b'); } }
   else if (d.kind === 'helm') { ell(g, 14, 14, 10, 9, t); r(g, 4, 14, 20, 8, t); r(g, 8, 16, 12, 5, '#1d2230'); ell(g, 11, 9, 4, 2, l); }
   else if (d.kind === 'armor') { r(g, 7, 6, 14, 18, t); r(g, 3, 6, 5, 11, dk); r(g, 20, 6, 5, 11, dk); r(g, 10, 4, 8, 4, '#1d2230'); r(g, 13, 10, 2, 11, l); }

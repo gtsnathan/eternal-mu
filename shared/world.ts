@@ -1,5 +1,5 @@
 export const T = { GRASS: 0, STONE: 1, WATER: 2, SNOW: 3, ICE: 4, DIRT: 5 };
-export interface Obj { k: 'tree' | 'pine' | 'rock' | 'house' | 'wall' | 'fountain'; x: number; y: number; w: number; h: number; v: number }
+export interface Obj { k: 'tree' | 'pine' | 'rock' | 'house' | 'wall' | 'fountain' | 'lamp' | 'stall' | 'barrel'; x: number; y: number; w: number; h: number; v: number }
 export interface Portal { x: number; y: number; to: string; tx: number; ty: number; label: string }
 export interface Npc { id: string; name: string; x: number; y: number; shop?: string; line: string; look: number }
 export interface Zone { mob: string; n: number; cx: number; cy: number; r: number }
@@ -29,6 +29,9 @@ function valoria() {
   for (let y = 18; y <= 21; y++) m.solid[y * 50 + 49] = 1;
   ([[17, 13, 5, 3, 0], [28, 13, 6, 3, 1], [17, 24, 5, 3, 1], [29, 24, 5, 3, 2], [8, 8, 5, 3, 2], [40, 28, 6, 3, 0]] as number[][]).forEach(([x, y, w, h, v]) => { mark(x - 1, y - 2, x + w, y + h); obj(m, 'house', x, y, w, h, v); });
   obj(m, 'fountain', 24, 19, 3, 3);
+  ([[23, 16], [27, 16], [22, 24], [28, 24], [36, 17], [36, 22], [43, 17], [43, 22]] as number[][]).forEach(([x, y]) => obj(m, 'lamp', x, y));
+  obj(m, 'stall', 18, 20, 3, 2, 0); obj(m, 'stall', 31, 20, 3, 2, 1);
+  ([[23, 13], [24, 13], [27, 26], [16, 23]] as number[][]).forEach(([x, y], i) => obj(m, 'barrel', x, y, 1, 1, i % 2));
   rect(m, 24, 19, 26, 21, T.WATER);
   rect(m, 4, 30, 11, 35, T.WATER); mark(3, 29, 12, 36); for (let y = 30; y <= 35; y++) for (let x = 4; x <= 11; x++) m.solid[y * 50 + x] = 1;
   for (let y = 1; y < 39; y++) for (let x = 1; x < 49; x++) if (!free[y * 50 + x] && !m.solid[y * 50 + x] && r() < .13) obj(m, 'tree', x, y, 1, 1, r() * 3 | 0);

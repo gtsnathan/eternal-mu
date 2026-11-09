@@ -8,15 +8,21 @@ export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots'];
 export const SLOT_NAMES: Record<Slot, string> = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', pants: 'Calças', boots: 'Botas' };
 export interface ItemDef {
   key: string; name: string; kind: Slot | 'potion' | 'material'; lvl: number; price: number;
-  dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string;
+  dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: 'sword' | 'axe' | 'staff' | 'bow';
 }
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'pot_hp', name: 'Poção de Vida', kind: 'potion', lvl: 1, price: 20, heal: 80 },
   { key: 'pot_mp', name: 'Poção de Mana', kind: 'potion', lvl: 1, price: 20, mana: 50 },
   { key: 'shard', name: 'Estilhaço Gélido', kind: 'material', lvl: 1, price: 15 },
-  { key: 'short_sword', name: 'Espada Curta', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#cfd8e3' },
-  { key: 'iron_axe', name: 'Machado de Ferro', kind: 'weapon', lvl: 8, price: 700, dmg: 20, blade: '#9aa7b5' },
-  { key: 'frost_blade', name: 'Lâmina Boreal', kind: 'weapon', lvl: 18, price: 3500, dmg: 42, blade: '#7fe3ff' },
+  { key: 'short_sword', name: 'Espada Curta', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#cfd8e3', wtype: 'sword' },
+  { key: 'app_staff', name: 'Cajado do Aprendiz', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#b58cff', wtype: 'staff' },
+  { key: 'oak_bow', name: 'Arco de Carvalho', kind: 'weapon', lvl: 1, price: 120, dmg: 7, blade: '#8a5a2f', wtype: 'bow' },
+  { key: 'rune_staff', name: 'Cajado Rúnico', kind: 'weapon', lvl: 8, price: 700, dmg: 22, blade: '#63e0c8', wtype: 'staff' },
+  { key: 'long_bow', name: 'Arco Longo', kind: 'weapon', lvl: 8, price: 700, dmg: 18, blade: '#6d7f3a', wtype: 'bow' },
+  { key: 'glacier_staff', name: 'Cetro Glacial', kind: 'weapon', lvl: 18, price: 3500, dmg: 44, blade: '#7fe3ff', wtype: 'staff' },
+  { key: 'aurora_bow', name: 'Arco da Aurora', kind: 'weapon', lvl: 18, price: 3500, dmg: 38, blade: '#a4f5d0', wtype: 'bow' },
+  { key: 'iron_axe', name: 'Machado de Ferro', kind: 'weapon', lvl: 8, price: 700, dmg: 20, blade: '#9aa7b5', wtype: 'axe' },
+  { key: 'frost_blade', name: 'Lâmina Boreal', kind: 'weapon', lvl: 18, price: 3500, dmg: 42, blade: '#7fe3ff', wtype: 'sword' },
   { key: 'leather_helm', name: 'Capuz de Couro', kind: 'helm', lvl: 1, price: 90, def: 3, tint: '#7a5230' },
   { key: 'leather_armor', name: 'Gibão de Couro', kind: 'armor', lvl: 1, price: 150, def: 6, hp: 20, tint: '#7a5230' },
   { key: 'leather_pants', name: 'Calças de Couro', kind: 'pants', lvl: 1, price: 100, def: 4, tint: '#5e4026' },
@@ -31,7 +37,7 @@ export const RARITY = [
 ];
 export const SHOPS: Record<string, string[]> = {
   alquimista: ['pot_hp', 'pot_mp'],
-  ferreira: ['short_sword', 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
+  ferreira: ['short_sword', 'app_staff', 'oak_bow', 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
 };
 export interface MobDef {
   key: string; name: string; level: number; hp: number; dmg: number; def: number; speed: number; detect: number; leash: number;
@@ -41,31 +47,47 @@ export const MOBS: Record<string, MobDef> = {
   slime: { key: 'slime', name: 'Gelatina Gélida', level: 2, hp: 45, dmg: 9, def: 1, speed: 1.6, detect: 4.5, leash: 10, attackMs: 1500, xp: 20, respawnMs: 8000, gold: [3, 9],
     drops: [['pot_hp', .12], ['shard', .2], ['leather_boots', .03], ['leather_helm', .03]] },
   wolf: { key: 'wolf', name: 'Lobo Geladiço', level: 7, hp: 150, dmg: 22, def: 7, speed: 3.4, detect: 7, leash: 13, attackMs: 1200, xp: 70, respawnMs: 12000, gold: [10, 25],
-    drops: [['pot_hp', .15], ['pot_mp', .1], ['shard', .25], ['leather_armor', .04], ['leather_pants', .04], ['iron_axe', .02]] },
+    drops: [['pot_hp', .15], ['pot_mp', .1], ['shard', .25], ['leather_armor', .04], ['leather_pants', .04], ['iron_axe', .02], ['rune_staff', .02], ['long_bow', .02]] },
   golem: { key: 'golem', name: 'Colosso de Granizo', level: 14, hp: 520, dmg: 44, def: 20, speed: 1.9, detect: 6, leash: 12, attackMs: 1800, xp: 240, respawnMs: 20000, gold: [35, 80],
-    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02]] },
+    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rune_staff', .05], ['long_bow', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02]] },
   boss: { key: 'boss', name: 'Hrímara, a Soberana', level: 24, hp: 6500, dmg: 70, def: 32, speed: 2.7, detect: 9, leash: 16, attackMs: 1400, xp: 4000, respawnMs: 600000, gold: [800, 1500], boss: true,
-    drops: [['frost_blade', .5], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1]] },
+    drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1]] },
 };
-export const SKILLS = [
-  { n: 1, name: 'Golpe Circular', mana: 12, cd: 4000, mult: 1.3, radius: 2.4 },
-  { n: 2, name: 'Investida', mana: 18, cd: 7000, mult: 2, range: 7 },
-];
-export const BASE_STATS = { str: 28, agi: 20, vit: 25, ene: 10 };
-export const CLASS_NAME = 'Dark Warrior';
+export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse';
+export interface Skill { n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number }
+export interface ClassDef {
+  key: string; name: string; desc: string; base: { str: number; agi: number; vit: number; ene: number }; range: number; magic: boolean;
+  atk: [number, number, number]; color: string; pants: string; weapon: string; weapons: string[]; bolt: string | null; skills: Skill[];
+}
+// atk = pesos de Força, Agilidade e Energia no ataque
+export const CLASSES: Record<string, ClassDef> = {
+  dark_warrior: { key: 'dark_warrior', name: 'Dark Warrior', desc: 'Corpo a corpo, muita resistência.', base: { str: 28, agi: 20, vit: 25, ene: 10 }, range: 1.7, magic: false, atk: [.333, 0, 0], color: '#4d5873', pants: '#373b52', weapon: 'short_sword', weapons: ['sword', 'axe'], bolt: null, skills: [
+    { n: 1, name: 'Golpe Circular', kind: 'spin', mana: 12, cd: 4000, mult: 1.3, radius: 2.4 }, { n: 2, name: 'Investida', kind: 'dash', mana: 18, cd: 7000, mult: 2, range: 7 }] },
+  arcane_wizard: { key: 'arcane_wizard', name: 'Arcane Wizard', desc: 'Magia à distância, dano alto, pouca defesa.', base: { str: 18, agi: 18, vit: 15, ene: 32 }, range: 7, magic: true, atk: [0, 0, .4], color: '#3f4fa8', pants: '#2d3778', weapon: 'app_staff', weapons: ['staff'], bolt: '#8fd0ff', skills: [
+    { n: 1, name: 'Bola de Fogo', kind: 'splash', mana: 10, cd: 3000, mult: 1.5, radius: 2, range: 8, color: '#ff8a3c' }, { n: 2, name: 'Tempestade de Raios', kind: 'multi', mana: 20, cd: 8000, mult: 1.4, radius: 4, count: 5, range: 8, color: '#f6f07a' }] },
+  mystic_archer: { key: 'mystic_archer', name: 'Mystic Archer', desc: 'Arqueira veloz com um espírito auxiliar.', base: { str: 20, agi: 34, vit: 18, ene: 12 }, range: 8, magic: false, atk: [0, .34, 0], color: '#4f7a45', pants: '#3a5a33', weapon: 'oak_bow', weapons: ['bow'], bolt: '#f1e3b8', skills: [
+    { n: 1, name: 'Flecha Tripla', kind: 'multi', mana: 10, cd: 4000, mult: 1.2, radius: 3.5, count: 3, range: 9, color: '#f1e3b8' }, { n: 2, name: 'Espírito da Mata', kind: 'summon', mana: 22, cd: 12000, mult: .7, pet: 'wisp', ms: 30000 }] },
+  spell_knight: { key: 'spell_knight', name: 'Spell Knight', desc: 'Híbrido de força e energia.', base: { str: 26, agi: 24, vit: 20, ene: 22 }, range: 1.7, magic: false, atk: [.2, 0, .18], color: '#7a3f5e', pants: '#552c43', weapon: 'short_sword', weapons: ['sword', 'axe'], bolt: null, skills: [
+    { n: 1, name: 'Lâmina Arcana', kind: 'splash', mana: 12, cd: 3500, mult: 1.6, radius: 2, range: 2.6, color: '#d58cff' }, { n: 2, name: 'Explosão Rúnica', kind: 'spin', mana: 20, cd: 7000, mult: 1.7, radius: 3 }] },
+  shadow_summoner: { key: 'shadow_summoner', name: 'Shadow Summoner', desc: 'Invoca sombras e amaldiçoa inimigos.', base: { str: 16, agi: 20, vit: 18, ene: 34 }, range: 6.5, magic: true, atk: [0, 0, .34], color: '#4a2f6b', pants: '#33214a', weapon: 'app_staff', weapons: ['staff'], bolt: '#b06bff', skills: [
+    { n: 1, name: 'Invocar Sombra', kind: 'summon', mana: 22, cd: 10000, mult: 1, pet: 'shade', ms: 35000 }, { n: 2, name: 'Maldição', kind: 'curse', mana: 14, cd: 6000, mult: .8, range: 8, ms: 8000, color: '#b06bff' }] },
+};
+export const classOf = (name?: string): ClassDef => Object.values(CLASSES).find(c => c.name === name) ?? CLASSES.dark_warrior;
+export const canWield = (c: ClassDef, d: ItemDef) => d.kind !== 'weapon' || c.weapons.includes(d.wtype!);
 export const HAIR_COLORS = ['#2b2230', '#7a4a22', '#d9b24a', '#b23a2e', '#d8dde6', '#3f6fb5'];
 export const HAIR_STYLES = ['Curto', 'Espetado', 'Longo'];
 export const xpToNext = (lv: number) => Math.floor(50 * Math.pow(lv, 1.9) + 40);
 
-export interface Base { level: number; str: number; agi: number; vit: number; ene: number }
+export interface Base { cls?: string; level: number; str: number; agi: number; vit: number; ene: number }
 export interface ItemInst { id: string; key: string; qty: number; slot: number; equip: string | null; rarity: number }
+export const sellPrice = (i: ItemInst) => Math.floor(ITEMS[i.key].price * .3 * (1 + i.rarity * .5));
 export const itemStat = (i: ItemInst, f: 'dmg' | 'def' | 'hp') => Math.round((ITEMS[i.key][f] ?? 0) * RARITY[i.rarity].mult);
 export function derive(b: Base, items: ItemInst[]) {
-  let dmg = 0, def = 0, hp = 0;
+  let dmg = 0, def = 0, hp = 0; const w = classOf(b.cls).atk;
   for (const i of items) if (i.equip) { dmg += itemStat(i, 'dmg'); def += itemStat(i, 'def'); hp += itemStat(i, 'hp'); }
   return {
     maxHp: Math.floor(70 + b.level * 3 + b.vit * 3 + hp), maxMp: Math.floor(20 + b.level + b.ene * 2),
-    atk: Math.floor(b.str / 3 + dmg), def: Math.floor(b.agi / 5 + def),
+    atk: Math.floor(b.str * w[0] + b.agi * w[1] + b.ene * w[2] + dmg), def: Math.floor(b.agi / 5 + def),
     attackMs: Math.max(350, 1000 - b.agi * 3), crit: Math.min(.4, .05 + b.agi * .0007), dodge: Math.min(.3, b.agi * .0008),
   };
 }

@@ -76,29 +76,71 @@ label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
 .touch #atk{display:flex}
 .touch .menu{top:auto;bottom:170px;flex-direction:row;right:12px}
 #atk{display:none}
+.slot.sel{border-color:var(--gold);outline:2px solid var(--gold)}.touch .slot.sel{outline:0;border-color:var(--ln)}
+.slot b{font-weight:400;display:block;padding:9px 2px 0}
+#party{display:none;position:absolute;left:calc(8px + env(safe-area-inset-left));top:calc(88px + env(safe-area-inset-top));width:190px;background:#120f1fcc;border:2px solid var(--ln);padding:5px;font-size:11px}
+.pm{position:relative;margin-bottom:4px}.pm button{float:right;padding:0 5px;font-size:11px}.pm .bar{height:6px}#party .row button{padding:3px;font-size:10px}
+#pmenu{display:none;position:fixed;background:var(--pn);border:2px solid var(--gold);padding:6px;z-index:6}#pmname{color:var(--gold);margin-bottom:4px}
+#invite{display:none;position:absolute;left:50%;top:18%;transform:translateX(-50%);width:min(320px,90vw);background:var(--pn);border:3px solid var(--gold);padding:12px;text-align:center;z-index:7}#invite .row{margin-top:10px}
+#log .pt{color:#b9f59a}
+.clsb.on{border-color:var(--gold);outline:2px solid var(--gold)}.touch #party{top:88px;width:150px}
 @media (orientation:portrait){.touch #chat{top:112px;left:8px;transform:none;width:min(300px,70vw)}.touch .frame{width:190px}.touch .mini{width:120px}.touch #minimap{width:108px;height:83px}.touch .menu{bottom:232px}}
-@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:96px;flex-direction:column;right:8px}.touch #bar{grid-template-columns:repeat(3,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
+@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:124px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(3,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
+
+/* tema */
+.shoph{margin:12px 0 2px;color:var(--gold);font-size:13px}#shopl{max-height:62dvh;overflow:auto}
+body{background:#0a0814}
+.screen{background:linear-gradient(180deg,#120c28cc,#0a0814d9)}
+h1{font-size:44px;letter-spacing:5px;background:linear-gradient(180deg,#fff2c0,#e9c46a 48%,#a8671e);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(3px 3px 0 #2a1508) drop-shadow(0 0 16px #e9a63a66)}
+.card,.win,#invite{background:linear-gradient(180deg,#2a2342,#191428);border:2px solid #8a6a32;box-shadow:0 0 0 2px #0a0814,inset 0 0 0 2px #3f3458,0 18px 50px #000a}
+.win h3{border-bottom:1px solid #8a6a32;padding-bottom:7px}
+button{background:linear-gradient(180deg,#352c52,#241d3a);border-color:#5b4e7c}
+button.main{background:linear-gradient(180deg,#c28f35,#80591b);border-color:#f0d27a;text-shadow:1px 1px 0 #4a2d08}
+.frame,.mini,#party{background:linear-gradient(180deg,#221b38ee,#151024ee);border:2px solid #8a6a32;box-shadow:0 0 0 1px #0a0814,inset 0 0 0 1px #3f3458}
+.bar{border:1px solid #5b4e7c;height:12px}.hp i{background:linear-gradient(180deg,#ff7a85,#d7384f 45%,#8e1c33)}.mp i{background:linear-gradient(180deg,#8cc0ff,#3f7fe8 45%,#1f4aa8)}
+#xp{height:7px;background:#0a0814;border-top:1px solid #8a6a32}#xp i{background:linear-gradient(180deg,#ffe9a0,#d9a93a)}
+.menu button{background:linear-gradient(180deg,#352c52ee,#1e1830ee);border-color:#8a6a32;font-size:11px}
+#log{background:linear-gradient(0deg,#0f0b1c99,#0f0b1c33);border-radius:0}
+.chatline input{background:#0f0b1cbb;border-color:#5b4e7c}
+#bar{bottom:16px;align-items:flex-end;background:linear-gradient(180deg,#2a2342ee,#151024f2);border:2px solid #8a6a32;padding:6px 8px;box-shadow:0 0 0 1px #0a0814}
+.slot{background:radial-gradient(circle at 50% 35%,#352c52,#14101f);border-color:#5b4e7c}
+.slot u{z-index:2;text-shadow:1px 1px 0 #000;font-size:10px}.slot s{z-index:2;font-size:11px}
+.slot b{padding:0;display:block;line-height:0}.slot b canvas,.slot .pi{width:44px;height:44px;image-rendering:pixelated;display:block}
+.slot .pi{width:36px;height:36px}
+.orb{display:none;position:relative;width:74px;height:74px;border-radius:50%;background:#0a0814;border:3px solid #b98f42;box-shadow:0 0 0 2px #0a0814,inset 0 0 12px #000;overflow:hidden;margin:0 2px}
+body:not(.touch) .orb{display:block}
+.orb i{position:absolute;left:0;right:0;bottom:0;height:100%;transition:height .15s}.orb.hp i{background:radial-gradient(circle at 35% 25%,#ff8d97,#c92742 55%,#6e1026)}.orb.mp i{background:radial-gradient(circle at 35% 25%,#99ccff,#2f6fdd 55%,#143a8c)}
+.orb::after{content:"";position:absolute;left:14px;top:7px;width:26px;height:14px;border-radius:50%;background:#ffffff4d}
+.orb em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 13px ui-monospace,monospace;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;z-index:2}
+body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;align-items:center}body:not(.touch) #party{top:82px}
+.touch #bar{background:none;border:0;box-shadow:none;padding:0}
+.cell{background:radial-gradient(circle at 50% 35%,#272038,#120e1e);border-color:#40365a}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="hud">
   <div class="frame p"><canvas id="portrait" width="40" height="48"></canvas><div class="col"><div class="nm" id="nm"></div><div class="bar hp"><i id="hpb"></i><em id="hpt"></em></div><div class="bar mp"><i id="mpb"></i><em id="mpt"></em></div></div></div>
+  <div id="party" class="p"></div>
+  <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv">Convidar para grupo</button></div>
+  <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
   <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button id="auto">Auto</button><button id="exit">Sair</button></div>
   <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
   <div id="stick" class="p"><i></i></div>
   <div id="bar" class="p">
-    <button class="slot" id="atk"><u></u>Atacar</button>
-    <button class="slot" data-sk="1"><u>1</u>Golpe<br>Circular<div class="cd"></div></button>
-    <button class="slot" data-sk="2"><u>2</u>Investida<div class="cd"></div></button>
+    <div class="orb hp" id="orbh"><i></i><em></em></div>
+    <button class="slot" id="atk"></button>
+    <button class="slot" data-sk="1"><u>1</u><b></b><div class="cd"></div></button>
+    <button class="slot" data-sk="2"><u>2</u><b></b><div class="cd"></div></button>
     <button class="slot" data-pot="pot_hp"><u>Q</u>Vida<s></s></button>
     <button class="slot" data-pot="pot_mp"><u>E</u>Mana<s></s></button>
+    <div class="orb mp" id="orbm"><i></i><em></em></div>
   </div>
   <div class="win p" id="w-inv"><h3>Inventário <button data-close>×</button></h3><div class="gear" id="gear"></div><div class="grid" id="grid"></div><div class="info" id="invinfo">Moedas: 0</div></div>
   <div class="win p" id="w-char"><h3>Personagem <button data-close>×</button></h3><div id="charp"></div></div>
   <div class="win p" id="w-map"><h3 id="mapt">Mapa <button data-close>×</button></h3><canvas id="bigmap" style="width:100%;image-rendering:pixelated;display:block"></canvas></div>
-  <div class="win p" id="w-shop"><h3><span id="shopt"></span> <button data-close>×</button></h3><div id="shopl"></div><div class="info">Para vender, abra a Bolsa com a loja aberta e toque no item.</div></div>
+  <div class="win p" id="w-shop"><h3><span id="shopt"></span> <button data-close>×</button></h3><div id="shopl"></div></div>
 </div>
 <div id="xp"><i></i></div>
 <div id="root"></div>

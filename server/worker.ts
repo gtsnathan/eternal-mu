@@ -1,4 +1,4 @@
-import { BASE_STATS, CONFIG, derive, HAIR_COLORS, HAIR_STYLES, CLASS_NAME } from '../shared/data';
+import { CLASSES, CONFIG, derive, HAIR_COLORS, HAIR_STYLES } from '../shared/data';
 import { getMap, MAP_IDS } from '../shared/world';
 export { MapRoom } from './room';
 
@@ -82,19 +82,20 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   if (path === '/api/logout-all' && req.method === 'POST') { await db.prepare('DELETE FROM sessions WHERE account_id=?').bind(me.id).run(); return json({ ok: 1 }, 200, clear); }
   if (path === '/api/me') return json({ username: me.username, characters: await listChars(env, me.id) });
   if (path === '/api/characters' && req.method === 'POST') {
-    const { name, hairColor, hairStyle } = body;
+    const { name, hairColor, hairStyle } = body, cdef = Object.hasOwn(CLASSES, body.cls ?? 'dark_warrior') ? CLASSES[body.cls ?? 'dark_warrior'] : null;
+    if (!cdef) return err('Classe inválida.');
     if (typeof name !== 'string' || !/^[\p{L}0-9_]{3,14}$/u.test(name)) return err('Nome: 3 a 14 letras ou números.');
     if (!Number.isInteger(hairColor) || hairColor < 0 || hairColor >= HAIR_COLORS.length || !Number.isInteger(hairStyle) || hairStyle < 0 || hairStyle >= HAIR_STYLES.length) return err('Aparência inválida.');
-    const b = BASE_STATS, m = getMap('valoria'), st = derive({ level: 1, ...b }, []);
+    const b = cdef.base, m = getMap('valoria'), st = derive({ cls: cdef.name, level: 1, ...b }, []);
     let row: { id: number } | null;
     try {
       row = await db.prepare(`INSERT INTO characters(account_id,name,class,hair_color,hair_style,str,agi,vit,ene,hp,mp,gold,map,x,y,created_at)
         SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM characters WHERE account_id=?)<5 RETURNING id`)
-        .bind(me.id, name, CLASS_NAME, hairColor, hairStyle, b.str, b.agi, b.vit, b.ene, st.maxHp, st.maxMp, CONFIG.startGold, 'valoria', m.spawn.x, m.spawn.y, Date.now(), me.id).first();
+        .bind(me.id, name, cdef.name, hairColor, hairStyle, b.str, b.agi, b.vit, b.ene, st.maxHp, st.maxMp, CONFIG.startGold, 'valoria', m.spawn.x, m.spawn.y, Date.now(), me.id).first();
     } catch { return err('Esse nome já está em uso.', 409); }
     if (!row) return err('Limite de 5 personagens atingido.');
     const ins = 'INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity) VALUES(?,?,?,?,?,?,0)';
-    await db.batch([db.prepare(ins).bind(crypto.randomUUID(), row.id, 'short_sword', 1, -1, 'weapon'), db.prepare(ins).bind(crypto.randomUUID(), row.id, 'pot_hp', 5, 0, null), db.prepare(ins).bind(crypto.randomUUID(), row.id, 'pot_mp', 3, 1, null)]);
+    await db.batch([db.prepare(ins).bind(crypto.randomUUID(), row.id, cdef.weapon, 1, -1, 'weapon'), db.prepare(ins).bind(crypto.randomUUID(), row.id, 'pot_hp', 5, 0, null), db.prepare(ins).bind(crypto.randomUUID(), row.id, 'pot_mp', 3, 1, null)]);
     return json({ characters: await listChars(env, me.id) });
   }
   const del = path.match(/^\/api\/characters\/(\d+)\/delete$/);
