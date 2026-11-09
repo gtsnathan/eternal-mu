@@ -46,7 +46,7 @@ label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
 #minimap{width:146px;height:112px;display:block;image-rendering:pixelated}
 .minfo{display:flex;flex-wrap:wrap;justify-content:space-between;font-size:11px;margin-top:3px;gap:4px;white-space:nowrap}#conn{color:#79e08a}
 .menu{position:absolute;right:calc(8px + env(safe-area-inset-right));top:172px;display:flex;flex-direction:column;gap:4px}
-.menu button{padding:5px 8px;font-size:12px;background:#1e1930dd;min-width:42px}
+.menu button{white-space:nowrap;padding:5px 8px;font-size:12px;background:#1e1930dd;min-width:42px}
 #chat{position:absolute;left:8px;bottom:14px;width:min(380px,44vw)}
 #log{height:128px;overflow-y:auto;background:#120f1fa8;padding:6px;font-size:12px;word-break:break-word;pointer-events:none}
 #log div{text-shadow:1px 1px 0 #000}#log .sys{color:var(--gold)}#log .g{color:#9fd6ff}#log b{color:#c9f0b0}
@@ -85,9 +85,20 @@ label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
 #log .pt{color:#b9f59a}
 .clsb.on{border-color:var(--gold);outline:2px solid var(--gold)}.touch #party{top:88px;width:150px}
 @media (orientation:portrait){.touch #chat{top:112px;left:8px;transform:none;width:min(300px,70vw)}.touch .frame{width:190px}.touch .mini{width:120px}.touch #minimap{width:108px;height:83px}.touch .menu{bottom:232px}}
-@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:124px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(4,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
+@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:104px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(4,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
 
+/* moderno */
+html,body{font-family:system-ui,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.frame,.mini,#party,.card,.win,#invite,#bar,#tframe,#pmenu,#lootc{border-radius:12px;border:1px solid #c9a24f88!important;background:linear-gradient(180deg,#221b38e0,#120e1fe6)!important;box-shadow:0 10px 30px #0009,inset 0 1px 0 #ffffff1f!important}
+button{border-radius:8px;border-width:1px!important;transition:filter .12s,border-color .12s}button:hover{filter:brightness(1.2)}
+.bar{border-radius:6px;border:0;background:#05040acc}.bar i{border-radius:6px}.slot,.cell{border-radius:8px;border-width:1px!important}.slot{box-shadow:inset 0 1px 0 #ffffff24}
+input[type=text],input[type=password],input[type=email]{border-radius:8px;border-width:1px}
+#portrait{border-radius:8px}#minimap{border-radius:8px}#log{border-radius:10px;font-size:13px}.chatline input,.chatline button{border-radius:8px}
+.menu button{border-radius:8px;font-weight:600}#xp{background:#07050ee6}#xpt{font-family:inherit;font-weight:700}
+h1{font-weight:800;letter-spacing:4px}.shopitem canvas{width:28px;height:28px}.orb em{font-family:inherit}
+.touch #bar{background:none!important;border:0!important;box-shadow:none!important}
 /* tema */
+#toast{position:absolute;left:50%;top:64px;transform:translateX(-50%);padding:7px 18px;border-radius:999px;background:#120e1fdd;border:1px solid #c9a24f88;color:#ffe08a;font-weight:700;font-size:14px;white-space:nowrap;opacity:0;pointer-events:none;z-index:6}#toast.show{animation:toast 4s ease forwards}@keyframes toast{0%{opacity:0;transform:translate(-50%,-10px)}8%{opacity:1;transform:translate(-50%,0)}85%{opacity:1}100%{opacity:0}}.touch #toast{top:150px;font-size:12px}
 #xp{height:15px!important;z-index:3}#xp i{position:absolute;left:0;top:0;bottom:0}#xpt{position:absolute;inset:0;text-align:center;font:700 10px/14px ui-monospace,monospace;color:#fff;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;pointer-events:none}
 #hud #bar{margin-bottom:6px}.touch #stick{margin-bottom:6px}
 #tframe{display:none;position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(280px,60vw);background:linear-gradient(180deg,#2a1420ee,#150c14ee);border:2px solid #8a6a32;padding:5px 9px;text-align:center;font-size:12px;font-weight:700;color:#ffd9c9;box-shadow:0 0 0 1px #0a0814}.touch #tframe{top:calc(100px + env(safe-area-inset-top));width:220px}
@@ -128,13 +139,14 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
 <body>
 <canvas id="game"></canvas>
 <div id="hud">
-  <div class="frame p"><canvas id="portrait" width="40" height="48"></canvas><div class="col"><div class="nm" id="nm"></div><div class="bar hp"><i id="hpb"></i><em id="hpt"></em></div><div class="bar mp"><i id="mpb"></i><em id="mpt"></em></div></div></div>
+  <div class="frame p"><canvas id="portrait" width="80" height="96"></canvas><div class="col"><div class="nm" id="nm"></div><div class="bar hp"><i id="hpb"></i><em id="hpt"></em></div><div class="bar mp"><i id="mpb"></i><em id="mpt"></em></div></div></div>
   <div id="tframe"><div id="tfn"></div><div class="bar hp"><i id="tfb"></i></div></div>
+  <div id="toast"></div>
   <div id="party" class="p"></div>
   <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
-  <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button id="auto">Auto</button><button id="exit">Sair</button></div>
+  <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button id="auto">Auto</button><button id="gfx">Gráf: Auto</button><button id="exit">Sair</button></div>
   <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
   <div id="stick" class="p"><i></i></div>
   <div id="bar" class="p">

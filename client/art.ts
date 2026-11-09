@@ -3,11 +3,34 @@ import { classOf, ITEMS, MOBS, SETS } from '../shared/data';
 import { T, Obj } from '../shared/world';
 
 export type Cv = HTMLCanvasElement;
+// ---------- alta resolução: cada sprite ganha o dobro de pixels, com bordas suavizadas ----------
+const hdCache = new WeakMap<Cv, Cv>();
+export const noHd = new WeakSet<Cv>();
+export const gfx = { hd: true };
+export function hdOf(c: Cv): Cv {
+  let h = hdCache.get(c); if (h) return h;
+  const W = c.width, H = c.height; h = document.createElement('canvas'); h.width = W * 2; h.height = H * 2;
+  const s = new Uint32Array(c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, W, H).data.buffer), gh = h.getContext('2d')!, img = gh.createImageData(W * 2, H * 2), d = new Uint32Array(img.data.buffer);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const P = s[y * W + x], A = y ? s[(y - 1) * W + x] : P, D = y < H - 1 ? s[(y + 1) * W + x] : P, L = x ? s[y * W + x - 1] : P, R = x < W - 1 ? s[y * W + x + 1] : P, i = y * 2 * (W * 2) + x * 2, j = i + W * 2;
+    d[i] = L === A && L !== D && A !== R ? A : P; d[i + 1] = A === R && A !== L && R !== D ? R : P; d[j] = D === L && D !== R && L !== A ? L : P; d[j + 1] = R === D && R !== A && D !== L ? D : P;
+  }
+  gh.putImageData(img, 0, 0); hdCache.set(c, h); noHd.add(h); return h;
+}
+/** Faz o contexto desenhar a versão em alta resolução mantendo as coordenadas originais. */
+export function hdCtx(x: CanvasRenderingContext2D) {
+  const o = x.drawImage.bind(x) as (...a: any[]) => void;
+  (x as any).drawImage = (im: any, ...a: number[]) => {
+    if (!gfx.hd || !(im instanceof HTMLCanvasElement) || noHd.has(im) || im.width > 700) return o(im, ...a);
+    const h = hdOf(im);
+    if (a.length === 2) o(h, a[0], a[1], im.width, im.height); else if (a.length === 4) o(h, ...a); else o(h, a[0] * 2, a[1] * 2, a[2] * 2, a[3] * 2, a[4], a[5], a[6], a[7]);
+  };
+}
 const glowCache = new Map<string, Cv>();
 /** Luz radial suave; desenhar com composição 'lighter' (ou normal, para sombras). */
 export function glowSprite(col: string): Cv {
   let c = glowCache.get(col); if (c) return c; c = cv(64, 64); const g = c.getContext('2d')!, n = parseInt(col.slice(1), 16), rgb = `${n >> 16},${n >> 8 & 255},${n & 255}`, gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(.45, `rgba(${rgb},.42)`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowCache.set(col, c); return c;
+  gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(.45, `rgba(${rgb},.42)`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowCache.set(col, c); noHd.add(c); return c;
 }
 type G = CanvasRenderingContext2D;
 export function cv(w: number, h: number): Cv { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }

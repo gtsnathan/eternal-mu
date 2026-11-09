@@ -1,4 +1,4 @@
-import { CLASSES, CONFIG, derive, HAIR_COLORS, HAIR_STYLES } from '../shared/data';
+import { cleanSettings, DEFAULT_SETTINGS, JEWELS, MOBS, CLASSES, CONFIG, derive, HAIR_COLORS, HAIR_STYLES } from '../shared/data';
 import { getMap, MAP_IDS } from '../shared/world';
 export { MapRoom } from './room';
 
@@ -32,7 +32,7 @@ async function limit(db: D1Database, key: string, max: number, windowMs: number)
 function readCookie(req: Request) { const m = (req.headers.get('cookie') ?? '').match(new RegExp(`(?:^|; )${COOKIE}=([a-f0-9]{64})`)); return m?.[1] ?? null; }
 async function auth(req: Request, env: Env) {
   const t = readCookie(req); if (!t) return null;
-  const r = await env.DB.prepare('SELECT a.id, a.username FROM sessions s JOIN accounts a ON a.id=s.account_id WHERE s.token_hash=? AND s.expires_at>?').bind(await sha(t), Date.now()).first<{ id: number; username: string }>();
+  const r = await env.DB.prepare('SELECT a.id, a.username, a.is_admin FROM sessions s JOIN accounts a ON a.id=s.account_id WHERE s.token_hash=? AND s.expires_at>? AND a.banned=0').bind(await sha(t), Date.now()).first<{ id: number; username: string; is_admin: number }>();
   return r;
 }
 async function startSession(req: Request, env: Env, accountId: number, username: string) {
@@ -47,6 +47,44 @@ const ip = (req: Request) => req.headers.get('cf-connecting-ip') ?? 'local';
 async function listChars(env: Env, acc: number) {
   const { results } = await env.DB.prepare('SELECT id,name,class,hair_color,hair_style,level,map FROM characters WHERE account_id=? ORDER BY id').bind(acc).all();
   return results;
+}
+const toRooms = (env: Env, path: string, body: unknown) => Promise.all(MAP_IDS.map(id => env.MAP_ROOM.get(env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room' + path, { method: 'POST', body: JSON.stringify(body) })).then(r => r.json() as Promise<any>).catch(() => ({}))));
+async function admin(req: Request, env: Env, path: string, b: any, adminId: number): Promise<Response> {
+  const db = env.DB, audit = (action: string, detail: unknown) => db.prepare('INSERT INTO admin_log(admin_id,action,detail,at) VALUES(?,?,?,?)').bind(adminId, action, JSON.stringify(detail).slice(0, 2000), Date.now()).run();
+  if (path === '/api/admin/config' && req.method === 'GET') {
+    const r = await db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>();
+    return json({ settings: r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, defaults: { mobs: Object.values(MOBS).map(m => ({ key: m.key, name: m.name, level: m.level, hp: m.hp, dmg: m.dmg, def: m.def, xp: m.xp, respawnMs: m.respawnMs })), jewels: Object.fromEntries(Object.entries(JEWELS).map(([k, v]) => [k, v.chance])) } });
+  }
+  if (req.method !== 'POST' && !(path === '/api/admin/players' || path === '/api/admin/log')) return err('Método inválido.', 405);
+  if (path === '/api/admin/config') {
+    const s = cleanSettings(b.settings), now = Date.now();
+    await db.prepare("INSERT INTO settings(key,value,updated_at) VALUES('game',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at").bind(JSON.stringify(s), now).run();
+    await audit('config', s); await toRooms(env, '/settings', s); return json({ settings: s });
+  }
+  if (path === '/api/admin/players') {
+    const q = (new URL(req.url).searchParams.get('q') ?? '').replace(/[%_\\]/g, '').slice(0, 30);
+    const { results } = await db.prepare(`SELECT c.id,c.name,c.class,c.level,c.gold,c.map,a.id AS account_id,a.username,a.banned,a.is_admin FROM characters c JOIN accounts a ON a.id=c.account_id WHERE c.name LIKE ? OR a.username LIKE ? ORDER BY c.level DESC LIMIT 50`).bind(`%${q}%`, `%${q}%`).all();
+    return json({ players: results });
+  }
+  if (path === '/api/admin/player') {
+    const id = Number(b.charId), gold = Number(b.gold), level = Number(b.level);
+    if (!Number.isInteger(id) || !Number.isInteger(gold) || gold < 0 || gold > 2e9 || !Number.isInteger(level) || level < 1 || level > CONFIG.maxLevel) return err('Valores inválidos.');
+    const done = await toRooms(env, '/player', { char: id, gold, level });
+    if (!done.some(d => d.handled)) await db.prepare('UPDATE characters SET gold=?, level=? WHERE id=?').bind(gold, level, id).run();
+    await audit('player', { id, gold, level }); return json({ ok: 1 });
+  }
+  if (path === '/api/admin/ban') {
+    const id = Number(b.accountId), ban = b.banned === true ? 1 : 0; if (!Number.isInteger(id)) return err('Conta inválida.');
+    if (id === adminId) return err('Você não pode suspender a própria conta.');
+    await db.batch([db.prepare('UPDATE accounts SET banned=? WHERE id=?').bind(ban, id), ...(ban ? [db.prepare('DELETE FROM sessions WHERE account_id=?').bind(id)] : [])]);
+    if (ban) await toRooms(env, '/kick', { account: id }); await audit(ban ? 'ban' : 'unban', { id }); return json({ ok: 1 });
+  }
+  if (path === '/api/admin/announce') {
+    const m = String(b.m ?? '').trim().slice(0, 200); if (!m) return err('Escreva a mensagem.');
+    await toRooms(env, '/news', { m }); await audit('announce', { m }); return json({ ok: 1 });
+  }
+  if (path === '/api/admin/log') { const { results } = await db.prepare('SELECT l.action,l.detail,l.at,a.username FROM admin_log l JOIN accounts a ON a.id=l.admin_id ORDER BY l.id DESC LIMIT 100').all(); return json({ log: results }); }
+  return err('Não encontrado.', 404);
 }
 async function api(req: Request, env: Env, path: string): Promise<Response> {
   if (req.method === 'POST' && (!sameOrigin(req) || !(req.headers.get('content-type') ?? '').includes('application/json'))) return err('Requisição inválida.', 403);
@@ -70,9 +108,10 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
     const { username, password } = body;
     if (typeof username !== 'string' || typeof password !== 'string' || password.length > 128) return err('Usuário ou senha incorretos.', 401);
     if (!await limit(db, `login:${ip(req)}:${username.toLowerCase().slice(0, 32)}`, 10, 9e5)) return err('Muitas tentativas. Aguarde 15 minutos.', 429);
-    const a = await db.prepare('SELECT id,username,pass_hash FROM accounts WHERE username=?').bind(username).first<{ id: number; username: string; pass_hash: string }>();
+    const a = await db.prepare('SELECT id,username,pass_hash,banned FROM accounts WHERE username=?').bind(username).first<{ id: number; username: string; pass_hash: string; banned: number }>();
     const ok = await verifyPw(password, a?.pass_hash ?? DUMMY);
     if (!a || !ok) return err('Usuário ou senha incorretos.', 401);
+    if (a.banned) return err('Esta conta foi suspensa.', 403);
     return startSession(req, env, a.id, a.username);
   }
   const me = await auth(req, env);
@@ -80,7 +119,8 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   const clear = { 'set-cookie': `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` };
   if (path === '/api/logout' && req.method === 'POST') { await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await sha(readCookie(req)!)).run(); return json({ ok: 1 }, 200, clear); }
   if (path === '/api/logout-all' && req.method === 'POST') { await db.prepare('DELETE FROM sessions WHERE account_id=?').bind(me.id).run(); return json({ ok: 1 }, 200, clear); }
-  if (path === '/api/me') return json({ username: me.username, characters: await listChars(env, me.id) });
+  if (path.startsWith('/api/admin/')) return me.is_admin === 1 ? admin(req, env, path, body, me.id) : err('Acesso restrito a administradores.', 403);
+  if (path === '/api/me') return json({ admin: me.is_admin === 1, username: me.username, characters: await listChars(env, me.id) });
   if (path === '/api/characters' && req.method === 'POST') {
     const { name, hairColor, hairStyle } = body, cdef = Object.hasOwn(CLASSES, body.cls ?? 'dark_warrior') ? CLASSES[body.cls ?? 'dark_warrior'] : null;
     if (!cdef) return err('Classe inválida.');

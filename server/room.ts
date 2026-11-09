@@ -1,9 +1,9 @@
-import { SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
+import { cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
 import { blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  eid: number; charId: number; ws: CfWebSocket; name: string; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -23,20 +23,25 @@ export class MapRoom {
   private summons = new Map<number, Summon>(); private partyMode = new Map<number, number>(); private partyQ: Promise<unknown> = Promise.resolve();
   private byChar = new Map<number, Player>(); private saves = new Map<number, Promise<unknown>>();
   private nextId = 1; private timer: ReturnType<typeof setInterval> | null = null; private last = 0; private lastSave = 0;
-  private tickN = 0;
+  private cfg: Settings = DEFAULT_SETTINGS; private cfgReady: Promise<void> | null = null; private defs: Record<string, MobDef> = structuredClone(MOBS); private jewelRules = structuredClone(JEWELS);
+  private tickN = 0; private announced = new Map<number, number>();
   private fx: (Pt & Record<string, unknown>)[] = [];
 
   constructor(_state: unknown, env: Env) { this.env = env; }
 
   async fetch(req: Request): Promise<Response> {
     const route = new URL(req.url).pathname;
+    if (route === '/settings') { this.applyCfg(cleanSettings(await req.json())); this.cfgReady = Promise.resolve(); return new Response('{}'); }
+    if (route === '/news') { const b: any = await req.json(); this.send_all(JSON.stringify({ t: 'news', m: b.m })); return new Response('{}'); }
+    if (route === '/kick') { const b: any = await req.json(); for (const p of [...this.players.values()]) if (p.accountId === b.account) { this.send(p, { t: 'kick', m: 'Conta suspensa.' }); try { p.ws.close(4000, 'banned'); } catch { /* */ } this.leave(p); } return new Response('{}'); }
+    if (route === '/player') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); if (b.level > p.level) p.points += (b.level - p.level) * CONFIG.pointsPerLevel; p.level = b.level; p.xp = 0; p.gold = b.gold; p.dirty = true; p.meDirty = true; for (const o of this.players.values()) o.known.delete(p.eid); await this.flush(p); return new Response('{"handled":true}'); }
     if (route === '/global') { this.send_all(await req.text()); return new Response('ok'); }
     if (route === '/partychat') { const b: any = await req.json(); this.partySend(b.pid, b.msg); return new Response('ok'); }
     if (route === '/party') { await this.reloadParty(((await req.json()) as any).pid); return new Response('ok'); }
     this.init(req.headers.get('x-map')!);
     const pair = new WebSocketPair(); const client = pair[0], server = pair[1];
     server.accept();
-    this.join(server, Number(req.headers.get('x-char'))).catch(e => { console.error('join', e); try { server.close(1011, 'erro'); } catch { /* já fechado */ } });
+    this.join(server, Number(req.headers.get('x-char')), new URL(req.url).searchParams.has('login')).catch(e => { console.error('join', e); try { server.close(1011, 'erro'); } catch { /* já fechado */ } });
     return new Response(null, { status: 101, webSocket: client } as ResponseInit);
   }
 
@@ -44,10 +49,22 @@ export class MapRoom {
     if (this.map) return;
     this.mapId = id; this.map = getMap(id);
     for (const z of this.map.zones) for (let i = 0; i < z.n; i++) {
-      const p = this.randomFree(z.cx, z.cy, z.r), def = MOBS[z.mob];
+      const p = this.randomFree(z.cx, z.cy, z.r), def = this.defs[z.mob];
       const m: Mob = { eid: this.nextId++, def, x: p.x, y: p.y, hx: p.x, hy: p.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, curseUntil: 0, slowUntil: 0, hitBy: new Map() };
       this.mobs.set(m.eid, m);
     }
+  }
+  private async loadCfg() { try { const r = await this.env.DB.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>(); if (r) this.applyCfg(cleanSettings(JSON.parse(r.value))); } catch (e) { console.error('cfg', e); } }
+  private applyCfg(c: Settings) {
+    this.cfg = c;
+    for (const k of Object.keys(MOBS)) {
+      const base = MOBS[k], o = c.mobs[k] ?? {}, d = this.defs[k], old = d.hp;
+      d.hp = Math.max(1, Math.round((o.hp ?? base.hp) * c.hp)); d.dmg = Math.round((o.dmg ?? base.dmg) * c.dmg); d.def = o.def ?? base.def; d.xp = Math.round((o.xp ?? base.xp) * c.xp); d.respawnMs = Math.round((o.respawnMs ?? base.respawnMs) * c.respawn);
+      d.gold = [Math.round(base.gold[0] * c.gold), Math.round(base.gold[1] * c.gold)]; d.drops = base.drops.map(([i, ch]) => [i, Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop))]);
+      if (old !== d.hp) for (const m of this.mobs.values()) if (m.def === d && m.hp > 0) m.hp = Math.max(1, Math.ceil(m.hp / old * d.hp));
+    }
+    for (const k of Object.keys(JEWELS)) this.jewelRules[k].chance = c.jewels[k] ?? JEWELS[k].chance;
+    const jc = Object.fromEntries(Object.entries(this.jewelRules).map(([k, v]) => [k, v.chance])); for (const p of this.players.values()) this.send(p, { t: 'jc', jc });
   }
   private randomFree(cx: number, cy: number, r: number): Pt {
     for (let i = 0; i < 60; i++) { const a = Math.random() * 6.283, d = Math.random() * r, p = { x: Math.floor(cx + Math.cos(a) * d) + .5, y: Math.floor(cy + Math.sin(a) * d) + .5 }; if (!blocked(this.map, p.x, p.y)) return p; }
@@ -55,11 +72,13 @@ export class MapRoom {
   }
 
   // ---------- conexão ----------
-  private async join(ws: CfWebSocket, charId: number) {
+  private async join(ws: CfWebSocket, charId: number, login = false) {
     let open = true, player: Player | null = null; const early: string[] = [];
     ws.addEventListener('close', () => { open = false; if (player) this.leave(player); });
     ws.addEventListener('error', () => { open = false; if (player) this.leave(player); });
     ws.addEventListener('message', e => { if (player) this.onMessage(player, e.data); else if (early.length < 5) early.push(e.data); });
+    await (this.cfgReady ??= this.loadCfg());
+    if (!open) return;
     const old = this.byChar.get(charId);
     if (old) { this.send(old, { t: 'kick', m: 'Este personagem entrou em outro dispositivo.' }); try { old.ws.close(4000, 'replaced'); } catch { /* já fechado */ } this.leave(old); }
     await this.saves.get(charId);
@@ -70,14 +89,19 @@ export class MapRoom {
     if (this.byChar.has(charId)) { ws.close(4000, 'replaced'); return; }
     const items: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity, plus: i.plus ?? 0 }));
     const p: Player = {
-      eid: this.nextId++, charId, ws, name: c.name, buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
+      accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], budget: 40, lastChat: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     if (blocked(this.map, p.x, p.y)) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; }
     if (p.hp <= 0) p.hp = this.stats(p).maxHp;
     player = p; this.players.set(p.eid, p); this.byChar.set(charId, p);
-    this.send(p, { t: 'w', you: p.eid, map: this.mapId, x: p.x, y: p.y, name: p.name, cls: p.cls, hairColor: p.hairColor, hairStyle: p.hairStyle });
+    this.send(p, { t: 'w', you: p.eid, map: this.mapId, x: p.x, y: p.y, name: p.name, cls: p.cls, hairColor: p.hairColor, hairStyle: p.hairStyle, jc: Object.fromEntries(Object.entries(this.jewelRules).map(([k, v]) => [k, v.chance])) });
     this.sendInv(p); this.sendMe(p);
+    if (login && Date.now() - (this.announced.get(charId) ?? 0) > 60000) { // anuncia só na entrada real, sem repetir em quedas
+      this.announced.set(charId, Date.now()); if (this.announced.size > 2000) this.announced.clear();
+      const msg = JSON.stringify({ t: 'ann', name: p.name, cls: p.cls }); this.send_all(msg);
+      for (const id of MAP_IDS) if (id !== this.mapId) this.stub(id).fetch(new Request('https://room/global', { method: 'POST', body: msg })).catch(() => { });
+    }
     const pm = await db.prepare('SELECT party_id FROM party_members WHERE char_id=?').bind(charId).first<{ party_id: number }>();
     if (pm && !p.gone) { p.partyId = pm.party_id; await this.reloadParty(pm.party_id); }
     for (const m of early) this.onMessage(p, m);
@@ -170,7 +194,7 @@ export class MapRoom {
     const now = Date.now();
     if (typeof m.m !== 'string' || now - p.lastChat < 700) return;
     const txt = m.m.trim().slice(0, 160); if (!txt) return; p.lastChat = now;
-    if (CONFIG.testCommands && /^\/teste(\s|$)/i.test(txt)) return this.testKit(p, txt, now);
+    if (this.cfg.test && /^\/teste(\s|$)/i.test(txt)) return this.testKit(p, txt, now);
     if (m.ch === 'p') {
       if (!p.partyId) return this.sys(p, 'Você não está em um grupo.');
       const msg = JSON.stringify({ t: 'c', ch: 'p', from: p.name, m: txt });
@@ -323,7 +347,7 @@ export class MapRoom {
     for (const x of [a, b]) { this.send(x, { t: 'tr', m: null, msg: 'Troca concluída!' }); this.sendInv(x); }
   }
   private upgrade(p: Player, slot: unknown, id: unknown) {
-    const j = this.invAt(p, slot), rule = j && JEWELS[j.key], it = p.items.find(i => i.id === id); if (!j || !rule || !it || !SLOTS.includes(ITEMS[it.key].kind as Slot)) return;
+    const j = this.invAt(p, slot), rule = j && this.jewelRules[j.key], it = p.items.find(i => i.id === id); if (!j || !rule || !it || !SLOTS.includes(ITEMS[it.key].kind as Slot)) return;
     const cur = it.plus ?? 0; if (cur < rule.min || cur >= rule.max) return this.sys(p, `${ITEMS[j.key].name} serve para itens de +${rule.min} até +${rule.max - 1}.`);
     this.takeOne(p, j); const win = Math.random() < rule.chance, was = cur; it.plus = win ? cur + 1 : Math.max(rule.min, cur - rule.fail); p.dirtyItems.add(it.id); p.dirty = true; p.logs.push([win ? 'upgrade_ok' : 'upgrade_fail', it.id, it.key, it.plus, 0, Date.now()]);
     this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: win ? 1 : 0, v: it.plus }); this.sys(p, win ? `${ITEMS[it.key].name} agora é +${it.plus}!` : `A melhoria falhou: ${ITEMS[it.key].name} ${was === it.plus ? 'manteve' : 'caiu para'} +${it.plus}.`);

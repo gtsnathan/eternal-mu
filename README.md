@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.9
+# Eternal MU · versão 0.11
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -38,10 +38,21 @@ Abra `http://localhost:8787`. Para testar com dois jogadores, use uma janela nor
 | Poções | Q e E | Vida e Mana |
 | Bolsa, personagem, mapa | I, C, M | Bolsa, Perfil, Mapa |
 | Chat | Enter | Campo de chat |
+| Grupo e troca | D com o cursor no jogador | Toque no jogador |
 
 ## Comando de teste
 
 No chat, `/teste` dá o set mais forte da sua classe, joias e 500.000 moedas, e sobe o personagem ao nível exigido. `/teste 1` a `/teste 4` escolhem o set, do mais fraco ao mais forte. **Antes de abrir ao público, mude `testCommands` para `false` em `shared/data.ts`** e rode `npm run build`.
+
+## Painel de administração
+
+Fica em `/admin`. Para tornar uma conta administradora, execute no Console do D1:
+
+```sql
+UPDATE accounts SET is_admin=1 WHERE username='SEU_USUARIO';
+```
+
+O painel edita taxas de XP, moedas, drops e joias, cada monstro, as chances das joias, o comando `/teste`, jogadores e avisos.
 
 ## Onde mexer
 

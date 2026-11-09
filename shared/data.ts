@@ -154,3 +154,19 @@ export function derive(b: Base, items: ItemInst[]) {
   };
 }
 export const rollDamage = (atk: number, def: number, rnd: number) => Math.max(1, Math.round((atk - def * .6) * (.85 + rnd * .3)));
+
+// ---------- configurações editáveis no painel /admin ----------
+export interface MobOverride { hp?: number; dmg?: number; def?: number; xp?: number; respawnMs?: number; drop?: number }
+export interface Settings { xp: number; gold: number; drop: number; jewel: number; hp: number; dmg: number; respawn: number; test: boolean; jewels: Record<string, number>; mobs: Record<string, MobOverride> }
+export const DEFAULT_SETTINGS: Settings = { xp: 1, gold: 1, drop: 1, jewel: 1, hp: 1, dmg: 1, respawn: 1, test: CONFIG.testCommands, jewels: {}, mobs: {} };
+const clampN = (v: unknown, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null; };
+/** Aceita só campos conhecidos e dentro de limites seguros. */
+export function cleanSettings(x: any): Settings {
+  const s: Settings = { ...DEFAULT_SETTINGS, jewels: {}, mobs: {} };
+  for (const k of ['xp', 'gold', 'drop', 'jewel', 'hp', 'dmg', 'respawn'] as const) s[k] = clampN(x?.[k], k === 'respawn' || k === 'hp' ? .05 : 0, 1000) ?? 1;
+  s.test = x?.test === true;
+  for (const k of Object.keys(JEWELS)) { const v = clampN(x?.jewels?.[k], 0, 1); if (v !== null && x?.jewels?.[k] !== '' && x?.jewels?.[k] != null) s.jewels[k] = v; }
+  for (const k of Object.keys(MOBS)) { const o = x?.mobs?.[k]; if (!o || typeof o !== 'object') continue; const r: MobOverride = {}; const lim: Record<keyof MobOverride, [number, number]> = { hp: [1, 1e9], dmg: [0, 1e7], def: [0, 1e6], xp: [0, 1e9], respawnMs: [1000, 864e5], drop: [0, 1000] };
+    for (const f of Object.keys(lim) as (keyof MobOverride)[]) if (o[f] !== '' && o[f] != null) { const v = clampN(o[f], lim[f][0], lim[f][1]); if (v !== null) r[f] = v; } if (Object.keys(r).length) s.mobs[k] = r; }
+  return s;
+}
