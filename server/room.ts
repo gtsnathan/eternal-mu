@@ -432,7 +432,10 @@ export class MapRoom {
       else if (this.give(p, d.key, 1, d.rarity, 'loot')) { p.dirty = true; this.drops.delete(d.eid); this.sendInv(p); this.sys(p, `Obteve: ${ITEMS[d.key].name}`); }
       else if (now - p.lastInvFull > 5000) { p.lastInvFull = now; this.sys(p, 'Inventário cheio.'); }
     }
-    for (const g of this.map.portals) if (Math.hypot(p.x - g.x, p.y - g.y) < .9) { this.travel(p, g.to, g.tx, g.ty); return; }
+    for (const g of this.map.portals) if (Math.hypot(p.x - g.x, p.y - g.y) < .9) {
+      if (g.lvl && p.level < g.lvl) { if (now - p.lastInvFull > 3000) { p.lastInvFull = now; this.sys(p, `Este portal exige nível ${g.lvl}.`); } continue; }
+      this.travel(p, g.to, g.tx, g.ty); return;
+    }
     if (p.meDirty) this.sendMe(p);
   }
   private nearestPlayer(m: Mob, r: number) { let best: Player | null = null, bd = r; for (const p of this.players.values()) { if (p.deadUntil) continue; const d = dist(m, p); if (d <= bd) { bd = d; best = p; } } return best; }
@@ -454,22 +457,22 @@ export class MapRoom {
     if (!t || t.deadUntil) { t = this.nearestPlayer(m, def.detect) ?? undefined; if (!t) { m.state = 'back'; m.nextThink = 0; return; } m.target = t.eid; }
     if (Math.hypot(m.x - m.hx, m.y - m.hy) > def.leash) { m.state = 'back'; m.target = 0; m.nextThink = 0; return; }
     if (def.boss) this.bossLogic(m, now);
-    const d = dist(m, t), reach = def.boss ? 2.2 : 1.4;
+    const d = dist(m, t), reach = def.reach ?? (def.boss ? 2.2 : 1.4);
     if (d > reach) {
       if (now >= m.nextThink) { m.nextThink = now + 500; m.path = findPath(this.map, m.x, m.y, t.x, t.y, 500); }
       this.follow(m, def.speed * dt);
     } else if (now >= m.nextAtk) {
-      m.nextAtk = now + def.attackMs; this.fx.push({ k: 'bite', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y });
+      m.nextAtk = now + def.attackMs; this.fx.push(def.bolt ? { k: 'bolt', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y, b: def.bolt } : { k: 'bite', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y });
       this.hurt(t, def.dmg * (m.phase === 2 ? 1.35 : 1) * (now < m.curseUntil ? .7 : 1), now);
     }
   }
   private bossLogic(m: Mob, now: number) {
-    if (m.phase === 1 && m.hp < m.def.hp / 2) { m.phase = 2; m.nextNova = now + 800; for (const o of this.players.values()) this.sys(o, 'Hrímara entra em fúria!'); }
+    if (m.phase === 1 && m.hp < m.def.hp / 2) { m.phase = 2; m.nextNova = now + 800; for (const o of this.players.values()) this.sys(o, `${m.def.name} entra em fúria!`); }
     if (!m.nextNova) m.nextNova = now + 4000;
     if (now < m.nextNova) return;
     m.nextNova = now + (m.phase === 2 ? 5000 : 8000);
     const at = { x: m.x, y: m.y }, r = 5, delay = 1300;
-    this.fx.push({ k: 'nova', x: at.x, y: at.y, r, d: delay });
+    this.fx.push({ k: 'nova', x: at.x, y: at.y, r, d: delay, b: m.def.nova });
     setTimeout(() => { const n = Date.now(); for (const p of this.players.values()) if (dist(p, at) <= r) this.hurt(p, m.def.dmg * 1.5, n); }, delay);
   }
   private snapshot(p: Player) {

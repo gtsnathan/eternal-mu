@@ -152,7 +152,7 @@ function effect(f: any) {
     case 'die': burst(f.x, f.y - .3, 26, '#d8f4ff', 5); beep(110, 260); break;
     case 'lvl': for (let i = 0; i < 44; i++) parts.push({ x: f.x + (Math.random() - .5), y: f.y, vx: 0, vy: -3 - Math.random() * 3, life: 0, max: .9, c: '#ffe08a', s: 3 }); break;
     case 'heal': burst(f.x, f.y - .4, 10, '#7dffa1', 2); beep(520, 120, 'sine', .05); break;
-    case 'nova': rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: f.d / 1000, c: '#7fe3ff', tele: true }); beep(90, 900, 'sawtooth', .05); setTimeout(() => { if (running) { rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: .4, c: '#d9f7ff' }); burst(f.x, f.y, 70, '#bdf0ff', 12); beep(70, 400, 'square', .07); } }, f.d); break;
+    case 'nova': rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: f.d / 1000, c: f.b ?? '#7fe3ff', tele: true }); beep(90, 900, 'sawtooth', .05); setTimeout(() => { if (running) { rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: .4, c: f.b ?? '#d9f7ff' }); burst(f.x, f.y, 70, f.b ?? '#bdf0ff', 12); beep(70, 400, 'square', .07); } }, f.d); break;
   }
 }
 function updateHud() {
@@ -202,8 +202,8 @@ function renderShop() {
   for (const i of bag) { const r = document.createElement('div'); r.className = 'shopitem'; r.dataset.sell = i.key; const c = cv(28, 28); c.getContext('2d')!.drawImage(icon(i.key), 0, 0); c.style.imageRendering = 'pixelated'; const s = document.createElement('span'); s.textContent = `${ITEMS[i.key].name}${i.qty > 1 ? ` ×${i.qty}` : ''} · ${sellPrice(i)} moedas`; s.style.color = RARITY[i.rarity].color; s.title = itemText(i); const b = document.createElement('button'); b.textContent = 'Vender'; b.onclick = () => { if (i.rarity && !confirm(`Vender ${ITEMS[i.key].name} (${RARITY[i.rarity].name})?`)) return; send({ t: 'se', npc: npc.id, slot: i.slot }); }; r.append(c, s, b); L.appendChild(r); }
 }
 let miniBase: Cv | null = null;
-const TILE_COL = ['#4c8a3f', '#a29a8b', '#2f74b5', '#e4edf6', '#a6d6ee', '#94734b'];
-function bakeMini() { if (!map) return; miniBase = cv(map.w, map.h); const x = miniBase.getContext('2d')!; for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) { const sol = map.solid[j * map.w + i], t = map.tiles[j * map.w + i]; x.fillStyle = sol && t !== T.WATER ? (map.safe ? '#3a5b34' : '#274c48') : TILE_COL[t]; x.fillRect(i, j, 1, 1); } }
+const TILE_COL = ['#4c8a3f', '#a29a8b', '#2f74b5', '#e4edf6', '#a6d6ee', '#94734b', '#e8601c', '#3b3236'];
+function bakeMini() { if (!map) return; miniBase = cv(map.w, map.h); const x = miniBase.getContext('2d')!; for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) { const sol = map.solid[j * map.w + i], t = map.tiles[j * map.w + i]; x.fillStyle = sol && t !== T.WATER && t !== T.LAVA ? (map.safe ? '#3a5b34' : '#274c48') : TILE_COL[t]; x.fillRect(i, j, 1, 1); } }
 function paintMap(c: HTMLCanvasElement, sx: number, sy: number, wv: number, hv: number) {
   if (!map || !miniBase) return; const x = c.getContext('2d')!, k = c.width / wv; x.imageSmoothingEnabled = false; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); x.drawImage(miniBase, sx, sy, wv, hv, 0, 0, c.width, c.height);
   const dot = (px: number, py: number, col: string, s = 3) => { x.fillStyle = col; x.fillRect((px - sx) * k - s / 2, (py - sy) * k - s / 2, s, s); };
@@ -323,10 +323,10 @@ function frame(ts: number) {
   if (holding && ts > holdAt) { holdAt = ts + 200; const w = toWorld(curX, curY); target = 0; pendingNpc = null; send({ t: 'g', x: w.x, y: w.y }); }
   const x0 = Math.max(0, Math.floor(-ox / 32)), y0 = Math.max(0, Math.floor(-oy / 32)), x1 = Math.min(map.w - 1, Math.ceil((-ox + vw) / 32)), y1 = Math.min(map.h - 1, Math.ceil((-oy + vh) / 32));
   const wf = Math.floor(ts / 260) % 4;
-  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const t = map.tiles[j * map.w + i], v = (i * 7 + j * 13) % 4; g.drawImage(tile(t, v, t === T.WATER ? wf : 0), i * 32, j * 32);
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const t = map.tiles[j * map.w + i], v = (i * 7 + j * 13) % 4; g.drawImage(tile(t, v, t === T.WATER || t === T.LAVA ? wf : 0), i * 32, j * 32);
     const P = tilePrio(t), nb = (a: number, b: number, side: number) => { if (a < 0 || b < 0 || a >= map!.w || b >= map!.h) return; const nt = map!.tiles[b * map!.w + a]; if (tilePrio(nt) > P) g.drawImage(edge(nt, side, t === T.WATER), i * 32, j * 32); };
     nb(i, j - 1, 0); nb(i, j + 1, 1); nb(i - 1, j, 2); nb(i + 1, j, 3);
-    if (t !== T.STONE && t !== T.WATER) { const q = (Math.sin(i * .37 + j * .11) + Math.sin(j * .29 - i * .17) + 2) / 4; g.fillStyle = t === T.GRASS ? '#123a1a' : '#6a8fc8'; g.globalAlpha = q * .2; g.fillRect(i * 32, j * 32, 32, 32); g.globalAlpha = 1; }
+    if (t !== T.STONE && t !== T.WATER && t !== T.LAVA) { const q = (Math.sin(i * .37 + j * .11) + Math.sin(j * .29 - i * .17) + 2) / 4; g.fillStyle = t === T.GRASS ? '#123a1a' : t === T.ASH ? '#120609' : '#6a8fc8'; g.globalAlpha = q * .2; g.fillRect(i * 32, j * 32, 32, 32); g.globalAlpha = 1; }
   }
   prints = prints.filter(p => (p.t += dt) < 9); for (const p of prints) { g.fillStyle = `rgba(120,145,185,${.55 * (1 - p.t / 9)})`; g.fillRect(Math.round(p.x * 32) - 2, Math.round(p.y * 32), 4, 3); }
   // marcador e portais
@@ -347,21 +347,23 @@ function frame(ts: number) {
   parts = parts.filter(p => (p.life += dt) < p.max); for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g ?? 0) * dt; g.globalAlpha = 1 - p.life / p.max; g.fillStyle = p.c; g.fillRect(Math.round(p.x * 32), Math.round(p.y * 32 - 8), p.s, p.s); } g.globalAlpha = 1;
   // luz do dia/noite e fontes de luz
   const night = nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
-  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : [226, 236, 255], [122, 130, 188], night); g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : map.id === 'infernal' ? [255, 214, 190] : [226, 236, 255], [122, 130, 188], night); g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   const light = (x: number, y: number, r: number, c: string, al: number) => { g.globalAlpha = Math.min(1, al); g.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
   for (const p of map.portals) light(p.x * 32, p.y * 32 - 26, 96 + Math.sin(ts / 300) * 8, '#8a55ff', .55 + night * .35);
+  if (map.id === 'infernal') for (let j = y0; j <= y1; j += 2) for (let i = x0; i <= x1; i += 2) if (map.tiles[j * map.w + i] === T.LAVA) light(i * 32 + 16, j * 32 + 16, 62 + Math.sin(ts / 300 + i + j) * 5, '#ff5a1c', .32);
   for (const o of map.objs) { if (o.x + o.w < x0 - 3 || o.x > x1 + 3 || o.y + o.h < y0 - 3 || o.y > y1 + 3) continue;
+    if (o.k === 'spire' && (o.x + o.y) % 4 === 0) light(o.x * 32 + 16, o.y * 32 - 6, 44, '#ff6a2b', .3);
     if (o.k === 'lamp') light(o.x * 32 + 16, o.y * 32 - 22, 80 + Math.sin(ts / 170 + o.x) * 3, '#ffb45a', .18 + night * .7);
     else if (o.k === 'house' && night > .1) for (const wx of [18, o.w * 32 - 28]) light(o.x * 32 - 4 + wx + 8, (o.y + o.h) * 32 - 39, 34, '#ffc66a', night * .8);
     else if (o.k === 'rock' && (o.x + o.y) % 5 === 0) light(o.x * 32 + 16, o.y * 32 + 2, 52, '#4fc6ff', .3 + night * .4); }
   for (const b of bolts) { const u = b.t / .16; light((b.x + (b.tx - b.x) * u) * 32, (b.y + (b.ty - b.y) * u) * 32 - 18, 34, b.c, .9); }
   for (const r of rings) if (!r.tele) light(r.x * 32, r.y * 32, r.r * 40, r.c, .5 * (1 - r.t / r.max));
-  for (const e of ents.values()) { if (e.k === 'd' && e.info.rarity) light(e.x * 32, e.y * 32, 34, RARITY[e.info.rarity].color, .5); if (e.k === 's') light(e.x * 32, e.y * 32 - 14, 46, e.info.mob === 'wisp' ? '#6dff9c' : '#a04dff', .6); if (e.k === 'm' && MOBS[e.info.mob].boss) light(e.x * 32, e.y * 32 - 50, 130, '#59c8ff', .35 + night * .3); if (e.k === 'p') { const fs = fullSetOf(SET_PIECES.map(p => e.info[p])); if (fs) { const col = SETS[fs].key === 'dragon' ? '#7dffb0' : SETS[fs].trim; light(e.x * 32, e.y * 32 + 2, 46 + Math.sin(ts / 260) * 4, col, .3); if (Math.random() < .25) parts.push({ x: e.x + (Math.random() - .5) * .9, y: e.y + .1, vx: 0, vy: -1.4, life: 0, max: .8, c: col, s: 2 }); } } if (e.id === you && night > .05) light(e.x * 32, e.y * 32 - 18, 130, '#ffdca0', night * .4); }
+  for (const e of ents.values()) { if (e.k === 'd' && e.info.rarity) light(e.x * 32, e.y * 32, 34, RARITY[e.info.rarity].color, .5); if (e.k === 's') light(e.x * 32, e.y * 32 - 14, 46, e.info.mob === 'wisp' ? '#6dff9c' : '#a04dff', .6); if (e.k === 'm' && MOBS[e.info.mob].boss) light(e.x * 32, e.y * 32 - 50, 130, MOBS[e.info.mob].nova ?? '#59c8ff', .35 + night * .3); if (e.k === 'p') { const fs = fullSetOf(SET_PIECES.map(p => e.info[p])); if (fs) { const col = SETS[fs].key === 'dragon' ? '#7dffb0' : SETS[fs].trim; light(e.x * 32, e.y * 32 + 2, 46 + Math.sin(ts / 260) * 4, col, .3); if (Math.random() < .25) parts.push({ x: e.x + (Math.random() - .5) * .9, y: e.y + .1, vx: 0, vy: -1.4, life: 0, max: .8, c: col, s: 2 }); } } if (e.id === you && night > .05) light(e.x * 32, e.y * 32 - 18, 130, '#ffdca0', night * .4); }
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.imageSmoothingEnabled = false;
   // nomes, barras e números
   g.textAlign = 'center';
   for (const n of map.npcs) label(n.x * 32, n.y * 32 - 50, n.name, '#ffe08a');
-  for (const p of map.portals) label(p.x * 32, p.y * 32 - 30, '» ' + p.label, '#d6bcff');
+  for (const p of map.portals) label(p.x * 32, p.y * 32 - 92, `» ${p.label}${p.lvl ? ` (Nv ${p.lvl})` : ''}`, me && p.lvl && me.level < p.lvl ? '#ff9b8e' : '#d6bcff');
   for (const e of ents.values()) {
     if (e.k === 's') continue;
     if (e.k === 'd') { if (e.info.key) label(e.x * 32, e.y * 32 - 22, ITEMS[e.info.key].name, RARITY[e.info.rarity].color); continue; }
@@ -372,10 +374,11 @@ function frame(ts: number) {
   texts = texts.filter(t => (t.t += dt) < .85); for (const t of texts) { const u = t.t / .85; g.font = `bold ${t.big ? 17 : 12}px ui-monospace,monospace`; g.globalAlpha = 1 - u * u; g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = '#0a0814'; const y = t.y * 32 - 38 - u * 26; g.strokeText(t.s, t.x * 32, y); g.fillStyle = t.c; g.fillText(t.s, t.x * 32, y); } g.globalAlpha = 1;
   // clima e iluminação
   g.setTransform(1, 0, 0, 1, 0, 0);
-  if (!map.safe) {
+  if (map.id === 'infernal') { for (const f of snow) { f.y -= f.s * dt * 4; f.x += Math.sin(ts / 700 + f.d) * .0008; if (f.y < 0) f.y = 1; g.globalAlpha = .45 + f.s * 7; g.fillStyle = f.s > .055 ? '#ffd76a' : '#ff7a2b'; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), 2 * Z, 2 * Z); } g.globalAlpha = 1; }
+  else if (!map.safe) {
     g.fillStyle = '#fff'; for (const f of snow) { f.y += f.s * dt * 5; f.x += Math.sin(ts / 900 + f.d) * .0006; if (f.y > 1) f.y = 0; g.globalAlpha = .35 + f.s * 8; const sz = (f.s > .055 ? 3 : 2) * Z; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), sz, sz); } g.globalAlpha = 1;
   }
-  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : map.id === 'infernal' ? '#40080888' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   if (me?.dead) { g.fillStyle = '#50000066'; g.fillRect(0, 0, W, H); }
   document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => { const c = cds[+b.dataset.sk!], el = b.querySelector('.cd') as HTMLElement; el.style.height = c && c.until > ts ? `${(c.until - ts) / c.ms * 100}%` : '0'; });
   if (ts > miniAt) { miniAt = ts + 200; renderMini(); if (party) document.querySelectorAll<HTMLElement>('.pm').forEach(r => { const e = [...ents.values()].find(x => x.k === 'p' && x.info.name === r.dataset.n), b = r.querySelector('i') as HTMLElement; b.style.width = `${e ? e.hp : 0}%`; r.style.opacity = e ? '1' : '.55'; }); }
@@ -388,7 +391,7 @@ function nightFactor() { const p = Date.now() / 1200000 % 1; return Math.max(0, 
 function drawObj(o: GameMap['objs'][number], ts: number) {
   let s = objSprite(o), X = o.x * 32 + s.ox, Y = o.y * 32 + s.oy;
   if (o.k === 'tree' || o.k === 'pine') shadow(o.x * 32 + 16, o.y * 32 + 28, 28, 11);
-  if (o.k === 'rock' || o.k === 'lamp' || o.k === 'barrel') shadow(o.x * 32 + 16, o.y * 32 + 28, 20, 8);
+  if (o.k === 'rock' || o.k === 'lamp' || o.k === 'barrel' || o.k === 'spire' || o.k === 'deadtree') shadow(o.x * 32 + 16, o.y * 32 + 28, 20, 8);
   if (o.k === 'house' || o.k === 'stall') shadow(o.x * 32 + o.w * 16, (o.y + o.h) * 32, o.w * 18, 12);
   if (o.k === 'rock' && (o.x + o.y) % 5 === 0) { g.drawImage(crystalSprite(o.v % 2), o.x * 32 - 2, o.y * 32 - 14); return; }
   if (o.k === 'house' && Math.random() < .05) parts.push({ x: o.x + o.w * .75, y: o.y - .9, vx: .2, vy: -.7, life: 0, max: 1.8, c: '#c9c9d6', s: 4 });

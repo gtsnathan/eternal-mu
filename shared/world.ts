@@ -1,6 +1,6 @@
-export const T = { GRASS: 0, STONE: 1, WATER: 2, SNOW: 3, ICE: 4, DIRT: 5 };
-export interface Obj { k: 'tree' | 'pine' | 'rock' | 'house' | 'wall' | 'fountain' | 'lamp' | 'stall' | 'barrel'; x: number; y: number; w: number; h: number; v: number }
-export interface Portal { x: number; y: number; to: string; tx: number; ty: number; label: string }
+export const T = { GRASS: 0, STONE: 1, WATER: 2, SNOW: 3, ICE: 4, DIRT: 5, LAVA: 6, ASH: 7 };
+export interface Obj { k: 'tree' | 'pine' | 'rock' | 'house' | 'wall' | 'fountain' | 'lamp' | 'stall' | 'barrel' | 'spire' | 'deadtree'; x: number; y: number; w: number; h: number; v: number }
+export interface Portal { x: number; y: number; to: string; tx: number; ty: number; label: string; lvl?: number }
 export interface Npc { id: string; name: string; x: number; y: number; shop?: string; line: string; look: number }
 export interface Zone { mob: string; n: number; cx: number; cy: number; r: number }
 export interface GameMap {
@@ -36,7 +36,8 @@ function valoria() {
   rect(m, 4, 30, 11, 35, T.WATER); mark(3, 29, 12, 36); for (let y = 30; y <= 35; y++) for (let x = 4; x <= 11; x++) m.solid[y * 50 + x] = 1;
   for (let y = 1; y < 39; y++) for (let x = 1; x < 49; x++) if (!free[y * 50 + x] && !m.solid[y * 50 + x] && r() < .13) obj(m, 'tree', x, y, 1, 1, r() * 3 | 0);
   m.spawn = { x: 25.5, y: 25 };
-  m.portals.push({ x: 46.5, y: 19.5, to: 'frostvale', tx: 6, ty: 35, label: 'Frostvale' });
+  m.portals.push({ x: 46.5, y: 19.5, to: 'frostvale', tx: 6, ty: 35, label: 'Frostvale' },
+    { x: 24.5, y: 36.5, to: 'infernal', tx: 7, ty: 40, label: 'Infernal Dominion', lvl: 20 });
   m.npcs.push({ id: 'alquimista', name: 'Odila, Alquimista', x: 21.5, y: 17.5, shop: 'alquimista', line: 'Frascos frescos! Não vá ao gelo sem eles.', look: 1 },
     { id: 'ferreira', name: 'Brunna, Ferreira', x: 30.5, y: 17.5, shop: 'ferreira', line: 'O aço de Valoria nunca falha.', look: 2 },
     { id: 'armeira', name: 'Isaura, Armeira de Sets', x: 25.5, y: 15.5, shop: 'armeira', line: 'Armaduras de lenda, para quem pode pagar.', look: 4 },
@@ -67,9 +68,33 @@ function frostvale() {
     { mob: 'golem', n: 7, cx: 64, cy: 30, r: 7 }, { mob: 'golem', n: 7, cx: 68, cy: 50, r: 7 }, { mob: 'boss', n: 1, cx: 80, cy: 12, r: 1 });
   return m;
 }
+function infernal() {
+  const W = 100, H = 80, m = makeMap('infernal', 'Infernal Dominion', W, H, false, T.ASH), r = rng(6660);
+  const blk = new Uint8Array(W * H), lava = new Uint8Array(W * H), open_ = new Uint8Array(W * H);
+  const clear = (cx: number, cy: number, rad: number) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= rad * rad) open_[y * W + x] = 1; };
+  for (let i = 0; i < 34; i++) { const cx = r() * W, cy = r() * H, a = 3 + r() * 7, b = 2 + r() * 5; for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (((x - cx) / a) ** 2 + ((y - cy) / b) ** 2 < 1) lava[y * W + x] = 1; }
+  for (let i = 0; i < 60; i++) { const cx = r() * W, cy = r() * H, c = 2 + r() * 3; for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if ((x - cx) ** 2 + (y - cy) ** 2 < c * c && r() < .55) blk[y * W + x] = 1; }
+  let cy = 40; for (let x = 2; x < 88; x++) { cy += (r() - .5) * 1.8; cy = Math.max(26, Math.min(56, cy)); clear(x, cy, 2.4); }
+  for (let y = Math.round(cy); y > 14; y--) clear(88, y, 2.4);
+  ([[7, 40, 6], [22, 30, 7], [24, 52, 7], [44, 26, 8], [46, 56, 8], [68, 32, 8], [70, 58, 8], [88, 14, 11]] as number[][]).forEach(([a, b, c]) => clear(a, b, c));
+  ([[22, 30, 44, 26], [24, 52, 46, 56], [44, 26, 68, 32], [46, 56, 70, 58], [22, 30, 24, 52], [68, 32, 70, 58]] as number[][]).forEach(([a, b, c, d]) => { for (let t = 0; t <= 1; t += .01) clear(a + (c - a) * t, b + (d - b) * t, 1.8); });
+  for (let x = 0; x < W; x++) for (const y of [0, H - 1]) obj(m, 'spire', x, y, 1, 1, r() * 3 | 0);
+  for (let y = 1; y < H - 1; y++) for (const x of [0, W - 1]) obj(m, 'spire', x, y, 1, 1, r() * 3 | 0);
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const i = y * W + x; if (open_[i]) { if (r() < .008) obj(m, 'deadtree', x, y, 1, 1, r() * 2 | 0); continue; }
+    if (lava[i]) { m.tiles[i] = T.LAVA; m.solid[i] = 1; } else if (blk[i]) obj(m, r() < .25 ? 'deadtree' : 'spire', x, y, 1, 1, r() * 3 | 0);
+  }
+  m.objs = m.objs.filter(o => !(Math.abs(o.x - 7) < 4 && Math.abs(o.y - 40) < 4) || o.x === 0);
+  for (let y = 36; y < 45; y++) for (let x = 3; x < 11; x++) m.solid[y * W + x] = 0;
+  m.spawn = { x: 7, y: 40 };
+  m.portals.push({ x: 3.5, y: 40.5, to: 'valoria', tx: 24.5, ty: 33, label: 'Valoria' });
+  m.zones.push({ mob: 'imp', n: 12, cx: 22, cy: 30, r: 6 }, { mob: 'imp', n: 11, cx: 24, cy: 52, r: 6 }, { mob: 'hound', n: 10, cx: 44, cy: 26, r: 7 }, { mob: 'hound', n: 10, cx: 46, cy: 56, r: 7 },
+    { mob: 'magma', n: 8, cx: 68, cy: 32, r: 7 }, { mob: 'wyrm', n: 6, cx: 70, cy: 58, r: 7 }, { mob: 'ignarok', n: 1, cx: 88, cy: 14, r: 1 });
+  return m;
+}
 const cache: Record<string, GameMap> = {};
-export const MAP_IDS = ['valoria', 'frostvale'];
-export function getMap(id: string): GameMap { return cache[id] ??= id === 'frostvale' ? frostvale() : valoria(); }
+export const MAP_IDS = ['valoria', 'frostvale', 'infernal'];
+export function getMap(id: string): GameMap { return cache[id] ??= id === 'frostvale' ? frostvale() : id === 'infernal' ? infernal() : valoria(); }
 
 export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return i < 0 || j < 0 || i >= m.w || j >= m.h || m.solid[j * m.w + i] === 1; };
 const R = .3;

@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.4
+# Eternal MU · versão 0.5
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -51,7 +51,9 @@ Abra `http://localhost:8787`. Para testar com dois jogadores, use uma janela nor
 
 Depois de alterar `client/` ou `shared/`, rode `npm run build`.
 
-## Situação da 0.4
+## Situação da 0.5
+
+Novo na 0.5: mapa Infernal Dominion (nível 20+), lava, 4 monstros, o chefe Ignarok e armas flamejantes.
 
 Novo na 0.4: 5 sets com visual próprio (Grifo Celeste, Leão Dourado, Serpente Esmeralda, Fênix Rubra, Dragão Dessecado), bônus por peças, aura de set completo e a Armeira em Valoria.
 
@@ -67,4 +69,4 @@ Diferenças em relação à especificação:
 - Senhas com PBKDF2-SHA256 (100 mil iterações, o máximo do Workers) no lugar de Argon2id.
 - Sprites em 4 direções.
 
-Ainda faltam: verificação de e-mail e recuperação de senha (exigem serviço de e-mail), captcha, os outros 4 mapas, reset e Master Level, melhorias +0 a +15, guildas, amigos, comércio entre jogadores, mercado, baú, quests, eventos, ranking, painel administrativo, música e app Android (Capacitor).
+Ainda faltam: verificação de e-mail e recuperação de senha (exigem serviço de e-mail), captcha, os outros 3 mapas, reset e Master Level, melhorias +0 a +15, guildas, amigos, comércio entre jogadores, mercado, baú, quests, eventos, ranking, painel administrativo, música e app Android (Capacitor).
