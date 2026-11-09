@@ -88,6 +88,8 @@ label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
 @media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:124px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(3,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
 
 /* tema */
+#lootc{display:none;position:absolute;left:50%;bottom:112px;transform:translateX(-50%);background:#2a1f08dd;border:2px solid var(--gold);color:#ffe08a;padding:3px 12px;font-weight:700;font-size:13px;white-space:nowrap}.touch #lootc{bottom:auto;top:calc(8px + 70px)}
+.tcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tcols small{color:var(--gold)}.tgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin-top:6px}#w-trade{width:min(520px,calc(100vw - 16px));z-index:8}
 .sethead{display:flex;gap:10px;align-items:center;margin-top:10px;padding:5px;background:#0f0b1c88;border:1px solid #5b4e7c}.sethead canvas{width:40px;height:56px;image-rendering:pixelated;flex:none}.sethead small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
 .shoph{margin:12px 0 2px;color:var(--gold);font-size:13px}#shopl{max-height:62dvh;overflow:auto}
 body{background:#0a0814}
@@ -123,7 +125,7 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
 <div id="hud">
   <div class="frame p"><canvas id="portrait" width="40" height="48"></canvas><div class="col"><div class="nm" id="nm"></div><div class="bar hp"><i id="hpb"></i><em id="hpt"></em></div><div class="bar mp"><i id="mpb"></i><em id="mpt"></em></div></div></div>
   <div id="party" class="p"></div>
-  <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv">Convidar para grupo</button></div>
+  <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
   <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button id="auto">Auto</button><button id="exit">Sair</button></div>
@@ -141,6 +143,12 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
   <div class="win p" id="w-inv"><h3>Inventário <button data-close>×</button></h3><div class="gear" id="gear"></div><div class="grid" id="grid"></div><div class="info" id="invinfo">Moedas: 0</div></div>
   <div class="win p" id="w-char"><h3>Personagem <button data-close>×</button></h3><div id="charp"></div></div>
   <div class="win p" id="w-map"><h3 id="mapt">Mapa <button data-close>×</button></h3><canvas id="bigmap" style="width:100%;image-rendering:pixelated;display:block"></canvas></div>
+  <div id="lootc" class="p"></div>
+  <div class="win p" id="w-trade"><h3>Troca com <span id="tname"></span></h3>
+    <div class="tcols"><div><b>Sua oferta</b> <small id="tstm"></small><div class="tgrid" id="tmine"></div><label>Moedas</label><input id="tgold" type="text" inputmode="numeric" value="0" autocomplete="off"></div>
+    <div><b>Oferta dele</b> <small id="tstt"></small><div class="tgrid" id="ttheirs"></div><div id="ttg" class="info"></div></div></div>
+    <div class="info">Sua bolsa (toque para oferecer):</div><div class="grid" id="tbag"></div>
+    <div class="row" style="margin-top:10px"><button id="tcancel">Cancelar</button><button class="main" id="tok">Travar oferta</button></div></div>
   <div class="win p" id="w-shop"><h3><span id="shopt"></span> <button data-close>×</button></h3><div id="shopl"></div></div>
 </div>
 <div id="xp"><i></i></div>

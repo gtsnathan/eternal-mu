@@ -3,12 +3,13 @@ import { blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step } from '../s
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  eid: number; charId: number; ws: CfWebSocket; name: string; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  eid: number; charId: number; ws: CfWebSocket; name: string; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
   budget: number; lastChat: number; nextRegen: number; gone: boolean; lastInvFull: number;
 }
+interface Trade { peer: Player; ids: Set<string>; gold: number; st: number }
 interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; hitBy: Map<number, number> }
 interface Summon extends Pt { eid: number; owner: Player; pet: string; atk: number; expires: number; nextAtk: number }
 interface Drop extends Pt { eid: number; key: string | null; gold: number; rarity: number; owner: number; party: number; ownUntil: number; expires: number }
@@ -68,7 +69,7 @@ export class MapRoom {
     if (this.byChar.has(charId)) { ws.close(4000, 'replaced'); return; }
     const items: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity }));
     const p: Player = {
-      eid: this.nextId++, charId, ws, name: c.name, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
+      eid: this.nextId++, charId, ws, name: c.name, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], budget: 40, lastChat: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     if (blocked(this.map, p.x, p.y)) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; }
@@ -82,31 +83,33 @@ export class MapRoom {
     if (!this.timer) { this.last = Date.now(); this.lastSave = this.last; this.timer = setInterval(() => this.safeTick(), CONFIG.tickMs); }
   }
   private leave(p: Player) {
-    if (p.gone) return; p.gone = true;
+    if (p.gone) return; this.cancelTrade(p, 'O outro jogador saiu.'); p.gone = true;
     this.players.delete(p.eid);
     if (this.byChar.get(p.charId) === p) this.byChar.delete(p.charId);
     p.dirty = true; this.flush(p);
     if (!this.players.size && this.timer) { clearInterval(this.timer); this.timer = null; }
   }
-  private flush(p: Player): Promise<unknown> {
-    if (!p.dirty && !p.dirtyItems.size && !p.delItems.size && !p.logs.length) return this.saves.get(p.charId) ?? Promise.resolve();
-    const db = this.env.DB, st: D1PreparedStatement[] = [];
-    const logs = p.logs; p.logs = [];
-    // apaga e libera posições antes de regravar: os índices de slot são únicos
-    for (const id of p.delItems) st.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId));
-    const dirtyIds = [...p.dirtyItems], changed = p.items.filter(i => p.dirtyItems.has(i.id));
-    for (const i of changed) st.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId));
-    for (const i of changed) st.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity) VALUES(?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity));
-    st.push(db.prepare('UPDATE characters SET level=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(p.level, p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), p.charId));
-    for (const l of logs) st.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
-    const delIds = [...p.delItems]; p.delItems.clear(); p.dirtyItems.clear(); p.dirty = false;
-    const prev = this.saves.get(p.charId) ?? Promise.resolve();
-    const run = prev.then(() => db.batch(st)).catch(e => {
-      console.error('save', e); p.dirty = true; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); p.logs.unshift(...logs);
-      if (p.gone) return db.batch(st).catch(e2 => console.error('save retry', e2));
-    });
-    this.saves.set(p.charId, run);
-    run.finally(() => { if (this.saves.get(p.charId) === run) this.saves.delete(p.charId); });
+  private flush(p: Player) { return this.saveBatch([p]); }
+  /** Grava um ou mais personagens em uma única transação (trocas gravam os dois juntos). */
+  private saveBatch(ps: Player[]): Promise<unknown> {
+    const db = this.env.DB, dels: D1PreparedStatement[] = [], ins: D1PreparedStatement[] = [], rest: D1PreparedStatement[] = [], undo: (() => void)[] = [];
+    for (const p of ps) {
+      if (!p.dirty && !p.dirtyItems.size && !p.delItems.size && !p.logs.length) continue;
+      const logs = p.logs; p.logs = [];
+      // apaga antes de regravar: os índices de posição são únicos
+      for (const id of p.delItems) dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId));
+      const dirtyIds = [...p.dirtyItems], changed = p.items.filter(i => p.dirtyItems.has(i.id));
+      for (const i of changed) { dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId)); ins.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity) VALUES(?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity)); }
+      rest.push(db.prepare('UPDATE characters SET level=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(p.level, p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), p.charId));
+      for (const l of logs) rest.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
+      const delIds = [...p.delItems]; p.delItems.clear(); p.dirtyItems.clear(); p.dirty = false;
+      undo.push(() => { p.dirty = true; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); p.logs.unshift(...logs); });
+    }
+    const prev = Promise.all(ps.map(p => this.saves.get(p.charId)));
+    if (!undo.length) return prev;
+    const st = [...dels, ...ins, ...rest];
+    const run: Promise<unknown> = prev.then(() => db.batch(st)).catch(e => { console.error('save', e); if (ps.some(p => p.gone)) return db.batch(st).catch(e2 => { console.error('save retry', e2); undo.forEach(u => u()); }); undo.forEach(u => u()); });
+    for (const p of ps) { this.saves.set(p.charId, run); run.finally(() => { if (this.saves.get(p.charId) === run) this.saves.delete(p.charId); }); }
     return run;
   }
   private send(p: Player, m: unknown) { try { p.ws.send(JSON.stringify(m)); } catch { /* fechando */ } }
@@ -114,7 +117,7 @@ export class MapRoom {
   private stats(p: Player) { return derive(p, p.items); }
   private sendMe(p: Player) {
     const s = this.stats(p); p.meDirty = false;
-    this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, gold: p.gold, dead: p.deadUntil > 0 });
+    this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, gold: p.gold, dead: p.deadUntil > 0, loot: p.streak, lootMs: Math.max(0, p.streakUntil - Date.now()) });
   }
   private sendInv(p: Player) { this.send(p, { t: 'inv', items: p.items }); }
   private sys(p: Player, m: string) { this.send(p, { t: 'sys', m }); }
@@ -130,6 +133,7 @@ export class MapRoom {
     if (m.t === 'c') return this.chat(p, m);
     if (p.deadUntil) return;
     const now = Date.now();
+    if (p.trade && ['b', 'se', 'u', 'e', 'ue'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
     switch (m.t) {
       case 'i': {
         if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
@@ -146,6 +150,11 @@ export class MapRoom {
       case 'st': return this.addStat(p, m.s, m.n);
       case 'b': return this.buy(p, m.npc, m.key, m.qty);
       case 'se': return this.sell(p, m.npc, m.slot);
+      case 'ti': return this.tradeInvite(p, m.id);
+      case 'ta': return this.tradeAccept(p);
+      case 'td': if (p.trade) this.cancelTrade(p, `${p.name} cancelou a troca.`); p.tradeFrom = null; return;
+      case 'to': return this.tradeOffer(p, m.ids, m.gold);
+      case 'tk': return this.tradeConfirm(p);
       case 'pi': return this.invite(p, m.id);
       case 'pa': return this.enqueueParty(() => this.acceptInvite(p));
       case 'pd': p.invite = null; return;
@@ -199,7 +208,7 @@ export class MapRoom {
     const it = this.invAt(p, slot); if (!it) return; const d = ITEMS[it.key];
     if (!SLOTS.includes(d.kind as Slot)) return;
     if (p.level < d.lvl) return this.sys(p, `Requer nível ${d.lvl}.`);
-    if (!canWield(classOf(p.cls), d)) return this.sys(p, 'Sua classe não usa esta arma.');
+    if (!canWield(classOf(p.cls), d)) return this.sys(p, 'Sua classe não usa este item.');
     const cur = p.items.find(i => i.equip === d.kind);
     const was = it.slot; it.equip = d.kind; it.slot = -1; p.dirtyItems.add(it.id);
     if (cur) { cur.equip = null; cur.slot = was; p.dirtyItems.add(cur.id); }
@@ -261,6 +270,51 @@ export class MapRoom {
     p.dirty = true; p.meDirty = true;
     this.send(p, { t: 'cd', n: sk.n, ms: sk.cd });
   }
+  // ---------- trocas ----------
+  private tradeInvite(p: Player, id: unknown) {
+    const t = this.players.get(id as number); if (!t || t === p || p.trade || dist(t, p) > 8) return;
+    if (t.trade) return this.sys(p, `${t.name} já está em uma troca.`);
+    t.tradeFrom = { from: p.eid, until: Date.now() + 30000 }; this.send(t, { t: 'tinv', from: p.name }); this.sys(p, `Pedido de troca enviado a ${t.name}.`);
+  }
+  private tradeAccept(p: Player) {
+    const f = p.tradeFrom; p.tradeFrom = null; if (!f || Date.now() > f.until || p.trade) return;
+    const o = this.players.get(f.from); if (!o || o.trade || o.deadUntil || p.deadUntil || dist(o, p) > 8) return this.sys(p, 'A troca não está mais disponível.');
+    p.trade = { peer: o, ids: new Set(), gold: 0, st: 0 }; o.trade = { peer: p, ids: new Set(), gold: 0, st: 0 }; this.sendTrade(p); this.sendTrade(o);
+  }
+  private sendTrade(p: Player) {
+    const t = p.trade; if (!t) return; const o = t.peer, ot = o.trade!, list = (x: Player, tr: Trade) => x.items.filter(i => tr.ids.has(i.id));
+    this.send(p, { t: 'tr', m: { name: o.name, mine: { items: list(p, t), gold: t.gold, st: t.st }, theirs: { items: list(o, ot), gold: ot.gold, st: ot.st } } });
+  }
+  private cancelTrade(p: Player, msg: string) {
+    const t = p.trade; if (!t) return; const o = t.peer; p.trade = null; o.trade = null;
+    this.send(p, { t: 'tr', m: null, msg }); this.send(o, { t: 'tr', m: null, msg });
+  }
+  private tradeOffer(p: Player, ids: unknown, gold: unknown) {
+    const t = p.trade; if (!t || !Array.isArray(ids) || ids.length > 20 || !Number.isInteger(gold) || (gold as number) < 0 || (gold as number) > p.gold) return;
+    const ok = new Set(p.items.filter(i => !i.equip).map(i => i.id)); if (!ids.every(i => typeof i === 'string' && ok.has(i))) return;
+    t.ids = new Set(ids as string[]); t.gold = gold as number; t.st = 0; t.peer.trade!.st = 0; this.sendTrade(p); this.sendTrade(t.peer);
+  }
+  private tradeConfirm(p: Player) {
+    const t = p.trade; if (!t) return; const ot = t.peer.trade!;
+    if (t.st === 0) t.st = 1; else if (t.st === 1 && ot.st >= 1) t.st = 2; else return;
+    if (t.st === 2 && ot.st === 2) return this.tradeCommit(p);
+    this.sendTrade(p); this.sendTrade(t.peer);
+  }
+  private tradeCommit(a: Player) {
+    const ta = a.trade!, b = ta.peer, tb = b.trade!, now = Date.now();
+    const outA = a.items.filter(i => ta.ids.has(i.id) && !i.equip), outB = b.items.filter(i => tb.ids.has(i.id) && !i.equip);
+    const bagN = (x: Player) => x.items.filter(i => !i.equip).length;
+    if (outA.length !== ta.ids.size || outB.length !== tb.ids.size || ta.gold > a.gold || tb.gold > b.gold) return this.cancelTrade(a, 'Troca inválida: os itens mudaram.');
+    if (bagN(a) - outA.length + outB.length > CONFIG.invSize || bagN(b) - outB.length + outA.length > CONFIG.invSize) return this.cancelTrade(a, 'Sem espaço na bolsa para concluir a troca.');
+    a.items = a.items.filter(i => !ta.ids.has(i.id)); b.items = b.items.filter(i => !tb.ids.has(i.id));
+    const move = (from: Player, to: Player, list: ItemInst[]) => { for (const i of list) { from.dirtyItems.delete(i.id); from.delItems.add(i.id); from.logs.push(['trade_out', i.id, i.key, i.qty, 0, now]); }
+      for (const i of list) { i.slot = this.freeSlot(to); to.items.push(i); to.delItems.delete(i.id); to.dirtyItems.add(i.id); to.logs.push(['trade_in', i.id, i.key, i.qty, 0, now]); } };
+    move(a, b, outA); move(b, a, outB);
+    a.gold += tb.gold - ta.gold; b.gold += ta.gold - tb.gold; a.logs.push(['trade_gold', null, null, 0, tb.gold - ta.gold, now]); b.logs.push(['trade_gold', null, null, 0, ta.gold - tb.gold, now]);
+    a.trade = null; b.trade = null; a.dirty = b.dirty = true; a.meDirty = b.meDirty = true; this.saveBatch([a, b]);
+    for (const x of [a, b]) { this.send(x, { t: 'tr', m: null, msg: 'Troca concluída!' }); this.sendInv(x); }
+  }
+  private bumpLoot(p: Player, now: number) { p.streak = Math.min(10, (now < p.streakUntil ? p.streak : 0) + 1); p.streakUntil = now + 15000; p.meDirty = true; }
   // ---------- grupos ----------
   private enqueueParty(f: () => Promise<unknown>) { this.partyQ = this.partyQ.then(f).catch(e => console.error('party', e)); }
   private partySend(pid: number, msg: string) { for (const o of this.players.values()) if (o.partyId === pid) try { o.ws.send(msg); } catch { /* */ } }
@@ -342,7 +396,7 @@ export class MapRoom {
     if (m.def.boss) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {
-    p.xp += xp; p.dirty = true; p.meDirty = true;
+    p.xp += Math.floor(xp * (1 + p.streak * .05)); p.dirty = true; p.meDirty = true;
     let up = false;
     while (p.level < CONFIG.maxLevel && p.xp >= xpToNext(p.level)) { p.xp -= xpToNext(p.level); p.level++; p.points += CONFIG.pointsPerLevel; up = true; }
     if (up) { const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Você alcançou o nível ${p.level}! +${CONFIG.pointsPerLevel} pontos (tecla C).`); for (const o of this.players.values()) o.known.delete(p.eid); }
@@ -354,10 +408,10 @@ export class MapRoom {
     const dmg = rollDamage(raw, s.def, Math.random());
     p.hp -= dmg; p.dirty = true; p.meDirty = true;
     this.fx.push({ k: 'hit', x: p.x, y: p.y, id: p.eid, v: dmg, c: 0, p: 1 });
-    if (p.hp <= 0) { p.hp = 0; p.deadUntil = now + 3000; p.path = null; p.target = 0; p.ix = p.iy = 0; this.fx.push({ k: 'die', x: p.x, y: p.y, id: p.eid }); this.sys(p, 'Você morreu. Retornando a Valoria…'); }
+    if (p.hp <= 0) { this.cancelTrade(p, 'A troca foi cancelada.'); p.hp = 0; p.deadUntil = now + 3000; p.path = null; p.target = 0; p.ix = p.iy = 0; this.fx.push({ k: 'die', x: p.x, y: p.y, id: p.eid }); this.sys(p, 'Você morreu. Retornando a Valoria…'); }
   }
   private travel(p: Player, map: string, x: number, y: number) {
-    p.map = map; p.x = x; p.y = y; p.path = null; p.target = 0; p.gone = true; p.dirty = true;
+    this.cancelTrade(p, 'A troca foi cancelada.'); p.map = map; p.x = x; p.y = y; p.path = null; p.target = 0; p.gone = true; p.dirty = true;
     this.players.delete(p.eid); if (this.byChar.get(p.charId) === p) this.byChar.delete(p.charId);
     if (!this.players.size && this.timer) { clearInterval(this.timer); this.timer = null; }
     this.flush(p).then(() => { this.send(p, { t: 'portal' }); try { p.ws.close(1000, 'portal'); } catch { /* */ } });
@@ -405,6 +459,8 @@ export class MapRoom {
   private tickPlayer(p: Player, dt: number, now: number) {
     p.budget = Math.min(40, p.budget + dt * 25);
     const s = this.stats(p);
+    if (p.streak && now > p.streakUntil) { p.streak = 0; p.meDirty = true; }
+    if (p.trade && dist(p, p.trade.peer) > 10) this.cancelTrade(p, 'Vocês se afastaram demais.');
     if (p.deadUntil) {
       if (now >= p.deadUntil) {
         p.deadUntil = 0; p.hp = Math.ceil(s.maxHp / 2); p.mp = Math.ceil(s.maxMp / 2); p.meDirty = true;
@@ -427,9 +483,9 @@ export class MapRoom {
         if (now >= p.nextAtk) { p.nextAtk = now + s.attackMs; this.fx.push({ k: 'swing', x: p.x, y: p.y, id: p.eid, tx: m.x, ty: m.y, b: classOf(p.cls).bolt }); this.hit(p, m, s.atk, s.crit); }
       }
     } else if (p.path) { this.follow(p, dst); p.dirty = true; }
-    for (const d of this.drops.values()) if (dist(d, p) <= 2.2 && (d.owner === p.charId || (d.party && d.party === p.partyId) || now > d.ownUntil)) {
-      if (d.key === null) { p.gold += d.gold; p.logs.push(['loot_gold', null, null, 0, d.gold, now]); p.dirty = true; p.meDirty = true; this.drops.delete(d.eid); }
-      else if (this.give(p, d.key, 1, d.rarity, 'loot')) { p.dirty = true; this.drops.delete(d.eid); this.sendInv(p); this.sys(p, `Obteve: ${ITEMS[d.key].name}`); }
+    for (const d of this.drops.values()) if (dist(d, p) <= 1.2 && (d.owner === p.charId || (d.party && d.party === p.partyId) || now > d.ownUntil)) {
+      if (d.key === null) { const g = Math.ceil(d.gold * (1 + p.streak * .05)); p.gold += g; p.logs.push(['loot_gold', null, null, 0, g, now]); p.dirty = true; p.meDirty = true; this.drops.delete(d.eid); this.bumpLoot(p, now); this.fx.push({ k: 'loot', x: p.x, y: p.y, id: p.eid, n: p.streak }); }
+      else if (this.give(p, d.key, 1, d.rarity, 'loot')) { p.dirty = true; this.drops.delete(d.eid); this.bumpLoot(p, now); this.fx.push({ k: 'loot', x: p.x, y: p.y, id: p.eid, n: p.streak }); this.sendInv(p); this.sys(p, `Obteve: ${ITEMS[d.key].name}`); }
       else if (now - p.lastInvFull > 5000) { p.lastInvFull = now; this.sys(p, 'Inventário cheio.'); }
     }
     for (const g of this.map.portals) if (Math.hypot(p.x - g.x, p.y - g.y) < .9) {

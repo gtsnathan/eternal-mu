@@ -11,17 +11,34 @@ export interface ItemDef {
   dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: 'sword' | 'axe' | 'staff' | 'bow'; set?: string;
 }
 // Sets: cada peça equipada do mesmo set soma bônus (2 peças: defesa, 3: vida, 4: ataque %)
-export interface SetDef { key: string; name: string; of: string; lvl: number; color: string; trim: string; cape: string; power: number; price: number; bonus: { def: number; hp: number; atk: number } }
+export interface SetDef { cls?: string; key: string; name: string; of: string; lvl: number; color: string; trim: string; cape: string; power: number; price: number; bonus: { def: number; hp: number; atk: number } }
 export const SETS: Record<string, SetDef> = {
+  salamander: { key: 'salamander', name: 'Salamandra Arcana', of: 'da', lvl: 14, color: '#c2452d', trim: '#ffd23f', cape: '#7d2416', power: 1.4, price: 2500, bonus: { def: 6, hp: 50, atk: .07 } },
+  bat: { key: 'bat', name: 'Morcego Noturno', of: 'do', lvl: 14, color: '#3b2a55', trim: '#d86bff', cape: '#21163a', power: 1.4, price: 2500, bonus: { def: 6, hp: 50, atk: .07 } },
+  wolf: { key: 'wolf', name: 'Lobo Rúnico', of: 'do', lvl: 16, color: '#8a98a8', trim: '#6fd6ff', cape: '#3e4c5e', power: 1.6, price: 3500, bonus: { def: 8, hp: 80, atk: .08 } },
+  spider: { key: 'spider', name: 'Aranha Viúva', of: 'da', lvl: 24, color: '#241a28', trim: '#ff3b4f', cape: '#14101a', power: 2.4, price: 12000, bonus: { def: 16, hp: 140, atk: .13 } },
+  scorpion: { key: 'scorpion', name: 'Escorpião Negro', of: 'do', lvl: 25, color: '#2a2430', trim: '#e8c23a', cape: '#17131c', power: 2.5, price: 14000, bonus: { def: 17, hp: 150, atk: .13 } },
+  manticore: { key: 'manticore', name: 'Mantícora Carmesim', of: 'da', lvl: 36, color: '#9a2f2f', trim: '#e0b04a', cape: '#5a1616', power: 3.8, price: 55000, bonus: { def: 29, hp: 270, atk: .2 } },
+  pegasus: { key: 'pegasus', name: 'Pégaso Aurora', of: 'do', lvl: 44, color: '#f0e6ff', trim: '#ff9fd8', cape: '#b48cd8', power: 5, price: 150000, bonus: { def: 40, hp: 400, atk: .27 } },
+  hydra: { key: 'hydra', name: 'Hidra Sombria', of: 'da', lvl: 48, color: '#2f4a3a', trim: '#9affc8', cape: '#16281e', power: 5.8, price: 240000, bonus: { def: 48, hp: 480, atk: .31 } },
+  chimera: { key: 'chimera', name: 'Quimera Estelar', of: 'da', lvl: 50, color: '#3a2f8f', trim: '#9ff0ff', cape: '#1e1752', power: 6.2, price: 300000, bonus: { def: 52, hp: 520, atk: .33 } },
+  axolotl: { key: 'axolotl', name: 'Axolote Encantado', of: 'do', lvl: 12, color: '#f2a6c4', trim: '#ff5f9e', cape: '#d65a92', power: 1.25, price: 1500, bonus: { def: 5, hp: 40, atk: .06 } },
+  bear: { key: 'bear', name: 'Urso Ancião', of: 'do', lvl: 18, color: '#7a4f2a', trim: '#c49a6c', cape: '#4b2f18', power: 1.8, price: 5000, bonus: { def: 10, hp: 110, atk: .09 } },
+  owl: { key: 'owl', name: 'Coruja Lunar', of: 'da', lvl: 26, color: '#4a55a8', trim: '#ffe9a8', cape: '#2b3270', power: 2.6, price: 16000, bonus: { def: 18, hp: 160, atk: .14 } },
+  tiger: { key: 'tiger', name: 'Tigre Escarlate', of: 'do', lvl: 34, color: '#e0762a', trim: '#1d1620', cape: '#a12a1e', power: 3.5, price: 45000, bonus: { def: 27, hp: 250, atk: .19 } },
+  kraken: { key: 'kraken', name: 'Kraken Abissal', of: 'do', lvl: 42, color: '#5c3290', trim: '#56e0d0', cape: '#2d1a52', power: 4.7, price: 120000, bonus: { def: 38, hp: 370, atk: .26 } },
+  demon: { key: 'demon', name: 'Demônio Soberano', of: 'do', lvl: 54, color: '#7a1430', trim: '#ffcf3a', cape: '#3a0816', power: 7, price: 500000, bonus: { def: 60, hp: 600, atk: .38 } },
   griffin: { key: 'griffin', name: 'Grifo Celeste', of: 'do', lvl: 15, color: '#c9d8ee', trim: '#7fb3e8', cape: '#3f6fb5', power: 1.5, price: 3000, bonus: { def: 8, hp: 60, atk: .08 } },
   lion: { key: 'lion', name: 'Leão Dourado', of: 'do', lvl: 22, color: '#d9a62e', trim: '#b5651d', cape: '#a8441e', power: 2.2, price: 9000, bonus: { def: 14, hp: 120, atk: .12 } },
   serpent: { key: 'serpent', name: 'Serpente Esmeralda', of: 'da', lvl: 30, color: '#2c9a60', trim: '#b7e85a', cape: '#14573a', power: 3, price: 25000, bonus: { def: 22, hp: 200, atk: .16 } },
   phoenix: { key: 'phoenix', name: 'Fênix Rubra', of: 'da', lvl: 38, color: '#c8352a', trim: '#ffb13d', cape: '#ff7a2b', power: 4, price: 70000, bonus: { def: 32, hp: 300, atk: .22 } },
   dragon: { key: 'dragon', name: 'Dragão Dessecado', of: 'do', lvl: 46, color: '#3d3547', trim: '#7dffb0', cape: '#2a2430', power: 5.5, price: 200000, bonus: { def: 45, hp: 450, atk: .3 } },
 };
+// Cada classe veste somente os sets dela
+for (const [c, l] of Object.entries({ dark_warrior: ['bear', 'lion', 'tiger', 'dragon'], arcane_wizard: ['salamander', 'owl', 'phoenix', 'chimera'], mystic_archer: ['axolotl', 'griffin', 'serpent', 'pegasus'], spell_knight: ['wolf', 'scorpion', 'manticore', 'hydra'], shadow_summoner: ['bat', 'spider', 'kraken', 'demon'] })) for (const k of l) SETS[k].cls = c;
 export const SET_PIECES = ['helm', 'armor', 'pants', 'boots'] as const;
 const PIECE = { helm: ['Elmo', 11, 40, 1], armor: ['Couraça', 20, 90, 1.6], pants: ['Grevas', 14, 50, 1.1], boots: ['Botas', 8, 30, .9] } as const;
-const SET_ITEMS: ItemDef[] = Object.values(SETS).flatMap(s => SET_PIECES.map(p => ({ key: `${s.key}_${p}`, name: `${PIECE[p][0]} ${s.of} ${s.name}`, kind: p, lvl: s.lvl, price: Math.round(s.price * PIECE[p][3]), def: Math.round(PIECE[p][1] * s.power), hp: Math.round(PIECE[p][2] * s.power), tint: s.color, set: s.key })));
+const SET_ITEMS: ItemDef[] = Object.values(SETS).sort((a, b) => a.lvl - b.lvl).flatMap(s => SET_PIECES.map(p => ({ key: `${s.key}_${p}`, name: `${PIECE[p][0]} ${s.of} ${s.name}`, kind: p, lvl: s.lvl, price: Math.round(s.price * PIECE[p][3]), def: Math.round(PIECE[p][1] * s.power), hp: Math.round(PIECE[p][2] * s.power), tint: s.color, set: s.key })));
 const setDrops = (s: string, ch: number) => SET_PIECES.map(p => [`${s}_${p}`, ch] as [string, number]);
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'pot_hp', name: 'Poção de Vida', kind: 'potion', lvl: 1, price: 20, heal: 80 },
@@ -67,21 +84,21 @@ export const MOBS: Record<string, MobDef> = {
   imp: { key: 'imp', name: 'Diabrete Cinzento', level: 22, hp: 900, dmg: 70, def: 34, speed: 2.8, detect: 7, leash: 12, attackMs: 1500, xp: 380, respawnMs: 12000, gold: [50, 110], reach: 4.5, bolt: '#ff9d3c',
     drops: [['pot_hp', .3], ['pot_mp', .25], ['shard', .3], ...setDrops('griffin', .012)] },
   hound: { key: 'hound', name: 'Cão de Enxofre', level: 29, hp: 1900, dmg: 110, def: 50, speed: 4, detect: 8, leash: 14, attackMs: 1100, xp: 850, respawnMs: 15000, gold: [90, 190],
-    drops: [['pot_hp', .35], ['pot_mp', .25], ...setDrops('griffin', .02), ...setDrops('lion', .01)] },
+    drops: [['pot_hp', .35], ['pot_mp', .25], ...setDrops('griffin', .02), ...setDrops('lion', .01), ...setDrops('owl', .012)] },
   magma: { key: 'magma', name: 'Colosso de Magma', level: 37, hp: 5200, dmg: 190, def: 85, speed: 2, detect: 6.5, leash: 12, attackMs: 1800, xp: 2400, respawnMs: 22000, gold: [220, 420],
-    drops: [['pot_hp', .4], ...setDrops('lion', .02), ...setDrops('serpent', .01), ...ember(.012)] },
+    drops: [['pot_hp', .4], ...setDrops('lion', .02), ...setDrops('serpent', .01), ...setDrops('tiger', .012), ...setDrops('manticore', .012), ...ember(.012)] },
   wyrm: { key: 'wyrm', name: 'Serpe Carbonizada', level: 45, hp: 9500, dmg: 260, def: 120, speed: 3, detect: 8, leash: 14, attackMs: 1700, xp: 6000, respawnMs: 30000, gold: [500, 900], reach: 5.5, bolt: '#ff5a2c',
-    drops: [['pot_hp', .5], ...setDrops('serpent', .025), ...setDrops('phoenix', .012), ...ember(.03)] },
+    drops: [['pot_hp', .5], ...setDrops('serpent', .025), ...setDrops('phoenix', .012), ...setDrops('kraken', .012), ...setDrops('pegasus', .01), ...ember(.03)] },
   ignarok: { key: 'ignarok', name: 'Ignarok, o Dragão Ancestral', level: 60, hp: 120000, dmg: 420, def: 170, speed: 3, detect: 12, leash: 20, attackMs: 1500, xp: 150000, respawnMs: 1800000, gold: [15000, 30000], boss: true, reach: 3.2, nova: '#ff7a2b',
-    drops: [['pot_hp', 1], ['pot_mp', 1], ...ember(.4), ...setDrops('phoenix', .3), ...setDrops('dragon', .15)] },
+    drops: [['pot_hp', 1], ['pot_mp', 1], ...ember(.4), ...setDrops('phoenix', .3), ...setDrops('dragon', .15), ...setDrops('kraken', .2), ...setDrops('demon', .05), ...setDrops('pegasus', .1), ...setDrops('hydra', .08), ...setDrops('chimera', .08)] },
   slime: { key: 'slime', name: 'Gelatina Gélida', level: 2, hp: 45, dmg: 9, def: 1, speed: 1.6, detect: 4.5, leash: 10, attackMs: 1500, xp: 20, respawnMs: 8000, gold: [3, 9],
     drops: [['pot_hp', .12], ['shard', .2], ['leather_boots', .03], ['leather_helm', .03]] },
   wolf: { key: 'wolf', name: 'Lobo Geladiço', level: 7, hp: 150, dmg: 22, def: 7, speed: 3.4, detect: 7, leash: 13, attackMs: 1200, xp: 70, respawnMs: 12000, gold: [10, 25],
     drops: [['pot_hp', .15], ['pot_mp', .1], ['shard', .25], ['leather_armor', .04], ['leather_pants', .04], ['iron_axe', .02], ['rune_staff', .02], ['long_bow', .02]] },
   golem: { key: 'golem', name: 'Colosso de Granizo', level: 14, hp: 520, dmg: 44, def: 20, speed: 1.9, detect: 6, leash: 12, attackMs: 1800, xp: 240, respawnMs: 20000, gold: [35, 80],
-    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rune_staff', .05], ['long_bow', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02], ...setDrops('griffin', .012)] },
+    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rune_staff', .05], ['long_bow', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02], ...setDrops('griffin', .012), ...setDrops('axolotl', .02), ...setDrops('salamander', .015), ...setDrops('bat', .015), ...setDrops('wolf', .015)] },
   boss: { key: 'boss', name: 'Hrímara, a Soberana', level: 24, hp: 6500, dmg: 70, def: 32, speed: 2.7, detect: 9, leash: 16, attackMs: 1400, xp: 4000, respawnMs: 600000, gold: [800, 1500], boss: true,
-    drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
+    drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ...setDrops('scorpion', .1), ...setDrops('spider', .1), ...setDrops('bear', .25), ...setDrops('owl', .1), ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
 };
 export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse';
 export interface Skill { n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number }
@@ -103,7 +120,7 @@ export const CLASSES: Record<string, ClassDef> = {
     { n: 1, name: 'Invocar Sombra', kind: 'summon', mana: 22, cd: 10000, mult: 1, pet: 'shade', ms: 35000 }, { n: 2, name: 'Maldição', kind: 'curse', mana: 14, cd: 6000, mult: .8, range: 8, ms: 8000, color: '#b06bff' }] },
 };
 export const classOf = (name?: string): ClassDef => Object.values(CLASSES).find(c => c.name === name) ?? CLASSES.dark_warrior;
-export const canWield = (c: ClassDef, d: ItemDef) => d.kind !== 'weapon' || c.weapons.includes(d.wtype!);
+export const canWield = (c: ClassDef, d: ItemDef) => d.set ? SETS[d.set].cls === c.key : d.kind !== 'weapon' || c.weapons.includes(d.wtype!);
 export const HAIR_COLORS = ['#2b2230', '#7a4a22', '#d9b24a', '#b23a2e', '#d8dde6', '#3f6fb5'];
 export const HAIR_STYLES = ['Curto', 'Espetado', 'Longo'];
 export const xpToNext = (lv: number) => Math.floor(50 * Math.pow(lv, 1.9) + 40);

@@ -168,6 +168,21 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
     else if (a === 'lion' && dir !== 1) { r(g, mid - 3, Y + 22, 9, 8, t); r(g, mid - 1, Y + 23, 5, 5, '#f6dc8c'); r(g, mid - 1, Y + 24, 1, 1, '#3a2208'); r(g, mid + 3, Y + 24, 1, 1, '#3a2208'); r(g, mid + 1, Y + 26, 1, 1, '#3a2208'); }
     else if (a === 'serpent') { for (let y = 22; y < 29; y += 2) for (let x = (y % 4 ? 1 : 3); x < tw - 1; x += 4) r(g, X + tx + x, Y + y, 2, 1, t); }
     else if (a === 'griffin') { for (let i = 0; i < 6; i++) { r(g, mid - i, Y + 22 + i, 2, 1, t); r(g, mid + 1 + i, Y + 22 + i, 2, 1, t); } }
+    else if (a === 'spider') { if (dir !== 1) { r(g, mid - 2, Y + 22, 7, 2, t); r(g, mid, Y + 24, 3, 2, t); r(g, mid - 2, Y + 26, 7, 2, t); } else for (let i = 0; i < 4; i++) r(g, X + tx + i * 4 + 1, Y + 23 + i % 2 * 2, 3, 1, t); }
+    else if (a === 'bat') { for (let i = 0; i < 6; i++) { r(g, X + tx + i, Y + 22 + i, 2, 1, t); r(g, X + tx + tw - 2 - i, Y + 22 + i, 2, 1, t); } }
+    else if (a === 'wolf') { for (let y = 22; y < 29; y += 3) { r(g, mid - 2, Y + y, 6, 1, t); r(g, mid, Y + y - 1, 2, 3, t); } }
+    else if (a === 'scorpion') { for (let y = 22; y < 29; y += 2) r(g, X + tx + 1, Y + y, tw - 2, 1, y % 4 ? t : '#463e50'); }
+    else if (a === 'manticore') { r(g, mid - 3, Y + 22, 9, 7, t); r(g, mid - 1, Y + 24, 5, 3, '#5a1616'); }
+    else if (a === 'pegasus') { for (let i = 0; i < 4; i++) { r(g, X + tx + 1 + i * 2, Y + 23 + i, 3, 2, t); r(g, X + tx + tw - 4 - i * 2, Y + 23 + i, 3, 2, t); } }
+    else if (a === 'hydra') { for (let i = 0; i < 3; i++) { const xx = X + tx + 2 + i * ((tw - 6) >> 1); for (let y = 22; y < 29; y++) r(g, xx + (y % 2), Y + y, 2, 1, t); } }
+    else if (a === 'salamander') { for (const [dx, dy] of [[2, 1], [7, 4], [11, 2], [4, 6], [10, 6]]) if (dx < tw - 1) r(g, X + tx + dx, Y + 22 + dy, 2, 2, t); }
+    else if (a === 'chimera') { if (dir !== 1) { r(g, mid - 3, Y + 24, 9, 2, t); r(g, mid, Y + 21, 3, 8, t); r(g, mid + 1, Y + 24, 1, 2, '#fff'); } }
+    else if (a === 'axolotl' && dir !== 1) { r(g, mid - 3, Y + 22, 9, 7, '#ffe0ec'); for (const [dx, dy] of [[-2, 1], [3, 3], [0, 4]]) r(g, mid + dx, Y + 22 + dy, 2, 2, t); }
+    else if (a === 'bear') { for (let x = 1; x < tw - 1; x += 3) r(g, X + tx + x, Y + 21, 2, 3, t); if (dir !== 1) for (let i = 0; i < 3; i++) r(g, mid - 3 + i * 3, Y + 24 + i % 2, 1, 5, t); }
+    else if (a === 'owl') { if (dir !== 1) { r(g, mid - 2, Y + 22, 6, 7, t); r(g, mid, Y + 22, 5, 5, armor); } for (let y = 23; y < 29; y += 3) { r(g, X + tx + 1, Y + y, 2, 1, t); r(g, X + tx + tw - 3, Y + y, 2, 1, t); } }
+    else if (a === 'tiger') { for (let i = 1; i < tw - 1; i += 4) { r(g, X + tx + i, Y + 22, 2, 3 + i % 3, t); r(g, X + tx + i + 1, Y + 27, 2, 2, t); } }
+    else if (a === 'kraken') { for (let i = 0; i < 3; i++) { const yy = Y + 22 + i * 3; for (let x = 0; x < tw; x += 2) r(g, X + tx + x, yy + (x + i * 2) % 4 / 2, 2, 1, t); } }
+    else if (a === 'demon') { if (dir !== 1) { r(g, mid - 2, Y + 22, 7, 7, '#1d0a12'); r(g, mid - 1, Y + 24, 2, 2, t); r(g, mid + 2, Y + 24, 2, 2, t); r(g, mid, Y + 27, 3, 1, t); } r(g, X + tx, Y + 29, tw, 2, t); }
     else if (a === 'phoenix') { for (let i = 0; i < tw; i += 2) { const h = 3 + (i * 7 % 5); r(g, X + tx + i, Y + 29 - h, 2, h, i % 4 ? t : '#ffe08a'); } }
   }
   if (dir === 0) { r(g, X + 15, Y + 22, 3, 7, armL); r(g, X + 15, Y + 29, 3, 2, '#f0d27a'); }
@@ -205,6 +220,61 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
       r(g, h0 - 1, Y + 3, hw + 2, 10, '#eef3fb'); r(g, h0 - 4, Y + 4, 4, 11, '#7fb3e8'); if (dir !== 2) r(g, h0 + hw, Y + 4, 4, 11, '#7fb3e8');
       for (let x = 0; x < hw; x += 4) r(g, h0 + x, Y + 1, 3, 3, '#7fb3e8');
       if (f) { r(g, X + 11, Y + 7, 2, 2, '#241c2c'); r(g, X + 20, Y + 7, 2, 2, '#241c2c'); r(g, X + 14, Y + 8, 5, 4, '#e8b93e'); r(g, X + 15, Y + 12, 3, 2, '#c98f2a'); } else if (dir === 2) r(g, h0 + hw - 1, Y + 8, 6, 4, '#e8b93e'); else r(g, h0, Y + 8, hw, 12, '#c9d8ee');
+    } else if (a === 'salamander') {
+      const b = '#c2452d', t = '#ffd23f'; r(g, h0 - 3, Y + 4, hw + 6, 10, b); for (let x = -2; x < hw + 2; x += 4) r(g, h0 + x, Y + 1 + (x & 2), 3, 4, t); for (const [dx, dy] of [[1, 5], [9, 4], [13, 7]]) r(g, h0 + dx, Y + dy, 2, 2, t);
+      if (f) { r(g, X + 11, Y + 8, 3, 3, t); r(g, X + 19, Y + 8, 3, 3, t); r(g, X + 12, Y + 9, 1, 2, '#241c2c'); r(g, X + 20, Y + 9, 1, 2, '#241c2c'); } else if (dir === 2) r(g, h0 + 10, Y + 8, 3, 3, t); else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'chimera') {
+      const b = '#3a2f8f', t = '#9ff0ff'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); for (const [dx, h] of [[0, 8], [hw >> 1, 13], [hw - 3, 8]]) { r(g, h0 + dx, Y + 3 - h, 3, h, t); r(g, h0 + dx + 1, Y + 1 - h, 1, 2, '#fff'); }
+      if (f) { r(g, X + 11, Y + 8, 11, 2, t); r(g, X + 15, Y + 5, 3, 3, '#fff'); } else if (dir === 2) r(g, h0 + 7, Y + 8, 7, 2, t); else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'pegasus') {
+      const b = '#f0e6ff', t = '#ff9fd8'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); for (let y = 0; y < 20; y += 2) r(g, X + 15, Y + y, 3, 2, y % 4 ? t : '#ffc9ea'); r(g, h0 - 6, Y + 4, 6, 3, '#fff'); r(g, h0 - 8, Y + 7, 8, 3, b); if (dir !== 2) { r(g, h0 + hw, Y + 4, 6, 3, '#fff'); r(g, h0 + hw, Y + 7, 8, 3, b); }
+      if (f) { r(g, X + 11, Y + 8, 3, 2, '#5a3c8a'); r(g, X + 19, Y + 8, 3, 2, '#5a3c8a'); } else if (dir === 2) r(g, h0 + 10, Y + 8, 3, 2, '#5a3c8a'); else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'wolf') {
+      const b = '#8a98a8', l = '#c6d2de', t = '#6fd6ff'; r(g, h0 - 1, Y - 2, 5, 8, b); if (dir !== 2) r(g, h0 + hw - 4, Y - 2, 5, 8, b); r(g, h0 - 2, Y + 4, hw + 4, 11, b);
+      if (f) { r(g, X + 11, Y + 8, 3, 2, t); r(g, X + 19, Y + 8, 3, 2, t); r(g, X + 13, Y + 10, 7, 5, l); r(g, X + 15, Y + 10, 3, 2, '#1d2230'); } else if (dir === 2) { r(g, h0 + 8, Y + 8, 3, 2, t); r(g, h0 + hw - 3, Y + 10, 8, 4, l); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'scorpion') {
+      const b = '#2a2430', t = '#e8c23a'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); for (let y = 5; y < 13; y += 3) r(g, h0, Y + y, hw, 1, '#463e50'); r(g, h0 + hw - 3, Y - 6, 4, 10, b); r(g, h0 + 8, Y - 9, hw - 7, 4, b); r(g, h0 + 5, Y - 7, 4, 5, t); r(g, h0 - 4, Y + 9, 4, 4, t); if (dir !== 2) r(g, h0 + hw, Y + 9, 4, 4, t);
+      if (f) { r(g, X + 11, Y + 8, 11, 2, t); } else if (dir === 2) r(g, h0 + 7, Y + 8, 7, 2, t); else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'manticore') {
+      const b = '#9a2f2f', t = '#e0b04a'; r(g, h0 - 3, Y + 3, hw + 6, 14, t); for (let x = -3; x < hw + 3; x += 3) r(g, h0 + x, Y + (x & 1), 2, 4, '#c98a2a'); r(g, h0 - 5, Y - 1, 4, 7, b); if (dir !== 2) r(g, h0 + hw + 1, Y - 1, 4, 7, b);
+      if (dir !== 1) { r(g, h0 + 1, Y + 5, hw - 2, 9, b); if (f) { r(g, X + 11, Y + 8, 3, 2, '#ffe14a'); r(g, X + 19, Y + 8, 3, 2, '#ffe14a'); for (let x = 12; x < 21; x += 2) r(g, X + x, Y + 12, 1, 2, '#fff'); } else r(g, h0 + 9, Y + 8, 3, 2, '#ffe14a'); } else r(g, h0, Y + 5, hw, 12, t);
+    } else if (a === 'hydra') {
+      const b = '#2f4a3a', t = '#9affc8'; r(g, h0 - 2, Y + 3, hw + 4, 11, b); for (const dx of [-1, (hw >> 1) - 2, hw - 3]) { r(g, h0 + dx + 1, Y - 3, 3, 6, b); r(g, h0 + dx, Y - 7, 6, 5, b); r(g, h0 + dx + 3, Y - 6, 2, 1, t); r(g, h0 + dx + 5, Y - 4, 2, 1, '#fff'); }
+      if (f) { r(g, X + 11, Y + 8, 3, 2, t); r(g, X + 19, Y + 8, 3, 2, t); } else if (dir === 2) r(g, h0 + 10, Y + 8, 3, 2, t); else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'bat') {
+      const b = '#3b2a55', t = '#d86bff'; r(g, h0 - 4, Y - 6, 7, 13, b); r(g, h0 - 3, Y - 3, 4, 8, t); if (dir !== 2) { r(g, h0 + hw - 3, Y - 6, 7, 13, b); r(g, h0 + hw - 1, Y - 3, 4, 8, t); } r(g, h0 - 1, Y + 4, hw + 2, 11, b);
+      if (f) { r(g, X + 11, Y + 8, 3, 2, '#ff3b4f'); r(g, X + 19, Y + 8, 3, 2, '#ff3b4f'); r(g, X + 13, Y + 12, 2, 4, '#fff'); r(g, X + 18, Y + 12, 2, 4, '#fff'); } else if (dir === 2) { r(g, h0 + 9, Y + 8, 3, 2, '#ff3b4f'); r(g, h0 + 11, Y + 12, 2, 4, '#fff'); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'spider') {
+      const b = '#241a28', t = '#ff3b4f'; r(g, h0 - 2, Y + 3, hw + 4, 12, b); for (let i = 0; i < 3; i++) { r(g, h0 - 6, Y + 4 + i * 4, 5, 1, b); r(g, h0 - 8, Y + 5 + i * 4, 3, 3, b); if (dir !== 2) { r(g, h0 + hw + 1, Y + 4 + i * 4, 5, 1, b); r(g, h0 + hw + 5, Y + 5 + i * 4, 3, 3, b); } }
+      if (f) { for (const [dx, dy] of [[11, 6], [14, 5], [18, 5], [21, 6], [12, 9], [15, 8], [18, 8], [20, 9]]) r(g, X + dx, Y + dy, 2, 2, t); r(g, X + 13, Y + 13, 2, 4, '#e8dcc8'); r(g, X + 18, Y + 13, 2, 4, '#e8dcc8'); } else if (dir === 2) { for (const dx of [8, 11, 14]) r(g, h0 + dx, Y + 7, 2, 2, t); } else { r(g, h0 + 5, Y + 6, 6, 8, t); r(g, h0 + 7, Y + 9, 2, 2, b); }
+    } else if (a === 'axolotl') {
+      const p = '#f8c2d6', t = '#ff5f9e', t2 = '#ff94c0';
+      for (let i = 0; i < 3; i++) { r(g, h0 - 5, Y + 3 + i * 4, 5, 2, t); r(g, h0 - 8, Y + 2 + i * 4, 3, 3, t2); if (dir !== 2) { r(g, h0 + hw, Y + 3 + i * 4, 5, 2, t); r(g, h0 + hw + 5, Y + 2 + i * 4, 3, 3, t2); } }
+      r(g, h0 - 1, Y + 3, hw + 2, 12, p); r(g, h0 + 1, Y + 3, hw - 3, 2, '#ffe0ec');
+      if (f) { r(g, X + 10, Y + 8, 3, 3, '#241c2c'); r(g, X + 20, Y + 8, 3, 3, '#241c2c'); r(g, X + 10, Y + 8, 1, 1, '#fff'); r(g, X + 20, Y + 8, 1, 1, '#fff'); r(g, X + 13, Y + 13, 7, 1, '#c0507e'); r(g, X + 12, Y + 12, 1, 1, '#c0507e'); r(g, X + 20, Y + 12, 1, 1, '#c0507e'); } else if (dir === 2) { r(g, h0 + 10, Y + 8, 3, 3, '#241c2c'); r(g, h0 + 8, Y + 13, 6, 1, '#c0507e'); }
+    } else if (a === 'bear') {
+      const b = '#7a4f2a', l = '#c49a6c';
+      r(g, h0 - 1, Y + 1, 6, 6, b); r(g, h0 + 1, Y + 3, 2, 2, l); if (dir !== 2) { r(g, h0 + hw - 5, Y + 1, 6, 6, b); r(g, h0 + hw - 3, Y + 3, 2, 2, l); }
+      r(g, h0 - 2, Y + 4, hw + 4, 12, b); r(g, h0, Y + 4, hw - 4, 2, '#946539');
+      if (f) { r(g, X + 11, Y + 8, 2, 2, '#1a120c'); r(g, X + 20, Y + 8, 2, 2, '#1a120c'); r(g, X + 12, Y + 10, 9, 6, l); r(g, X + 15, Y + 10, 3, 2, '#1a120c'); r(g, X + 16, Y + 12, 1, 2, '#1a120c'); } else if (dir === 2) { r(g, h0 + hw - 4, Y + 9, 8, 6, l); r(g, h0 + hw + 2, Y + 9, 2, 2, '#1a120c'); r(g, h0 + 7, Y + 8, 2, 2, '#1a120c'); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'owl') {
+      const b = '#4a55a8', t = '#ffe9a8';
+      r(g, h0 - 1, Y + 3, hw + 2, 12, b); r(g, h0 - 2, Y, 5, 5, b); if (dir !== 2) r(g, h0 + hw - 3, Y, 5, 5, b); for (let x = 1; x < hw; x += 4) r(g, h0 + x, Y + 3, 2, 2, t);
+      if (f) { ell(g, X + 12, Y + 9, 4, 3, t); ell(g, X + 21, Y + 9, 4, 3, t); r(g, X + 11, Y + 8, 2, 3, '#1d1830'); r(g, X + 20, Y + 8, 2, 3, '#1d1830'); r(g, X + 15, Y + 11, 3, 4, '#e8b93e'); } else if (dir === 2) { ell(g, h0 + 9, Y + 9, 4, 3, t); r(g, h0 + 10, Y + 8, 2, 3, '#1d1830'); r(g, h0 + hw - 1, Y + 10, 4, 3, '#e8b93e'); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'tiger') {
+      const o2 = '#e0762a', k = '#1d1620';
+      r(g, h0 - 1, Y + 1, 5, 5, o2); if (dir !== 2) r(g, h0 + hw - 4, Y + 1, 5, 5, o2); r(g, h0 - 2, Y + 4, hw + 4, 12, o2); for (let x = 0; x < hw; x += 4) r(g, h0 + x, Y + 4, 2, 4 + (x % 3), k); r(g, X + 15, Y + 4, 3, 3, k);
+      if (f) { r(g, X + 11, Y + 9, 3, 2, '#b6f06a'); r(g, X + 19, Y + 9, 3, 2, '#b6f06a'); r(g, X + 12, Y + 11, 9, 5, '#fff3e0'); r(g, X + 15, Y + 11, 3, 2, '#d0405a'); r(g, X + 13, Y + 15, 2, 3, '#fff'); r(g, X + 18, Y + 15, 2, 3, '#fff'); } else if (dir === 2) { r(g, h0 + 8, Y + 9, 3, 2, '#b6f06a'); r(g, h0 + hw - 3, Y + 11, 7, 5, '#fff3e0'); } else r(g, h0, Y + 8, hw, 12, o2);
+    } else if (a === 'kraken') {
+      const p = '#5c3290', t = '#56e0d0', d = '#3a1d62';
+      for (const tx0 of (dir === 2 ? [h0 - 3, h0 + 1] : [h0 - 4, h0, h0 + hw - 5, h0 + hw - 1])) { for (let y = 8; y < 28; y++) r(g, tx0 + Math.round(Math.sin(y / 3 + tx0) * 1.4), Y + y, 3, 1, d); for (let y = 10; y < 27; y += 4) r(g, tx0 + Math.round(Math.sin(y / 3 + tx0) * 1.4) + 1, Y + y, 1, 1, t); }
+      r(g, h0 - 2, Y + 2, hw + 4, 11, p); r(g, h0, Y + 2, hw - 4, 2, '#8456bd');
+      if (f) { ell(g, X + 16, Y + 7, 4, 3, t); r(g, X + 15, Y + 5, 3, 5, '#14082a'); } else if (dir === 2) { ell(g, h0 + 10, Y + 7, 3, 2, t); r(g, h0 + 10, Y + 6, 1, 3, '#14082a'); } else r(g, h0, Y + 8, hw, 8, p);
+    } else if (a === 'demon') {
+      const b = '#7a1430', k = '#1d0a12', g2 = '#ffcf3a';
+      for (const [hxx, sgn] of (dir === 2 ? [[h0 - 2, -1]] : [[h0 - 2, -1], [h0 + hw - 1, 1]]) as number[][]) { r(g, hxx, Y + 2, 3, 7, k); r(g, hxx + sgn * 3, Y - 2, 4, 6, k); r(g, hxx + sgn * 5, Y - 7, 3, 7, k); r(g, hxx + sgn * 5, Y - 9, 2, 3, g2); }
+      r(g, h0 - 1, Y + 3, hw + 2, 13, b); r(g, h0 + 1, Y + 3, hw - 3, 2, '#a82348');
+      if (f) { r(g, X + 11, Y + 8, 4, 2, g2); r(g, X + 18, Y + 8, 4, 2, g2); r(g, X + 12, Y + 12, 9, 3, k); for (let x = 12; x < 21; x += 2) r(g, X + x, Y + 12, 1, 3, '#fff'); } else if (dir === 2) { r(g, h0 + 8, Y + 8, 5, 2, g2); r(g, h0 + 7, Y + 12, 7, 3, k); } else r(g, h0, Y + 8, hw, 12, b);
     } else {
       r(g, h0 - 1, Y + 3, hw + 2, 10, '#c8352a'); r(g, h0 - 1, Y + 11, hw + 2, 2, '#7d1c16');
       r(g, X + 15, Y - 5, 3, 9, '#ffb13d'); r(g, X + 12, Y - 2, 3, 6, '#ff7a2b'); r(g, X + 18, Y - 2, 3, 6, '#ff7a2b'); r(g, X + 16, Y - 7, 1, 3, '#ffe08a');
@@ -293,6 +363,12 @@ export function icon(key: string | null): Cv {
       else if (d.set === 'lion') { ell(g, 14, 14, 13, 12, '#b5651d'); ell(g, 14, 13, 8, 8, '#e8b93e'); r(g, 10, 10, 2, 2, '#3a2208'); r(g, 16, 10, 2, 2, '#3a2208'); r(g, 11, 14, 6, 4, '#f6dc8c'); r(g, 13, 14, 2, 2, '#3a2208'); }
       else if (d.set === 'serpent') { r(g, 3, 9, 22, 12, '#1a6b45'); ell(g, 14, 10, 8, 7, '#2fae6a'); r(g, 9, 9, 3, 2, '#ffe14a'); r(g, 16, 9, 3, 2, '#ffe14a'); r(g, 11, 13, 2, 5, '#fff'); r(g, 15, 13, 2, 5, '#fff'); }
       else if (d.set === 'phoenix') { r(g, 12, 1, 4, 11, '#ffb13d'); r(g, 8, 4, 3, 7, '#ff7a2b'); r(g, 17, 4, 3, 7, '#ff7a2b'); r(g, 8, 15, 12, 2, '#ffd76a'); }
+      else if (d.set === 'axolotl') { for (let i = 0; i < 3; i++) { r(g, 0, 7 + i * 5, 6, 2, tr); r(g, 22, 7 + i * 5, 6, 2, tr); } ell(g, 14, 14, 9, 8, '#f8c2d6'); r(g, 9, 12, 3, 3, '#241c2c'); r(g, 16, 12, 3, 3, '#241c2c'); r(g, 11, 18, 6, 1, '#c0507e'); }
+      else if (d.set === 'bear') { r(g, 3, 4, 7, 7, '#7a4f2a'); r(g, 18, 4, 7, 7, '#7a4f2a'); ell(g, 14, 14, 10, 9, '#7a4f2a'); r(g, 9, 11, 2, 2, '#1a120c'); r(g, 17, 11, 2, 2, '#1a120c'); r(g, 10, 14, 8, 6, tr); r(g, 13, 14, 2, 2, '#1a120c'); }
+      else if (d.set === 'owl') { r(g, 3, 3, 6, 7, S.color); r(g, 19, 3, 6, 7, S.color); ell(g, 14, 14, 11, 9, S.color); ell(g, 9, 13, 4, 4, tr); ell(g, 19, 13, 4, 4, tr); r(g, 8, 12, 2, 3, '#1d1830'); r(g, 18, 12, 2, 3, '#1d1830'); r(g, 13, 15, 2, 5, '#e8b93e'); }
+      else if (d.set === 'tiger') { ell(g, 14, 14, 11, 10, S.color); for (let x = 6; x < 23; x += 4) r(g, x, 5, 2, 6, tr); r(g, 8, 12, 4, 2, '#b6f06a'); r(g, 16, 12, 4, 2, '#b6f06a'); r(g, 10, 15, 8, 5, '#fff3e0'); r(g, 11, 19, 2, 4, '#fff'); r(g, 15, 19, 2, 4, '#fff'); }
+      else if (d.set === 'kraken') { for (const x of [3, 8, 18, 23]) r(g, x, 14, 3, 13, '#3a1d62'); ell(g, 14, 10, 10, 8, S.color); ell(g, 14, 10, 4, 3, tr); r(g, 13, 8, 2, 5, '#14082a'); }
+      else if (d.set === 'demon') { r(g, 2, 2, 3, 12, '#1d0a12'); r(g, 23, 2, 3, 12, '#1d0a12'); ell(g, 14, 15, 9, 9, S.color); r(g, 9, 13, 4, 2, tr); r(g, 15, 13, 4, 2, tr); for (let x = 9; x < 19; x += 2) r(g, x, 19, 1, 3, '#fff'); }
       else { r(g, 2, 8, 4, 11, tr); r(g, 22, 8, 4, 11, tr); r(g, 11, 13, 6, 5, '#e8b93e'); }
     } else if (d.kind === 'armor') { r(g, 7, 6, 14, 3, d.set === 'dragon' ? '#d9d2bb' : tr); if (d.set === 'dragon') for (let y = 11; y < 22; y += 3) r(g, 8, y, 12, 1, '#d9d2bb'); else { r(g, 11, 11, 6, 7, tr); r(g, 13, 13, 2, 3, '#fff'); } }
     else if (d.kind === 'pants') { r(g, 7, 4, 14, 2, tr); r(g, 7, 20, 6, 2, tr); r(g, 15, 20, 6, 2, tr); }
