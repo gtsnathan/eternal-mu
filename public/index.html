@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#120f1f">
+<title>Eternal MU</title>
+<style>
+:root{--bg:#120f1f;--pn:#1e1930;--pn2:#2a2342;--ln:#4d4268;--gold:#e9c46a;--tx:#ece6d8;--dim:#a79fb8;--hp:#d7384f;--mp:#3f7fe8;--xp:#e9c46a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px/1.35 ui-monospace,Menlo,Consolas,"DejaVu Sans Mono",monospace;overflow:hidden;overscroll-behavior:none}
+button,input{font:inherit;color:inherit}
+button{background:var(--pn2);border:2px solid var(--ln);padding:8px 12px;cursor:pointer;box-shadow:inset 0 2px 0 #ffffff14}
+button:hover{border-color:var(--gold)} button:disabled{opacity:.45;cursor:default}
+button.main{background:#8a6420;border-color:var(--gold);color:#fff5d8;font-weight:700}
+input[type=text],input[type=password],input[type=email]{width:100%;background:#120f1f;border:2px solid var(--ln);padding:9px;outline:0} input:focus{border-color:var(--gold)}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;background:radial-gradient(circle at 50% 18%,#3a2c63,#120f1f 65%)}
+.card{width:min(420px,100%);background:var(--pn);border:3px solid var(--ln);padding:20px;box-shadow:0 0 0 3px #0a0814,0 18px 50px #0009;margin:auto}
+.card.wide{width:min(720px,100%)}
+h1{font-size:34px;letter-spacing:3px;text-align:center;margin:0;color:var(--gold);text-shadow:3px 3px 0 #5a2d0c,6px 6px 0 #0a0814}
+.sub{text-align:center;color:var(--dim);margin:6px 0 18px}
+label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
+.check{display:flex;gap:8px;align-items:flex-start}
+.err{color:#ff8b8b;min-height:20px;margin:10px 0 6px}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
+.link{background:none;border:0;box-shadow:none;color:var(--gold);padding:4px;text-decoration:underline}
+.chars{display:grid;gap:8px;margin:12px 0}
+.char{display:flex;align-items:center;gap:12px;padding:8px;background:var(--pn2);border:2px solid var(--ln);text-align:left;width:100%}
+.char canvas,.preview canvas{image-rendering:pixelated}
+.char b{color:var(--gold)}.char small{color:var(--dim);display:block}
+.char .open{flex:1;background:none;border:0;box-shadow:none;display:flex;gap:12px;align-items:center;text-align:left;padding:0}
+.swatches{display:flex;gap:6px;flex-wrap:wrap}.sw{width:34px;height:34px;padding:0}.sw.on,.opt.on{border-color:var(--gold);outline:2px solid var(--gold)}
+.preview{display:flex;justify-content:center;margin-top:12px}
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+#hud .p{pointer-events:auto}
+.frame{position:absolute;top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));display:flex;gap:8px;background:#120f1fcc;border:2px solid var(--ln);padding:6px;width:min(270px,48vw)}
+#portrait{width:48px;height:58px;image-rendering:pixelated;background:#2a2342;flex:none}
+.frame .col{flex:1;min-width:0}
+.nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nm span{color:var(--gold)}
+.bar{position:relative;height:13px;background:#0a0814;border:1px solid #000;margin-top:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;transition:width .12s}.bar em{position:absolute;inset:0;text-align:center;font:10px/12px ui-monospace,monospace;font-style:normal;text-shadow:1px 1px 0 #000}
+.hp i{background:var(--hp)}.mp i{background:var(--mp)}
+#xp{position:fixed;left:0;right:0;bottom:0;height:5px;background:#0a0814}#xp i{display:block;height:100%;background:var(--xp);width:0}
+.mini{position:absolute;top:calc(8px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));background:#120f1fcc;border:2px solid var(--ln);padding:4px;width:158px}
+#minimap{width:146px;height:112px;display:block;image-rendering:pixelated}
+.minfo{display:flex;flex-wrap:wrap;justify-content:space-between;font-size:11px;margin-top:3px;gap:4px;white-space:nowrap}#conn{color:#79e08a}
+.menu{position:absolute;right:calc(8px + env(safe-area-inset-right));top:172px;display:flex;flex-direction:column;gap:4px}
+.menu button{padding:5px 8px;font-size:12px;background:#1e1930dd;min-width:42px}
+#chat{position:absolute;left:8px;bottom:14px;width:min(380px,44vw)}
+#log{height:128px;overflow-y:auto;background:#120f1fa8;padding:6px;font-size:12px;word-break:break-word;pointer-events:none}
+#log div{text-shadow:1px 1px 0 #000}#log .sys{color:var(--gold)}#log .g{color:#9fd6ff}#log b{color:#c9f0b0}
+.chatline{display:flex}.chatline button{padding:4px 7px;font-size:12px}.chatline input{padding:5px;font-size:13px;background:#120f1fcc}
+#bar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
+.slot{position:relative;width:52px;height:52px;padding:0;background:#1e1930e6;display:flex;align-items:center;justify-content:center;font-size:9px;line-height:1.05;touch-action:manipulation;overflow:hidden}
+.slot u{position:absolute;left:2px;top:1px;text-decoration:none;color:var(--gold)}.slot .cd{position:absolute;left:0;right:0;bottom:0;height:0;background:#000b}
+.slot s{position:absolute;right:2px;bottom:1px;text-decoration:none;text-shadow:1px 1px 0 #000}
+.win{position:absolute;display:none;left:50%;top:50%;transform:translate(-50%,-50%);width:min(450px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow:auto;background:var(--pn);border:3px solid var(--ln);padding:12px;box-shadow:0 0 0 3px #0a0814;z-index:5}
+.win h3{margin:0 0 10px;color:var(--gold);display:flex;justify-content:space-between;align-items:center}.win h3 button{padding:1px 9px}
+.gear{display:flex;gap:5px;margin-bottom:10px;justify-content:center}
+.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+.cell{position:relative;aspect-ratio:1;background:#120f1f;border:2px solid #3a3150;padding:0;display:flex;align-items:center;justify-content:center;box-shadow:none;min-width:0}
+.cell canvas{width:80%;height:80%;image-rendering:pixelated}.cell s{position:absolute;right:1px;bottom:0;font-size:10px;text-decoration:none;text-shadow:1px 1px 0 #000}
+.gear .cell{width:50px;font-size:9px;color:var(--dim)}
+.info{min-height:36px;margin-top:8px;color:var(--dim);font-size:12px}
+.shopitem{display:flex;align-items:center;gap:8px;padding:5px;border-bottom:1px solid var(--ln)}.shopitem span{flex:1}.shopitem button{padding:4px 8px}
+.stat{display:flex;align-items:center;justify-content:space-between;padding:4px 0}.stat button{padding:1px 10px;margin-left:8px}
+#over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#0009;font-size:20px;color:var(--gold);text-align:center;z-index:9;padding:20px}
+#stick{display:none;position:absolute;left:calc(20px + env(safe-area-inset-left));bottom:30px;width:130px;height:130px;border-radius:50%;background:#ffffff14;border:3px solid #ffffff35;touch-action:none}
+#stick i{position:absolute;left:37px;top:37px;width:50px;height:50px;border-radius:50%;background:#ffffff55}
+.touch #stick{display:block}
+.touch #chat{left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top));bottom:auto;width:min(210px,calc(100vw - 460px))}
+.touch #log{height:58px;font-size:10px}
+.touch #bar{left:auto;right:calc(12px + env(safe-area-inset-right));bottom:22px;transform:none;display:grid;grid-template-columns:repeat(3,60px);gap:7px}
+.touch .slot{width:60px;height:60px}
+.touch #atk{display:flex}
+.touch .menu{top:auto;bottom:170px;flex-direction:row;right:12px}
+#atk{display:none}
+@media (orientation:portrait){.touch #chat{top:112px;left:8px;transform:none;width:min(300px,70vw)}.touch .frame{width:190px}.touch .mini{width:120px}.touch #minimap{width:108px;height:83px}.touch .menu{bottom:232px}}
+@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:96px;flex-direction:column;right:8px}.touch #bar{grid-template-columns:repeat(3,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <div class="frame p"><canvas id="portrait" width="40" height="48"></canvas><div class="col"><div class="nm" id="nm"></div><div class="bar hp"><i id="hpb"></i><em id="hpt"></em></div><div class="bar mp"><i id="mpb"></i><em id="mpt"></em></div></div></div>
+  <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
+  <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button id="auto">Auto</button><button id="exit">Sair</button></div>
+  <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
+  <div id="stick" class="p"><i></i></div>
+  <div id="bar" class="p">
+    <button class="slot" id="atk"><u></u>Atacar</button>
+    <button class="slot" data-sk="1"><u>1</u>Golpe<br>Circular<div class="cd"></div></button>
+    <button class="slot" data-sk="2"><u>2</u>Investida<div class="cd"></div></button>
+    <button class="slot" data-pot="pot_hp"><u>Q</u>Vida<s></s></button>
+    <button class="slot" data-pot="pot_mp"><u>E</u>Mana<s></s></button>
+  </div>
+  <div class="win p" id="w-inv"><h3>Inventário <button data-close>×</button></h3><div class="gear" id="gear"></div><div class="grid" id="grid"></div><div class="info" id="invinfo">Moedas: 0</div></div>
+  <div class="win p" id="w-char"><h3>Personagem <button data-close>×</button></h3><div id="charp"></div></div>
+  <div class="win p" id="w-map"><h3 id="mapt">Mapa <button data-close>×</button></h3><canvas id="bigmap" style="width:100%;image-rendering:pixelated;display:block"></canvas></div>
+  <div class="win p" id="w-shop"><h3><span id="shopt"></span> <button data-close>×</button></h3><div id="shopl"></div><div class="info">Para vender, abra a Bolsa com a loja aberta e toque no item.</div></div>
+</div>
+<div id="xp"><i></i></div>
+<div id="root"></div>
+<div id="over"></div>
+<script src="game.js"></script>
+</body>
+</html>

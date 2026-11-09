@@ -1,0 +1,384 @@
+import { CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SKILLS, SLOTS, xpToNext, Slot } from '../shared/data';
+import { blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step } from '../shared/world';
+
+type Pt = { x: number; y: number };
+interface Player extends Pt {
+  eid: number; charId: number; ws: CfWebSocket; name: string; hairColor: number; hairStyle: number;
+  level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
+  map: string; items: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
+  cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
+  budget: number; lastChat: number; nextRegen: number; gone: boolean; lastInvFull: number;
+}
+interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; hitBy: Map<number, number> }
+interface Drop extends Pt { eid: number; key: string | null; gold: number; rarity: number; owner: number; ownUntil: number; expires: number }
+
+const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+const round = (n: number) => Math.round(n * 100) / 100;
+
+export class MapRoom {
+  private env: Env; private map!: GameMap; private mapId = '';
+  private players = new Map<number, Player>(); private mobs = new Map<number, Mob>(); private drops = new Map<number, Drop>();
+  private byChar = new Map<number, Player>(); private saves = new Map<number, Promise<unknown>>();
+  private nextId = 1; private timer: ReturnType<typeof setInterval> | null = null; private last = 0; private lastSave = 0;
+  private fx: (Pt & Record<string, unknown>)[] = [];
+
+  constructor(_state: unknown, env: Env) { this.env = env; }
+
+  async fetch(req: Request): Promise<Response> {
+    if (new URL(req.url).pathname === '/global') { this.send_all(await req.text()); return new Response('ok'); }
+    this.init(req.headers.get('x-map')!);
+    const pair = new WebSocketPair(); const client = pair[0], server = pair[1];
+    server.accept();
+    this.join(server, Number(req.headers.get('x-char'))).catch(e => { console.error('join', e); try { server.close(1011, 'erro'); } catch { /* já fechado */ } });
+    return new Response(null, { status: 101, webSocket: client } as ResponseInit);
+  }
+
+  private init(id: string) {
+    if (this.map) return;
+    this.mapId = id; this.map = getMap(id);
+    for (const z of this.map.zones) for (let i = 0; i < z.n; i++) {
+      const p = this.randomFree(z.cx, z.cy, z.r), def = MOBS[z.mob];
+      const m: Mob = { eid: this.nextId++, def, x: p.x, y: p.y, hx: p.x, hy: p.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, hitBy: new Map() };
+      this.mobs.set(m.eid, m);
+    }
+  }
+  private randomFree(cx: number, cy: number, r: number): Pt {
+    for (let i = 0; i < 60; i++) { const a = Math.random() * 6.283, d = Math.random() * r, p = { x: Math.floor(cx + Math.cos(a) * d) + .5, y: Math.floor(cy + Math.sin(a) * d) + .5 }; if (!blocked(this.map, p.x, p.y)) return p; }
+    return { x: Math.floor(cx) + .5, y: Math.floor(cy) + .5 };
+  }
+
+  // ---------- conexão ----------
+  private async join(ws: CfWebSocket, charId: number) {
+    let open = true, player: Player | null = null; const early: string[] = [];
+    ws.addEventListener('close', () => { open = false; if (player) this.leave(player); });
+    ws.addEventListener('error', () => { open = false; if (player) this.leave(player); });
+    ws.addEventListener('message', e => { if (player) this.onMessage(player, e.data); else if (early.length < 5) early.push(e.data); });
+    const old = this.byChar.get(charId);
+    if (old) { this.send(old, { t: 'kick', m: 'Este personagem entrou em outro dispositivo.' }); try { old.ws.close(4000, 'replaced'); } catch { /* já fechado */ } this.leave(old); }
+    await this.saves.get(charId);
+    const db = this.env.DB;
+    const [c, its] = await Promise.all([db.prepare('SELECT * FROM characters WHERE id=?').bind(charId).first(), db.prepare('SELECT * FROM items WHERE char_id=?').bind(charId).all()]);
+    if (!open) return;
+    if (!c || c.map !== this.mapId) { ws.close(4001, 'retry'); return; } // mudou de mapa durante a troca
+    if (this.byChar.has(charId)) { ws.close(4000, 'replaced'); return; }
+    const items: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity }));
+    const p: Player = {
+      eid: this.nextId++, charId, ws, name: c.name, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
+      x: c.x, y: c.y, map: c.map, items, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], budget: 40, lastChat: 0, nextRegen: 0, gone: false, lastInvFull: 0,
+    };
+    if (blocked(this.map, p.x, p.y)) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; }
+    if (p.hp <= 0) p.hp = this.stats(p).maxHp;
+    player = p; this.players.set(p.eid, p); this.byChar.set(charId, p);
+    this.send(p, { t: 'w', you: p.eid, map: this.mapId, x: p.x, y: p.y, name: p.name, hairColor: p.hairColor, hairStyle: p.hairStyle });
+    this.sendInv(p); this.sendMe(p);
+    for (const m of early) this.onMessage(p, m);
+    if (!this.timer) { this.last = Date.now(); this.lastSave = this.last; this.timer = setInterval(() => this.safeTick(), CONFIG.tickMs); }
+  }
+  private leave(p: Player) {
+    if (p.gone) return; p.gone = true;
+    this.players.delete(p.eid);
+    if (this.byChar.get(p.charId) === p) this.byChar.delete(p.charId);
+    p.dirty = true; this.flush(p);
+    if (!this.players.size && this.timer) { clearInterval(this.timer); this.timer = null; }
+  }
+  private flush(p: Player): Promise<unknown> {
+    if (!p.dirty && !p.dirtyItems.size && !p.delItems.size && !p.logs.length) return this.saves.get(p.charId) ?? Promise.resolve();
+    const db = this.env.DB, st: D1PreparedStatement[] = [];
+    const logs = p.logs; p.logs = [];
+    // apaga e libera posições antes de regravar: os índices de slot são únicos
+    for (const id of p.delItems) st.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId));
+    const dirtyIds = [...p.dirtyItems], changed = p.items.filter(i => p.dirtyItems.has(i.id));
+    for (const i of changed) st.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId));
+    for (const i of changed) st.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity) VALUES(?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity));
+    st.push(db.prepare('UPDATE characters SET level=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(p.level, p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), p.charId));
+    for (const l of logs) st.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
+    const delIds = [...p.delItems]; p.delItems.clear(); p.dirtyItems.clear(); p.dirty = false;
+    const prev = this.saves.get(p.charId) ?? Promise.resolve();
+    const run = prev.then(() => db.batch(st)).catch(e => {
+      console.error('save', e); p.dirty = true; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); p.logs.unshift(...logs);
+      if (p.gone) return db.batch(st).catch(e2 => console.error('save retry', e2));
+    });
+    this.saves.set(p.charId, run);
+    run.finally(() => { if (this.saves.get(p.charId) === run) this.saves.delete(p.charId); });
+    return run;
+  }
+  private send(p: Player, m: unknown) { try { p.ws.send(JSON.stringify(m)); } catch { /* fechando */ } }
+  private send_all(s: string) { for (const p of this.players.values()) try { p.ws.send(s); } catch { /* fechando */ } }
+  private stats(p: Player) { return derive(p, p.items); }
+  private sendMe(p: Player) {
+    const s = this.stats(p); p.meDirty = false;
+    this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, gold: p.gold, dead: p.deadUntil > 0 });
+  }
+  private sendInv(p: Player) { this.send(p, { t: 'inv', items: p.items }); }
+  private sys(p: Player, m: string) { this.send(p, { t: 'sys', m }); }
+
+  // ---------- comandos do cliente: nada aqui confia em valores calculados pelo cliente ----------
+  private onMessage(p: Player, raw: unknown) {
+    if (p.gone || typeof raw !== 'string' || raw.length > 400) return;
+    if (--p.budget < -30) { try { p.ws.close(4002, 'flood'); } catch { /* */ } return; }
+    if (p.budget < 0) return;
+    let m: any; try { m = JSON.parse(raw); } catch { return; }
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'ping') return this.send(p, { t: 'pong', c: m.c });
+    if (m.t === 'c') return this.chat(p, m);
+    if (p.deadUntil) return;
+    const now = Date.now();
+    switch (m.t) {
+      case 'i': {
+        if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
+        const l = Math.hypot(m.x, m.y); p.ix = l > 1 ? m.x / l : m.x; p.iy = l > 1 ? m.y / l : m.y;
+        if (l > .01) { p.path = null; p.target = 0; }
+        return;
+      }
+      case 'g': if (Number.isFinite(m.x) && Number.isFinite(m.y)) { p.target = 0; p.path = findPath(this.map, p.x, p.y, m.x, m.y); } return;
+      case 'a': if (this.mobs.get(m.id)?.hp && !this.map.safe) { p.target = m.id; p.nextRepath = 0; } return;
+      case 'k': return this.skill(p, m.n, m.id, now);
+      case 'u': return this.usePotion(p, m.slot, now);
+      case 'e': return this.equip(p, m.slot);
+      case 'ue': return this.unequip(p, m.eq);
+      case 'st': return this.addStat(p, m.s, m.n);
+      case 'b': return this.buy(p, m.npc, m.key, m.qty);
+      case 'se': return this.sell(p, m.npc, m.slot);
+    }
+  }
+  private chat(p: Player, m: any) {
+    const now = Date.now();
+    if (typeof m.m !== 'string' || now - p.lastChat < 700) return;
+    const txt = m.m.trim().slice(0, 160); if (!txt) return; p.lastChat = now;
+    const msg = JSON.stringify({ t: 'c', ch: m.ch === 'g' ? 'g' : 'l', from: p.name, m: txt });
+    if (m.ch === 'g') {
+      this.send_all(msg);
+      for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id)).fetch(new Request('https://room/global', { method: 'POST', body: msg })).catch(() => { });
+    } else for (const o of this.players.values()) if (dist(o, p) < CONFIG.aoiRadius) try { o.ws.send(msg); } catch { /* */ }
+  }
+  private addStat(p: Player, s: unknown, n: unknown) {
+    if (!(s === 'str' || s === 'agi' || s === 'vit' || s === 'ene') || !Number.isInteger(n) || (n as number) < 1 || (n as number) > p.points) return;
+    p[s] += n as number; p.points -= n as number; p.dirty = true; p.meDirty = true;
+  }
+  private freeSlot(p: Player) { const used = new Set(p.items.filter(i => !i.equip).map(i => i.slot)); for (let i = 0; i < CONFIG.invSize; i++) if (!used.has(i)) return i; return -1; }
+  private give(p: Player, key: string, qty: number, rarity: number, reason: string): boolean {
+    const def = ITEMS[key]; const stackable = def.kind === 'potion' || def.kind === 'material';
+    let it = stackable ? p.items.find(i => i.key === key && !i.equip) : undefined;
+    if (it) it.qty += qty;
+    else { const slot = this.freeSlot(p); if (slot < 0) return false; it = { id: crypto.randomUUID(), key, qty, slot, equip: null, rarity }; p.items.push(it); }
+    p.dirtyItems.add(it.id); p.logs.push([reason, it.id, key, qty, 0, Date.now()]); return true;
+  }
+  private takeOne(p: Player, it: ItemInst) {
+    if (--it.qty <= 0) { p.items.splice(p.items.indexOf(it), 1); p.dirtyItems.delete(it.id); p.delItems.add(it.id); } else p.dirtyItems.add(it.id);
+  }
+  private invAt(p: Player, slot: unknown) { return Number.isInteger(slot) ? p.items.find(i => !i.equip && i.slot === slot) : undefined; }
+  private usePotion(p: Player, slot: unknown, now: number) {
+    const it = this.invAt(p, slot); if (!it || now < p.nextPotion) return;
+    const d = ITEMS[it.key]; if (d.kind !== 'potion') return;
+    const s = this.stats(p); p.nextPotion = now + 700;
+    p.hp = Math.min(s.maxHp, p.hp + (d.heal ?? 0)); p.mp = Math.min(s.maxMp, p.mp + (d.mana ?? 0));
+    this.takeOne(p, it); p.logs.push(['use', it.id, it.key, 1, 0, now]);
+    p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'heal', x: p.x, y: p.y, id: p.eid });
+  }
+  private equip(p: Player, slot: unknown) {
+    const it = this.invAt(p, slot); if (!it) return; const d = ITEMS[it.key];
+    if (!SLOTS.includes(d.kind as Slot)) return;
+    if (p.level < d.lvl) return this.sys(p, `Requer nível ${d.lvl}.`);
+    const cur = p.items.find(i => i.equip === d.kind);
+    const was = it.slot; it.equip = d.kind; it.slot = -1; p.dirtyItems.add(it.id);
+    if (cur) { cur.equip = null; cur.slot = was; p.dirtyItems.add(cur.id); }
+    this.afterGear(p);
+  }
+  private unequip(p: Player, eq: unknown) {
+    const it = p.items.find(i => i.equip === eq); if (!it) return;
+    const slot = this.freeSlot(p); if (slot < 0) return this.sys(p, 'Inventário cheio.');
+    it.equip = null; it.slot = slot; p.dirtyItems.add(it.id); this.afterGear(p);
+  }
+  private afterGear(p: Player) {
+    const s = this.stats(p); p.hp = Math.min(p.hp, s.maxHp); p.dirty = true; p.meDirty = true; this.sendInv(p);
+    for (const o of this.players.values()) o.known.delete(p.eid);
+  }
+  private nearNpc(p: Player, id: unknown) { const n = this.map.npcs.find(x => x.id === id); return n?.shop && dist(p, n) <= 4 ? n : null; }
+  private buy(p: Player, npc: unknown, key: unknown, qty: unknown) {
+    const n = this.nearNpc(p, npc); if (!n || typeof key !== 'string' || !SHOPS[n.shop!].includes(key) || !Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > 50) return;
+    const d = ITEMS[key], stack = d.kind === 'potion' || d.kind === 'material', q = stack ? qty as number : 1, cost = d.price * q;
+    if (p.gold < cost) return this.sys(p, 'Moedas insuficientes.');
+    if (!this.give(p, key, q, 0, 'buy')) return this.sys(p, 'Inventário cheio.');
+    p.gold -= cost; p.logs.push(['buy_pay', null, key, q, -cost, Date.now()]); p.dirty = true; p.meDirty = true; this.sendInv(p);
+  }
+  private sell(p: Player, npc: unknown, slot: unknown) {
+    const it = this.invAt(p, slot); if (!this.nearNpc(p, npc) || !it) return;
+    const v = Math.floor(ITEMS[it.key].price * .3 * (1 + it.rarity * .5));
+    this.takeOne(p, it); p.gold += v; p.logs.push(['sell', it.id, it.key, 1, v, Date.now()]); p.dirty = true; p.meDirty = true; this.sendInv(p);
+  }
+
+  // ---------- combate ----------
+  private skill(p: Player, n: unknown, id: unknown, now: number) {
+    const sk = SKILLS.find(s => s.n === n); if (!sk || this.map.safe || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
+    const s = this.stats(p);
+    if (sk.n === 1) {
+      p.mp -= sk.mana; p.cds[1] = now + sk.cd; p.nextAtk = now + s.attackMs;
+      this.fx.push({ k: 'spin', x: p.x, y: p.y, id: p.eid, r: sk.radius });
+      for (const m of this.mobs.values()) if (m.hp > 0 && dist(m, p) <= sk.radius!) this.hit(p, m, s.atk * sk.mult!, s.crit);
+    } else {
+      const m = this.mobs.get(id as number); if (!m || m.hp <= 0 || dist(m, p) > sk.range!) return;
+      p.mp -= sk.mana; p.cds[2] = now + sk.cd; p.nextAtk = now + s.attackMs;
+      const from = { x: p.x, y: p.y }, d = dist(m, p), ux = (m.x - p.x) / (d || 1), uy = (m.y - p.y) / (d || 1);
+      for (let t = 0; t < d - 1; t += .2) step(this.map, p, ux * .2, uy * .2);
+      p.path = null; p.target = m.eid;
+      this.fx.push({ k: 'dash', x: p.x, y: p.y, id: p.eid, fx: from.x, fy: from.y });
+      if (dist(m, p) <= CONFIG.attackRange + 1) this.hit(p, m, s.atk * sk.mult!, s.crit);
+    }
+    p.dirty = true; p.meDirty = true;
+    this.send(p, { t: 'cd', n: sk.n, ms: sk.cd });
+  }
+  private hit(p: Player, m: Mob, atk: number, crit: number) {
+    if (m.state === 'back') return;
+    const isCrit = Math.random() < crit; let dmg = rollDamage(atk, m.def.def, Math.random()); if (isCrit) dmg = Math.round(dmg * 1.6);
+    m.hp -= dmg; m.hitBy.set(p.charId, (m.hitBy.get(p.charId) ?? 0) + dmg);
+    this.fx.push({ k: 'hit', x: m.x, y: m.y, id: m.eid, v: dmg, c: isCrit ? 1 : 0 });
+    if (m.state === 'idle') { m.state = 'chase'; m.target = p.eid; }
+    if (m.hp <= 0) this.killMob(m, p);
+  }
+  private killMob(m: Mob, killer: Player) {
+    m.hp = 0; m.respawnAt = Date.now() + m.def.respawnMs; m.path = null; m.state = 'idle'; m.target = 0;
+    this.fx.push({ k: 'die', x: m.x, y: m.y, id: m.eid });
+    let topChar = killer.charId, top = 0; for (const [c, d] of m.hitBy) if (d > top) { top = d; topChar = c; }
+    const owner = this.byChar.get(topChar) ?? killer; m.hitBy.clear();
+    this.addXp(owner, m.def.xp);
+    const [lo, hi] = m.def.gold, now = Date.now();
+    const drop = (key: string | null, gold: number, rarity: number) => { const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, owner: owner.charId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
+    drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
+    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, r = k === 'potion' || k === 'material' ? 0 : Math.random() < .08 ? 2 : Math.random() < .3 ? 1 : 0; drop(key, 0, r); }
+    if (m.def.boss) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
+  }
+  private addXp(p: Player, xp: number) {
+    p.xp += xp; p.dirty = true; p.meDirty = true;
+    let up = false;
+    while (p.level < CONFIG.maxLevel && p.xp >= xpToNext(p.level)) { p.xp -= xpToNext(p.level); p.level++; p.points += CONFIG.pointsPerLevel; up = true; }
+    if (up) { const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Você alcançou o nível ${p.level}! +${CONFIG.pointsPerLevel} pontos (tecla C).`); for (const o of this.players.values()) o.known.delete(p.eid); }
+  }
+  private hurt(p: Player, raw: number, now: number) {
+    if (p.deadUntil || p.gone) return;
+    const s = this.stats(p);
+    if (Math.random() < s.dodge) { this.fx.push({ k: 'miss', x: p.x, y: p.y, id: p.eid }); return; }
+    const dmg = rollDamage(raw, s.def, Math.random());
+    p.hp -= dmg; p.dirty = true; p.meDirty = true;
+    this.fx.push({ k: 'hit', x: p.x, y: p.y, id: p.eid, v: dmg, c: 0, p: 1 });
+    if (p.hp <= 0) { p.hp = 0; p.deadUntil = now + 3000; p.path = null; p.target = 0; p.ix = p.iy = 0; this.fx.push({ k: 'die', x: p.x, y: p.y, id: p.eid }); this.sys(p, 'Você morreu. Retornando a Valoria…'); }
+  }
+  private travel(p: Player, map: string, x: number, y: number) {
+    p.map = map; p.x = x; p.y = y; p.path = null; p.target = 0; p.gone = true; p.dirty = true;
+    this.players.delete(p.eid); if (this.byChar.get(p.charId) === p) this.byChar.delete(p.charId);
+    if (!this.players.size && this.timer) { clearInterval(this.timer); this.timer = null; }
+    this.flush(p).then(() => { this.send(p, { t: 'portal' }); try { p.ws.close(1000, 'portal'); } catch { /* */ } });
+  }
+
+  // ---------- simulação ----------
+  private safeTick() { try { this.tick(); } catch (e) { console.error('tick', e); } }
+  private follow(e: Pt & { path: Pt[] | null }, dist_: number) {
+    while (e.path && dist_ > 0) {
+      const n = e.path[0]; if (!n) { e.path = null; break; }
+      const d = dist(e, n);
+      if (d <= dist_) { if (!blocked(this.map, n.x, n.y)) { e.x = n.x; e.y = n.y; } dist_ -= d; e.path.shift(); if (!e.path.length) e.path = null; }
+      else { step(this.map, e, (n.x - e.x) / d * dist_, (n.y - e.y) / d * dist_); dist_ = 0; }
+    }
+  }
+  private tick() {
+    const now = Date.now(), dt = Math.min(.25, (now - this.last) / 1000); this.last = now;
+    for (const p of this.players.values()) this.tickPlayer(p, dt, now);
+    for (const m of this.mobs.values()) this.tickMob(m, dt, now);
+    this.separateMobs();
+    for (const d of this.drops.values()) if (now > d.expires) this.drops.delete(d.eid);
+    for (const p of this.players.values()) this.snapshot(p);
+    this.fx = [];
+    if (now - this.lastSave >= CONFIG.saveEveryMs) { this.lastSave = now; for (const p of this.players.values()) this.flush(p); }
+  }
+  /** Evita que monstros perseguindo o mesmo alvo ocupem o mesmo ponto. */
+  private separateMobs() {
+    const list = [...this.mobs.values()].filter(m => m.hp > 0 && m.state === 'chase');
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j], d = dist(a, b) || .01, min = a.def.boss || b.def.boss ? 1.6 : .85;
+      if (d < min) { const k = (min - d) * .25 / d, dx = (a.x - b.x) * k, dy = (a.y - b.y) * k; step(this.map, a, dx, dy); step(this.map, b, -dx, -dy); }
+    }
+  }
+  private tickPlayer(p: Player, dt: number, now: number) {
+    p.budget = Math.min(40, p.budget + dt * 25);
+    const s = this.stats(p);
+    if (p.deadUntil) {
+      if (now >= p.deadUntil) {
+        p.deadUntil = 0; p.hp = Math.ceil(s.maxHp / 2); p.mp = Math.ceil(s.maxMp / 2); p.meDirty = true;
+        const home = getMap('valoria').spawn;
+        if (this.mapId === 'valoria') { p.x = home.x; p.y = home.y; p.dirty = true; } else this.travel(p, 'valoria', home.x, home.y);
+      }
+      return;
+    }
+    if (now >= p.nextRegen) { p.nextRegen = now + 2000; const hp = Math.min(s.maxHp, p.hp + s.maxHp * .012), mp = Math.min(s.maxMp, p.mp + s.maxMp * .04); if (hp !== p.hp || mp !== p.mp) { p.hp = hp; p.mp = mp; p.meDirty = true; p.dirty = true; } }
+    const dst = CONFIG.playerSpeed * dt;
+    if (p.ix || p.iy) { step(this.map, p, p.ix * dst, p.iy * dst); p.dirty = true; }
+    else if (p.target) {
+      const m = this.mobs.get(p.target);
+      if (!m || m.hp <= 0) { p.target = 0; p.path = null; }
+      else if (dist(p, m) > CONFIG.attackRange) {
+        if (now >= p.nextRepath) { p.nextRepath = now + 400; p.path = findPath(this.map, p.x, p.y, m.x, m.y, 600); }
+        this.follow(p, dst); p.dirty = true;
+      } else {
+        p.path = null;
+        if (now >= p.nextAtk) { p.nextAtk = now + s.attackMs; this.fx.push({ k: 'swing', x: p.x, y: p.y, id: p.eid, tx: m.x, ty: m.y }); this.hit(p, m, s.atk, s.crit); }
+      }
+    } else if (p.path) { this.follow(p, dst); p.dirty = true; }
+    for (const d of this.drops.values()) if (dist(d, p) <= 2.2 && (d.owner === p.charId || now > d.ownUntil)) {
+      if (d.key === null) { p.gold += d.gold; p.logs.push(['loot_gold', null, null, 0, d.gold, now]); p.dirty = true; p.meDirty = true; this.drops.delete(d.eid); }
+      else if (this.give(p, d.key, 1, d.rarity, 'loot')) { p.dirty = true; this.drops.delete(d.eid); this.sendInv(p); this.sys(p, `Obteve: ${ITEMS[d.key].name}`); }
+      else if (now - p.lastInvFull > 5000) { p.lastInvFull = now; this.sys(p, 'Inventário cheio.'); }
+    }
+    for (const g of this.map.portals) if (Math.hypot(p.x - g.x, p.y - g.y) < .9) { this.travel(p, g.to, g.tx, g.ty); return; }
+    if (p.meDirty) this.sendMe(p);
+  }
+  private nearestPlayer(m: Mob, r: number) { let best: Player | null = null, bd = r; for (const p of this.players.values()) { if (p.deadUntil) continue; const d = dist(m, p); if (d <= bd) { bd = d; best = p; } } return best; }
+  private tickMob(m: Mob, dt: number, now: number) {
+    if (m.hp <= 0) { if (now >= m.respawnAt) { m.hp = m.def.hp; m.x = m.hx; m.y = m.hy; m.state = 'idle'; m.phase = 1; m.nextNova = 0; } return; }
+    const def = m.def;
+    if (m.state === 'back') {
+      if (now >= m.nextThink) { m.nextThink = now + 500; m.path = findPath(this.map, m.x, m.y, m.hx, m.hy, 800); }
+      this.follow(m, def.speed * 1.8 * dt);
+      if (Math.hypot(m.x - m.hx, m.y - m.hy) < 1 || !m.path) { m.state = 'idle'; m.hp = def.hp; m.phase = 1; m.hitBy.clear(); }
+      return;
+    }
+    if (m.state === 'idle') {
+      const t = this.nearestPlayer(m, def.detect);
+      if (t) { m.state = 'chase'; m.target = t.eid; m.nextThink = 0; }
+      else { if (now >= m.nextThink) { m.nextThink = now + 2500 + Math.random() * 4000; if (Math.random() < .5) { const p = this.randomFree(m.hx, m.hy, 3); m.path = findPath(this.map, m.x, m.y, p.x, p.y, 120); } } this.follow(m, def.speed * .45 * dt); return; }
+    }
+    let t = this.players.get(m.target);
+    if (!t || t.deadUntil) { t = this.nearestPlayer(m, def.detect) ?? undefined; if (!t) { m.state = 'back'; m.nextThink = 0; return; } m.target = t.eid; }
+    if (Math.hypot(m.x - m.hx, m.y - m.hy) > def.leash) { m.state = 'back'; m.target = 0; m.nextThink = 0; return; }
+    if (def.boss) this.bossLogic(m, now);
+    const d = dist(m, t), reach = def.boss ? 2.2 : 1.4;
+    if (d > reach) {
+      if (now >= m.nextThink) { m.nextThink = now + 500; m.path = findPath(this.map, m.x, m.y, t.x, t.y, 500); }
+      this.follow(m, def.speed * dt);
+    } else if (now >= m.nextAtk) {
+      m.nextAtk = now + def.attackMs; this.fx.push({ k: 'bite', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y });
+      this.hurt(t, def.dmg * (m.phase === 2 ? 1.35 : 1), now);
+    }
+  }
+  private bossLogic(m: Mob, now: number) {
+    if (m.phase === 1 && m.hp < m.def.hp / 2) { m.phase = 2; m.nextNova = now + 800; for (const o of this.players.values()) this.sys(o, 'Hrímara entra em fúria!'); }
+    if (!m.nextNova) m.nextNova = now + 4000;
+    if (now < m.nextNova) return;
+    m.nextNova = now + (m.phase === 2 ? 5000 : 8000);
+    const at = { x: m.x, y: m.y }, r = 5, delay = 1300;
+    this.fx.push({ k: 'nova', x: at.x, y: at.y, r, d: delay });
+    setTimeout(() => { const n = Date.now(); for (const p of this.players.values()) if (dist(p, at) <= r) this.hurt(p, m.def.dmg * 1.5, n); }, delay);
+  }
+  private snapshot(p: Player) {
+    const R = CONFIG.aoiRadius, seen = new Set<number>(), news: unknown[] = [], e: unknown[] = [];
+    const near = (o: Pt) => Math.abs(o.x - p.x) < R && Math.abs(o.y - p.y) < R;
+    const note = (id: number, full: () => unknown) => { seen.add(id); if (!p.known.has(id)) { p.known.add(id); news.push(full()); } };
+    for (const o of this.players.values()) if (near(o)) {
+      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, lv: o.level, hc: o.hairColor, hs: o.hairStyle, weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
+      e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / this.stats(o).maxHp * 100)]);
+    }
+    for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => ({ id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }
+    for (const d of this.drops.values()) if (near(d)) { note(d.eid, () => ({ id: d.eid, k: 'd', key: d.key, rarity: d.rarity, gold: d.gold })); e.push([d.eid, d.x, d.y, 0]); }
+    for (const id of p.known) if (!seen.has(id)) p.known.delete(id);
+    const fx = this.fx.filter(near);
+    this.send(p, fx.length || news.length ? { t: 's', e, n: news, fx } : { t: 's', e });
+  }
+}

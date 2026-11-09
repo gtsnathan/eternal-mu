@@ -1,0 +1,12 @@
+{
+  "name": "eternal-mu",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild client/main.ts --bundle --minify --target=es2020 --outfile=public/game.js",
+    "dev": "npm run build && wrangler d1 migrations apply eternal-mu --local && wrangler dev",
+    "deploy": "npm run build && wrangler d1 migrations apply eternal-mu --remote && wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": { "esbuild": "^0.25.0", "typescript": "^5.8.0", "wrangler": "^4.0.0" }
+}

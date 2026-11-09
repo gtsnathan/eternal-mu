@@ -1,0 +1,20 @@
+name = "eternal-mu"
+main = "server/worker.ts"
+compatibility_date = "2025-06-01"
+
+[assets]
+directory = "./public"
+
+[[durable_objects.bindings]]
+name = "MAP_ROOM"
+class_name = "MapRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MapRoom"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "eternal-mu"
+database_id = "c1ed8dc8-ec7b-4073-bee6-4d4fc7779992"
+migrations_dir = "migrations"
