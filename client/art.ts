@@ -83,7 +83,7 @@ export function tile(t: number, v: number, frame: number): Cv {
   } else if (t === T.DUNGEON) {
     r(g, 0, 0, 32, 32, '#2a2733'); for (let row = 0; row < 2; row++) for (let i = -1; i < 2; i++) { const x = i * 16 + (row % 2) * 8 + 1, y = row * 16 + 1, sh = ['#45404f', '#3e3a48', '#4a4555', '#413c4b'][R() * 4 | 0]; r(g, x, y, 14, 14, sh); r(g, x, y, 14, 1, '#57525f'); r(g, x, y + 13, 14, 1, '#36323f'); }
   } else if (t === T.MARBLE) {
-    r(g, 0, 0, 32, 32, '#b8b2c4'); for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) { r(g, a * 16 + 1, b * 16 + 1, 14, 14, ['#e0dce9', '#dcd8e6', '#e4e0ec', '#d9d5e3'][R() * 4 | 0]); r(g, a * 16 + 1, b * 16 + 1, 14, 1, '#ffffff'); } let vx = R() * 30, vy = 0; for (let i = 0; i < 18; i++) { r(g, vx | 0, vy | 0, 1, 1, '#c6c0d2'); vx += R() * 3 - 1.5; vy += 1.6; } 
+    r(g, 0, 0, 32, 32, '#7f7890'); for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) { r(g, a * 16 + 1, b * 16 + 1, 14, 14, ['#b9b3c8', '#b2acc2', '#c0bacd', '#aca6bc'][R() * 4 | 0]); r(g, a * 16 + 1, b * 16 + 1, 14, 1, '#d6d1e2'); r(g, a * 16 + 1, b * 16 + 14, 14, 1, '#918aa3'); } r(g, 15, 15, 2, 2, '#d9b45a'); let vx = R() * 30, vy = 0; for (let i = 0; i < 18; i++) { r(g, vx | 0, vy | 0, 1, 1, '#958ea8'); vx += R() * 3 - 1.5; vy += 1.6; } 
   } else if (t === T.CLOUD) {
     r(g, 0, 0, 32, 32, '#5f84c8'); for (let i = 0; i < 5; i++) { const x = (i * 13 + frame * 4 + v * 7) % 32, y = (i * 9 + 4) % 28; ell(g, x, y, 8, 3, '#8fb0e4'); ell(g, (x + 14) % 32, (y + 12) % 30, 6, 2, '#c8dcf6'); }
   } else if (t === T.DWALL) {
