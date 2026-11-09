@@ -1,6 +1,6 @@
 import { WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
-import { findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
-import { WING_ROOT, wingSprites, gfx, hdCtx, hdOf, noHd, tintFrame, archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
+import { trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
+import { chestSprite, WING_ROOT, wingSprites, gfx, hdCtx, hdOf, noHd, tintFrame, archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
 
 const $ = <E extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as E;
 const root = $('#root');
@@ -19,7 +19,7 @@ function showAuth(register = false, msg = '') {
   <label>Senha</label><input type="password" name="password" autocomplete="${register ? 'new-password' : 'current-password'}" required>
   ${register ? '<label>Confirmar senha</label><input type="password" name="confirm" autocomplete="new-password" required><label class="check"><input type="checkbox" name="terms"> Li e aceito os termos de uso</label>' : ''}
   <div class="err">${esc(msg)}</div><button class="main" style="width:100%">${register ? 'Cadastrar' : 'Entrar'}</button>
-  <div style="text-align:center;margin-top:10px"><button type="button" class="link">${register ? 'Já tenho conta' : 'Criar conta'}</button></div></form></div>`;
+  <div style="text-align:center;margin-top:10px"><button type="button" class="link">${register ? 'Já tenho conta' : 'Criar conta'}</button> <a href="/guia" style="color:var(--gold);margin-left:12px">Guia do jogador</a></div></form></div>`;
   $('.link').onclick = () => showAuth(!register);
   const f = root.querySelector('form')!;
   f.onsubmit = async e => {
@@ -30,35 +30,36 @@ function showAuth(register = false, msg = '') {
 async function showChars(msg = '') {
   let me: any; try { me = await api('me'); } catch (e: any) { return e.status === 401 ? showAuth(false, msg) : showAuth(false, 'Sem conexão com o servidor.'); }
   root.innerHTML = `<div class="screen"><div class="card wide"><h1>ETERNAL MU</h1><div class="sub">Conta: ${esc(me.username)}</div><div class="err">${esc(msg)}</div><div class="chars"></div>
-  <div class="row">${me.characters.length < 5 ? '<button class="main" id="new">Novo personagem</button>' : ''}<button id="out">Sair</button><button id="outall">Sair de todos os dispositivos</button>${me.admin ? '<button id="adm">Painel Admin</button>' : ''}</div></div></div>`;
+  <div class="row">${me.characters.length < 5 ? '<button class="main" id="new">Novo personagem</button>' : ''}<button id="guia">Guia</button><button id="out">Sair</button><button id="outall">Sair de todos os dispositivos</button>${me.admin ? '<button id="adm">Painel Admin</button>' : ''}</div></div></div>`;
   const list = $('.chars');
   if (!me.characters.length) list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:16px">Crie seu primeiro herói.</div>';
   for (const c of me.characters) {
     const row = document.createElement('div'); row.className = 'char';
-    row.innerHTML = `<button class="open"><span class="pv"></span><span><b>${esc(c.name)}</b><small>${esc(c.class)} · Nível ${c.level} · ${esc(getMap(c.map).name)}</small></span></button><button class="del">Excluir</button>`;
+    row.innerHTML = `<button class="open"><span class="pv"></span><span><b>${esc(c.name)}</b><small>${esc(c.class)} · Nível ${c.level} · ${esc(getMap(c.map).name)}</small></span></button><button class="edit">Editar</button><button class="del">Excluir</button>`;
     row.querySelector('.pv')!.appendChild(portrait(c));
     (row.querySelector('.open') as HTMLElement).onclick = () => startGame(c.id);
+    (row.querySelector('.edit') as HTMLElement).onclick = () => showCreate(c);
     (row.querySelector('.del') as HTMLElement).onclick = async () => { if (confirm(`Excluir ${c.name} para sempre?`)) { await api(`characters/${c.id}/delete`, {}); showChars(); } };
     list.appendChild(row);
   }
   const adm = root.querySelector('#adm') as HTMLElement | null; if (adm) adm.onclick = () => { location.href = '/admin'; };
-  const nw = root.querySelector('#new') as HTMLElement | null; if (nw) nw.onclick = showCreate;
+  const nw = root.querySelector('#new') as HTMLElement | null; if (nw) nw.onclick = () => showCreate();
+  $('#guia').onclick = () => { location.href = '/guia'; };
   $('#out').onclick = async () => { await api('logout', {}); showAuth(); };
   $('#outall').onclick = async () => { await api('logout-all', {}); showAuth(); };
 }
-function showCreate() {
-  let hc = 0, hs = 0, ck = 'dark_warrior';
-  root.innerHTML = `<div class="screen"><form class="card"><h1 style="font-size:24px">NOVO HERÓI</h1><div class="sub" id="cdesc"></div><div class="row" id="sk"></div>
-  <label>Nome</label><input type="text" name="name" maxlength="14" required autocomplete="off">
+function showCreate(ed?: any) {
+  let hc = ed?.hair_color ?? 0, hs = ed?.hair_style ?? 0, ck = ed ? classOf(ed.class).key : 'dark_warrior';
+  root.innerHTML = `<div class="screen"><form class="card"><h1 style="font-size:24px">${ed ? esc(ed.name) : 'NOVO HERÓI'}</h1><div class="sub" id="cdesc"></div>${ed ? '' : '<div class="row" id="sk"></div><label>Nome</label><input type="text" name="name" maxlength="14" required autocomplete="off">'}
   <label>Cor do cabelo</label><div class="swatches" id="sc"></div><label>Estilo</label><div class="row" id="ss"></div><div class="preview"></div>
-  <div class="err"></div><div class="row"><button type="button" id="back">Voltar</button><button class="main">Criar</button></div></form></div>`;
+  <div class="err"></div><div class="row"><button type="button" id="back">Voltar</button><button class="main">${ed ? 'Salvar' : 'Criar'}</button></div></form></div>`;
   const pv = () => { $('#cdesc').textContent = CLASSES[ck].desc; root.querySelectorAll<HTMLElement>('.clsb').forEach(b => b.classList.toggle('on', b.dataset.c === ck)); const c = portrait({ hair_color: hc, hair_style: hs, class: CLASSES[ck].name }); c.style.width = '120px'; c.style.height = '168px'; $('.preview').replaceChildren(c); root.querySelectorAll('.sw').forEach((b, i) => b.classList.toggle('on', i === hc)); root.querySelectorAll('.opt').forEach((b, i) => b.classList.toggle('on', i === hs)); };
-  Object.values(CLASSES).forEach(c => { const b = document.createElement('button'); b.type = 'button'; b.className = 'opt0 clsb'; b.dataset.c = c.key; b.textContent = c.name; b.style.fontSize = '11px'; b.onclick = () => { ck = c.key; pv(); }; $('#sk').appendChild(b); });
+  if (!ed) Object.values(CLASSES).forEach(c => { const b = document.createElement('button'); b.type = 'button'; b.className = 'opt0 clsb'; b.dataset.c = c.key; b.textContent = c.name; b.style.fontSize = '11px'; b.onclick = () => { ck = c.key; pv(); }; $('#sk').appendChild(b); });
   HAIR_COLORS.forEach((col, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = col; b.setAttribute('aria-label', `Cor ${i + 1}`); b.onclick = () => { hc = i; pv(); }; $('#sc').appendChild(b); });
   HAIR_STYLES.forEach((n, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'opt'; b.textContent = n; b.onclick = () => { hs = i; pv(); }; $('#ss').appendChild(b); });
   pv(); $('#back').onclick = () => showChars();
   const f = root.querySelector('form')!;
-  f.onsubmit = async e => { e.preventDefault(); try { await api('characters', { name: new FormData(f).get('name'), cls: ck, hairColor: hc, hairStyle: hs }); showChars(); } catch (x: any) { $('.err').textContent = x.message; } };
+  f.onsubmit = async e => { e.preventDefault(); try { if (ed) { await api(`characters/${ed.id}/edit`, { hairColor: hc, hairStyle: hs }); return showChars('Personagem atualizado.'); } await api('characters', { name: new FormData(f).get('name'), cls: ck, hairColor: hc, hairStyle: hs }); showChars(); } catch (x: any) { $('.err').textContent = x.message; } };
 }
 
 // ---------- jogo ----------
@@ -115,7 +116,7 @@ function handle(m: any) {
     case 'news': { log(`Aviso: ${m.m}`, 'sys'); const el = $('#toast'); el.textContent = m.m; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(520, 240, 'triangle', .05); break; }
     case 'pong': rtt = Math.round(performance.now() - m.c); setConn(true); break;
     case 'me': { const lv = me?.level; me = m; updateHud(); if (lv !== undefined && lv !== m.level) beep(660, 400, 'triangle', .06); break; }
-    case 'inv': items = m.items; updateHud(); renderInv(); drawPortrait(); if (shop) renderShop(); break;
+    case 'inv': chest = m.chest ?? []; items = m.items; updateHud(); renderInv(); drawPortrait(); if (shop) renderShop(); break;
     case 's': snapshot(m); break;
     case 'sys': log(m.m, 'sys'); break;
     case 'c': log(`<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : '', true); break;
@@ -216,7 +217,11 @@ function renderChar() {
 }
 const setBonus = (k: string, n: number) => { const b = SETS[k].bonus, o: string[] = []; if (n >= 2) o.push(`+${b.def} def`); if (n >= 3) o.push(`+${b.hp} vida`); if (n >= 4) o.push(`+${Math.round(b.atk * 100)}% atq`); return o.join(' · ') || 'sem bônus'; };
 function renderShop() {
-  if (!shop || !me) return; const sk = `${you}|${shop.id}|${me.level}|${me.gold}|${JSON.stringify(items)}`; if (sk === shopKey) return; shopKey = sk; $('#shopt').textContent = shop.name; const L = $('#shopl'), npc = shop; L.replaceChildren();
+  if (!shop || !me) return; const sk = `${you}|${shop.id}|${me.level}|${me.gold}|${JSON.stringify(items)}|${JSON.stringify(chest)}`; if (sk === shopKey) return; shopKey = sk; $('#shopt').textContent = shop.name; const L = $('#shopl'), npc = shop; L.replaceChildren();
+  if (npc.shop === 'chest') {
+    const section = (title: string, cap: string, list: ItemInst[], act: (i: ItemInst) => void, base: number) => { const h = document.createElement('h4'); h.className = 'shoph'; h.textContent = `${title} (${list.length}/${CONFIG.invSize}) ${cap}`; const gr = document.createElement('div'); gr.className = 'grid'; for (let n = 0; n < CONFIG.invSize; n++) { const it = list.find(x => x.slot === base + n); gr.appendChild(makeCell(it, () => { if (it) act(it); })); } L.append(h, gr); };
+    section('Baú', '· clique para retirar', chest, i => send({ t: 'wd', slot: i.slot }), 1000); section('Bolsa', '· clique para guardar', items.filter(i => !i.equip), i => send({ t: 'dep', slot: i.slot }), 0); return;
+  }
   if (npc.shop === 'wings') {
     const count = (k: string) => items.filter(i => i.key === k && !i.equip).reduce((a, i) => a + i.qty, 0), m0 = me;
     WING_RECIPES.forEach((rc, t) => { const key = `wing_${myCls.key}_${t}`, d = ITEMS[key], box = document.createElement('div'); box.className = 'sethead'; const ic = cv(56, 56); ic.getContext('2d')!.drawImage(hdOf(icon(key)), 0, 0); ic.style.cssText = 'width:42px;height:42px'; const tx = document.createElement('div'); tx.style.flex = '1'; const need: [string, number, number][] = rc.mats.map(([k, q]) => [ITEMS[k].name, count(k), q]); const prev = t > 0 ? `wing_${myCls.key}_${t - 1}` : null; if (prev) need.unshift([ITEMS[prev].name, count(prev), 1]); const lines = need.map(([n, h, q]) => `<small style="color:${h >= q ? '#79e08a' : '#ff9b8e'}">${esc(n)}: ${h}/${q}</small>`).join(''); tx.innerHTML = `<b style="color:${d.blade}">${esc(d.name)}</b><small>Nível ${d.lvl} · ${rc.gold.toLocaleString('pt-BR')} moedas</small>${lines}`; const b = document.createElement('button'); b.textContent = 'Criar'; b.disabled = m0.level < d.lvl || m0.gold < rc.gold || need.some(([, h, q]) => h < q); b.onclick = () => send({ t: 'cw', tier: t }); box.append(ic, tx, b); L.appendChild(box); });
@@ -231,8 +236,8 @@ function renderShop() {
   for (const i of bag) { const r = document.createElement('div'); r.className = 'shopitem'; r.dataset.sell = i.key; const c = cv(56, 56); c.getContext('2d')!.drawImage(hdOf(icon(i.key)), 0, 0); c.style.imageRendering = 'pixelated'; const s = document.createElement('span'); s.textContent = `${ITEMS[i.key].name}${i.qty > 1 ? ` ×${i.qty}` : ''} · ${sellPrice(i)} moedas`; s.style.color = RARITY[i.rarity].color; s.title = itemText(i); const b = document.createElement('button'); b.textContent = 'Vender'; b.onclick = () => { if (i.rarity && !confirm(`Vender ${ITEMS[i.key].name} (${RARITY[i.rarity].name})?`)) return; send({ t: 'se', npc: npc.id, slot: i.slot }); }; r.append(c, s, b); L.appendChild(r); }
 }
 let miniBase: Cv | null = null;
-const TILE_COL = ['#4c8a3f', '#a29a8b', '#2f74b5', '#e4edf6', '#a6d6ee', '#94734b', '#e8601c', '#3b3236'];
-function bakeMini() { if (!map) return; miniBase = cv(map.w, map.h); const x = miniBase.getContext('2d')!; for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) { const sol = map.solid[j * map.w + i], t = map.tiles[j * map.w + i]; x.fillStyle = sol && t !== T.WATER && t !== T.LAVA ? (map.safe ? '#3a5b34' : '#274c48') : TILE_COL[t]; x.fillRect(i, j, 1, 1); } }
+const TILE_COL = ['#4c8a3f', '#a29a8b', '#2f74b5', '#e4edf6', '#a6d6ee', '#94734b', '#e8601c', '#3b3236', '#2a4a30', '#45404f', '#e6e2ee', '#7fa3dc', '#14121c'];
+function bakeMini() { if (!map) return; miniBase = cv(map.w, map.h); const x = miniBase.getContext('2d')!; for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) { const sol = map.solid[j * map.w + i], t = map.tiles[j * map.w + i]; x.fillStyle = sol && t !== T.WATER && t !== T.LAVA && t !== T.CLOUD && t !== T.DWALL ? (map.safe ? '#3a5b34' : '#274c48') : TILE_COL[t]; x.fillRect(i, j, 1, 1); } }
 function paintMap(c: HTMLCanvasElement, sx: number, sy: number, wv: number, hv: number) {
   if (!map || !miniBase) return; const x = c.getContext('2d')!, k = c.width / wv; x.imageSmoothingEnabled = false; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); x.drawImage(miniBase, sx, sy, wv, hv, 0, 0, c.width, c.height);
   const dot = (px: number, py: number, col: string, s = 3) => { x.fillStyle = col; x.fillRect((px - sx) * k - s / 2, (py - sy) * k - s / 2, s, s); };
@@ -324,7 +329,7 @@ canvas.addEventListener('pointerdown', e => {
   if (best) return attack(best);
   if (e.pointerType !== 'mouse') for (const en of ents.values()) if (en.k === 'p' && en.id !== you && Math.hypot(en.x - wx, en.y - .6 - wy) < .9) { playerMenu(en, e.clientX, e.clientY); return; }
   for (const n of map.npcs) if (Math.hypot(n.x - wx, n.y - .6 - wy) < 1.1) { const a = ents.get(you); pendingNpc = n; target = 0; if (a && Math.hypot(a.x - n.x, a.y - n.y) > 2.5) { send({ t: 'g', x: n.x, y: n.y + 1.4 }); startPred(n.x, n.y + 1.4); } return; }
-  target = 0; pendingNpc = null; marker = { x: wx, y: wy, t: 0 }; closeWin('shop'); send({ t: 'g', x: wx, y: wy }); startPred(wx, wy);
+  autoAt = performance.now() + 1500; target = 0; pendingNpc = null; marker = { x: wx, y: wy, t: 0 }; closeWin('shop'); send({ t: 'g', x: wx, y: wy }); startPred(wx, wy);
   if (e.pointerType === 'mouse') { holding = true; holdAt = performance.now() + 250; } // segurar: segue o cursor
 });
 // Qualidade: 2 alto (densidade da tela e bloom), 1 médio, 0 baixo. Em Auto, reduz sozinho se o FPS cair.
@@ -339,6 +344,7 @@ document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const c = cv
 { const c = cv(56, 56); c.getContext('2d')!.drawImage(hdOf(icon('short_sword')), 0, 0); c.className = 'pi'; $('#atk').appendChild(c); [...$('#atk').childNodes].filter(n => n.nodeType === 3).forEach(n => n.remove()); }
 
 // ---------- render ----------
+let chest: ItemInst[] = [], editId = 0;
 let jewelSlot = -1, gfxInit = false;
 const bloomC = cv(16, 16), bloomX = bloomC.getContext('2d')!; noHd.add(bloomC);
 let ghosts: { c: Cv; x: number; y: number; t: number }[] = [];
@@ -381,7 +387,7 @@ function frame(ts: number) {
     if (pendingNpc && Math.hypot(a.x - pendingNpc.x, a.y - pendingNpc.y) < 2.6) { const n = pendingNpc; pendingNpc = null; log(`${n.name}: ${n.line}`, 'sys'); if (n.shop) { shop = n; renderShop(); openW('shop'); } }
     if (shop && Math.hypot(a.x - shop.x, a.y - shop.y) > 3.8) closeWin('shop');
     if (target && !ents.has(target)) target = 0;
-    if (auto && ts > autoAt && me && !me.dead && !map.safe && !target) { autoAt = ts + 350; const m = nearestMob(14); if (m) attack(m); }
+    if (auto && ts > autoAt && me && !me.dead && !map.safe) { autoAt = ts + 280; autoPlay(a, ts); }
   }
   const W = canvas.width, H = canvas.height, vw = W / Z, vh = H / Z;
   const cx = Math.max(vw / 2, Math.min(map.w * 32 - vw / 2, camX * 32)), cy = Math.max(vh / 2, Math.min(map.h * 32 - vh / 2, camY * 32));
@@ -396,6 +402,7 @@ function frame(ts: number) {
   for (let cy = Math.floor(y0 / CH); cy <= Math.floor(y1 / CH); cy++) for (let cx = Math.floor(x0 / CH); cx <= Math.floor(x1 / CH); cx++) cs.push({ cx, cy, ch: chunk(map, cx, cy) });
   for (const c of cs) for (let n = 0; n < c.ch.anim.length; n += 2) { const i = c.ch.anim[n], j = c.ch.anim[n + 1]; g.drawImage(tile(map.tiles[j * map.w + i], (i * 7 + j * 13) % 4, wf), i * 32, j * 32); }
   for (const c of cs) g.drawImage(c.ch.c, c.cx * CH * 32, c.cy * CH * 32, CH * 32, CH * 32);
+  if (map.traps) { const up = trapUp(Date.now()); for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) if (map.traps.has(j * map.w + i)) { const X0 = i * 32, Y0 = j * 32; g.fillStyle = '#1a1722'; g.fillRect(X0 + 3, Y0 + 3, 26, 26); g.fillStyle = up ? '#e0e6ee' : '#57525f'; for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { const sx = X0 + 7 + a * 8, sy = Y0 + 7 + b * 8; if (up) { g.fillRect(sx, sy - 5, 2, 8); g.fillStyle = '#ff5a4a'; g.fillRect(sx, sy - 6, 2, 2); g.fillStyle = '#e0e6ee'; } else g.fillRect(sx, sy, 2, 2); } } }
   prints = prints.filter(p => (p.t += dt) < 9); for (const p of prints) { g.fillStyle = `rgba(120,145,185,${.55 * (1 - p.t / 9)})`; g.fillRect(Math.round(p.x * 32) - 2, Math.round(p.y * 32), 4, 3); }
   // marcador e portais
   if (marker) { marker.t += dt; const u = marker.t / .5; if (u > 1) marker = null; else { g.strokeStyle = '#ffe08a'; g.lineWidth = 1; g.globalAlpha = 1 - u; g.strokeRect(marker.x * 32 - 8 + u * 4, marker.y * 32 - 5 + u * 3, 16 - u * 8, 10 - u * 6); g.globalAlpha = 1; } }
@@ -418,25 +425,27 @@ function frame(ts: number) {
   // vida no ambiente
   { const camWX = -ox + vw / 2, camWY = -oy + vh / 2, sm = g.imageSmoothingEnabled;
     g.imageSmoothingEnabled = true;
-    for (let i = 0; i < 4; i++) { const rad = 260 + i * 60, cxx = camWX + Math.sin(ts / 21000 + i * 1.9) * vw * .6, cyy = camWY + Math.cos(ts / 17000 + i * 2.7) * vh * .6; g.globalAlpha = map.id === 'frostvale' ? .16 : map.id === 'infernal' ? .22 : .1; g.drawImage(glowSprite(map.id === 'frostvale' ? '#ffffff' : map.id === 'infernal' ? '#120609' : '#0a0814'), cxx - rad, cyy - rad * .6, rad * 2, rad * 1.2); }
+    for (let i = 0; i < 4; i++) { const rad = 260 + i * 60, cxx = camWX + Math.sin(ts / 21000 + i * 1.9) * vw * .6, cyy = camWY + Math.cos(ts / 17000 + i * 2.7) * vh * .6; g.globalAlpha = map.id === 'celestial' ? .2 : map.id === 'frostvale' ? .16 : map.id === 'infernal' ? .22 : .1; g.drawImage(glowSprite(map.id === 'frostvale' || map.id === 'celestial' ? '#ffffff' : map.id === 'infernal' ? '#120609' : '#0a0814'), cxx - rad, cyy - rad * .6, rad * 2, rad * 1.2); }
     g.globalAlpha = 1; g.imageSmoothingEnabled = sm;
     if (map.safe) for (let i = 0; i < 10; i++) { const bx = camWX + Math.sin(ts / 3100 + i * 2.1) * vw * .46 + Math.sin(ts / 700 + i) * 14, by = camWY + Math.cos(ts / 2700 + i * 1.3) * vh * .42 + Math.sin(ts / 430 + i) * 8, w = Math.floor(ts / 120 + i) % 2 ? 3 : 1; g.fillStyle = ['#f4e36b', '#f2a0c0', '#8fd0ff'][i % 3]; g.fillRect(Math.round(bx - w), Math.round(by), w, 3); g.fillRect(Math.round(bx + 1), Math.round(by), w, 3); }
     if (Math.random() < .5) { const ri = x0 + Math.floor(Math.random() * (x1 - x0 + 1)), rj = y0 + Math.floor(Math.random() * (y1 - y0 + 1)), tt = map.tiles[rj * map.w + ri]; if (tt === T.LAVA) parts.push({ x: ri + Math.random(), y: rj + .9, vx: 0, vy: -1.6, life: 0, max: .5, c: '#ffd76a', s: 3, g: 3 }); else if (tt === T.WATER) parts.push({ x: ri + Math.random(), y: rj + Math.random() + .3, vx: 0, vy: 0, life: 0, max: .3, c: '#ffffff', s: 2 }); else if (tt === T.ICE) parts.push({ x: ri + Math.random(), y: rj + Math.random() + .3, vx: 0, vy: 0, life: 0, max: .4, c: '#ffffff', s: 2 }); }
   }
   // luz do dia/noite e fontes de luz
-  const night = nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
-  if (night > .02) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : map.id === 'infernal' ? [255, 214, 190] : [226, 236, 255], [122, 130, 188], night); g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
+  const night = map.id === 'ashen' ? .95 : map.id === 'celestial' ? 0 : map.id === 'eldergrove' ? Math.max(.42, nightFactor()) : nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
+  if (night > .02) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : map.id === 'infernal' ? [255, 214, 190] : map.id === 'eldergrove' ? [214, 240, 214] : map.id === 'celestial' ? [255, 248, 228] : [226, 236, 255], [122, 130, 188], night); g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   const light = (x: number, y: number, r: number, c: string, al: number) => { g.globalAlpha = Math.min(1, al); g.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
   for (const p of map.portals) light(p.x * 32, p.y * 32 - 26, 96 + Math.sin(ts / 300) * 8, '#8a55ff', .55 + night * .35);
   if (map.id === 'infernal') for (let j = y0 - y0 % 4; j <= y1; j += 4) for (let i = x0 - x0 % 4; i <= x1; i += 4) if (map.tiles[j * map.w + i] === T.LAVA) light(i * 32 + 16, j * 32 + 16, 118 + Math.sin(ts / 300 + i + j) * 6, '#ff5a1c', .34);
   for (const o of vis) {
     if (o.k === 'spire' && (o.x + o.y) % 4 === 0) light(o.x * 32 + 16, o.y * 32 - 6, 44, '#ff6a2b', .3);
+    if (o.k === 'torch') light(o.x * 32 + 16, o.y * 32 + 8, 130 + Math.sin(ts / 110 + o.x) * 7, '#ff9a4a', .9);
+    if (o.k === 'shroom') light(o.x * 32 + 16, o.y * 32 - 8, 62, o.v ? '#3fd6c0' : '#b06bff', .55);
     if (o.k === 'lamp') light(o.x * 32 + 16, o.y * 32 - 22, 80 + Math.sin(ts / 170 + o.x) * 3, '#ffb45a', .18 + night * .7);
     else if (o.k === 'house' && night > .1) for (const wx of [18, o.w * 32 - 28]) light(o.x * 32 - 4 + wx + 8, (o.y + o.h) * 32 - 39, 34, '#ffc66a', night * .8);
     else if (o.k === 'rock' && (o.x + o.y) % 5 === 0) light(o.x * 32 + 16, o.y * 32 + 2, 52, '#4fc6ff', .3 + night * .4); }
   for (const b of bolts) { const u = b.t / .16; light((b.x + (b.tx - b.x) * u) * 32, (b.y + (b.ty - b.y) * u) * 32 - 18, 34, b.c, .9); }
   for (const r of rings) if (!r.tele) light(r.x * 32, r.y * 32, r.r * 40, r.c, .5 * (1 - r.t / r.max));
-  for (const e of ents.values()) { if (e.k === 'd' && e.info.rarity) light(e.x * 32, e.y * 32, 34, RARITY[e.info.rarity].color, .5); if (e.k === 's') light(e.x * 32, e.y * 32 - 14, 46, e.info.mob === 'wisp' ? '#6dff9c' : '#a04dff', .6); if (e.k === 'm' && MOBS[e.info.mob].boss) light(e.x * 32, e.y * 32 - 50, 130, MOBS[e.info.mob].nova ?? '#59c8ff', .35 + night * .3); if (e.k === 'p' && e.info.weapon && ITEMS[e.info.weapon].lvl >= 26) light(e.x * 32 + (e.dir === 3 ? -12 : 12), e.y * 32 - 34, 34, ITEMS[e.info.weapon].blade!, .4 + Math.sin(ts / 240 + e.id) * .12); if (e.k === 'p' && e.info.wings && ITEMS[e.info.wings].wtier === 2 && Math.random() < .35) parts.push({ x: e.x + (Math.random() - .5) * 2.6, y: e.y - .4 - Math.random(), vx: 0, vy: .6, life: 0, max: .9, c: ITEMS[e.info.wings].blade!, s: 2 }); if (e.k === 'p') { const fs = fullSetOf(SET_PIECES.map(p => e.info[p])); if (fs) { const col = SETS[fs].key === 'dragon' ? '#7dffb0' : SETS[fs].trim; light(e.x * 32, e.y * 32 + 2, 46 + Math.sin(ts / 260) * 4, col, .3); if (Math.random() < .25) parts.push({ x: e.x + (Math.random() - .5) * .9, y: e.y + .1, vx: 0, vy: -1.4, life: 0, max: .8, c: col, s: 2 }); } } if (e.id === you && night > .05) light(e.x * 32, e.y * 32 - 18, 130, '#ffdca0', night * .4); }
+  for (const e of ents.values()) { if (e.k === 'd' && e.info.rarity) light(e.x * 32, e.y * 32, 34, RARITY[e.info.rarity].color, .5); if (e.k === 's') light(e.x * 32, e.y * 32 - 14, 46, e.info.mob === 'wisp' ? '#6dff9c' : '#a04dff', .6); if (e.k === 'm' && MOBS[e.info.mob].boss) light(e.x * 32, e.y * 32 - 50, 130, MOBS[e.info.mob].nova ?? '#59c8ff', .15 + night * .15); if (e.k === 'p' && e.info.weapon && ITEMS[e.info.weapon].lvl >= 26) light(e.x * 32 + (e.dir === 3 ? -12 : 12), e.y * 32 - 34, 34, ITEMS[e.info.weapon].blade!, .4 + Math.sin(ts / 240 + e.id) * .12); if (e.k === 'p' && e.info.wings && ITEMS[e.info.wings].wtier === 2 && Math.random() < .35) parts.push({ x: e.x + (Math.random() - .5) * 2.6, y: e.y - .4 - Math.random(), vx: 0, vy: .6, life: 0, max: .9, c: ITEMS[e.info.wings].blade!, s: 2 }); if (e.k === 'p') { const fs = fullSetOf(SET_PIECES.map(p => e.info[p])); if (fs) { const col = SETS[fs].key === 'dragon' ? '#7dffb0' : SETS[fs].trim; light(e.x * 32, e.y * 32 + 2, 46 + Math.sin(ts / 260) * 4, col, .3); if (Math.random() < .25) parts.push({ x: e.x + (Math.random() - .5) * .9, y: e.y + .1, vx: 0, vy: -1.4, life: 0, max: .8, c: col, s: 2 }); } } if (e.id === you && night > .05) light(e.x * 32, e.y * 32 - 18, 130, '#ffdca0', night * .4); }
   if (map.safe && night > .15) for (let i = 0; i < 12; i++) light(-ox + vw / 2 + Math.sin(ts / 3900 + i * 3.1) * vw * .47, -oy + vh / 2 + Math.cos(ts / 3300 + i * 1.7) * vh * .44, 13, '#c6ff7a', night * (.5 + Math.sin(ts / 310 + i * 2) * .4));
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.imageSmoothingEnabled = false;
   if (quality === 2 && 'filter' in g) {
@@ -446,7 +455,7 @@ function frame(ts: number) {
   }
   // nomes, barras e números
   g.textAlign = 'center';
-  for (const n of map.npcs) { label(n.x * 32, n.y * 32 - 50, n.name, '#ffe08a'); if (n.shop) label(n.x * 32, n.y * 32 - 62 + Math.sin(ts / 260) * 2, '$', '#ffd76a'); }
+  for (const n of map.npcs) { label(n.x * 32, n.y * 32 - 50, n.name, '#ffe08a'); if (n.shop && n.id !== 'bau') label(n.x * 32, n.y * 32 - 62 + Math.sin(ts / 260) * 2, '$', '#ffd76a'); }
   for (const p of map.portals) label(p.x * 32, p.y * 32 - 92, `» ${p.label}${p.lvl ? ` (Nv ${p.lvl})` : ''}`, me && p.lvl && me.level < p.lvl ? '#ff9b8e' : '#d6bcff');
   for (const e of ents.values()) {
     if (e.k === 's') continue;
@@ -460,7 +469,7 @@ function frame(ts: number) {
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (map.id === 'infernal') { for (const f of snow) { f.y -= f.s * dt * 4; f.x += Math.sin(ts / 700 + f.d) * .0008; if (f.y < 0) f.y = 1; g.globalAlpha = .45 + f.s * 7; g.fillStyle = f.s > .055 ? '#ffd76a' : '#ff7a2b'; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), 2 * Z, 2 * Z); } g.globalAlpha = 1; }
   else if (!map.safe) {
-    g.fillStyle = '#fff'; for (const f of snow) { f.y += f.s * dt * 5; f.x += Math.sin(ts / 900 + f.d) * .0006; if (f.y > 1) f.y = 0; g.globalAlpha = .35 + f.s * 8; const sz = (f.s > .055 ? 3 : 2) * Z; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), sz, sz); } g.globalAlpha = 1;
+    g.fillStyle = map.id === 'eldergrove' ? '#b6f06a' : map.id === 'celestial' ? '#ffe9a8' : map.id === 'ashen' ? '#6a6478' : '#fff'; for (const f of snow) { f.y += f.s * dt * 5; f.x += Math.sin(ts / 900 + f.d) * .0006; if (f.y > 1) f.y = 0; g.globalAlpha = .35 + f.s * 8; const sz = (f.s > .055 ? 3 : 2) * Z; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), sz, sz); } g.globalAlpha = 1;
   }
   const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : map.id === 'infernal' ? '#40080888' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   if (me?.dead) { g.fillStyle = '#50000066'; g.fillRect(0, 0, W, H); }
@@ -496,6 +505,8 @@ function decal(x: CanvasRenderingContext2D, t: number, i: number, j: number) {
     else if (n < 7) { p(X, Y + 4, 9, 1, '#6b5a4a'); p(X + 3, Y + 2, 1, 3, '#6b5a4a'); p(X + 6, Y + 1, 1, 4, '#6b5a4a'); }
     else if (n < 12) { p(X, Y + 4, 12, 2, '#f8fcff'); p(X + 2, Y + 3, 8, 1, '#ffffff'); p(X, Y + 6, 12, 1, '#c5d5e7'); }
   } else if (t === T.ICE) { if (n < 20) { p(X, Y, 1, 5, '#fff'); p(X - 2, Y + 2, 5, 1, '#fff'); } }
+  else if (t === T.MOSS) { if (n < 7) { p(X + 1, Y + 4, 2, 4, '#d6d0c0'); p(X - 1, Y + 1, 6, 3, n % 2 ? '#3fd6c0' : '#b06bff'); } else if (n < 16) for (let a = 0; a < 5; a++) p(X + a * 2, Y + 5 - (a % 3) * 2, 1, 3 + (a % 3) * 2, a % 2 ? '#4f8f50' : '#2f6b3a'); }
+  else if (t === T.DUNGEON) { if (n < 5) { p(X, Y + 3, 10, 2, '#b8b09e'); p(X - 1, Y + 2, 2, 4, '#cfc7b4'); p(X + 9, Y + 2, 2, 4, '#cfc7b4'); } else if (n < 8) { p(X, Y, 7, 6, '#b8b09e'); p(X + 1, Y + 2, 2, 2, '#1a1416'); p(X + 4, Y + 2, 2, 2, '#1a1416'); } else if (n < 16) { let a = X; for (let k = 0; k < 8; k++) { p(a, Y + k, 1, 1, '#23202b'); a += (h >> k) % 3 - 1; } } }
   else if (t === T.ASH) {
     if (n < 3) { p(X, Y, 7, 6, '#cfc7b4'); p(X + 1, Y + 6, 5, 2, '#a8a08e'); p(X + 1, Y + 2, 2, 2, '#1a1416'); p(X + 4, Y + 2, 2, 2, '#1a1416'); }
     else if (n < 7) { p(X, Y + 3, 11, 2, '#b8b09e'); p(X - 1, Y + 2, 2, 4, '#cfc7b4'); p(X + 10, Y + 2, 2, 4, '#cfc7b4'); }
@@ -504,7 +515,7 @@ function decal(x: CanvasRenderingContext2D, t: number, i: number, j: number) {
 }
 function objShadow(x: CanvasRenderingContext2D, o: GameMap['objs'][number]) {
   const sh = glowSprite('#0a0814'), put = (cx: number, cy: number, rx: number, ry: number) => x.drawImage(sh, cx - rx, cy - ry, rx * 2, ry * 2), X = o.x * 32 + 16, Y = o.y * 32;
-  if (o.k === 'tree' || o.k === 'pine') put(X, Y + 28, 28, 11); else if (o.k === 'rock' || o.k === 'lamp' || o.k === 'barrel' || o.k === 'spire' || o.k === 'deadtree') put(X, Y + 28, 20, 8); else if (o.k === 'house' || o.k === 'stall') put(o.x * 32 + o.w * 16, (o.y + o.h) * 32, o.w * 18, 12);
+  if (o.k === 'tree' || o.k === 'pine') put(X, Y + 28, 28, 11); else if (o.k === 'oak') put(X, Y + 28, 34, 13); else if (o.k === 'rock' || o.k === 'lamp' || o.k === 'barrel' || o.k === 'spire' || o.k === 'deadtree' || o.k === 'shroom' || o.k === 'pillar' || o.k === 'statue') put(X, Y + 28, 20, 8); else if (o.k === 'house' || o.k === 'stall') put(o.x * 32 + o.w * 16, (o.y + o.h) * 32, o.w * 18, 12);
 }
 /** Bloco 12×12 do chão já desenhado: tiles, bordas e sombras saem prontos de uma vez. */
 function chunk(m: GameMap, cx: number, cy: number) {
@@ -512,10 +523,11 @@ function chunk(m: GameMap, cx: number, cy: number) {
   const S = gfx.hd ? 2 : 1, c = cv(CH * 32 * S, CH * 32 * S), x = c.getContext('2d')!, anim: number[] = [], x0 = cx * CH, y0 = cy * CH; noHd.add(c); hdCtx(x); x.imageSmoothingEnabled = false; x.scale(S, S); x.translate(-x0 * 32, -y0 * 32);
   for (let j = y0; j < Math.min(m.h, y0 + CH); j++) for (let i = x0; i < Math.min(m.w, x0 + CH); i++) {
     const t = m.tiles[j * m.w + i], v = (i * 7 + j * 13) % 4;
-    if (t === T.WATER || t === T.LAVA) anim.push(i, j); else x.drawImage(tile(t, v, 0), i * 32, j * 32);
+    if (t === T.WATER || t === T.LAVA || t === T.CLOUD) anim.push(i, j); else x.drawImage(tile(t, t === T.DWALL && j + 1 < m.h && m.tiles[(j + 1) * m.w + i] !== T.DWALL ? 7 : v, 0), i * 32, j * 32);
+    if (t === T.DWALL) continue;
     const P = tilePrio(t), nb = (a: number, b: number, side: number) => { if (a < 0 || b < 0 || a >= m.w || b >= m.h) return; const nt = m.tiles[b * m.w + a]; if (tilePrio(nt) > P) x.drawImage(edge(nt, side, t === T.WATER), i * 32, j * 32); };
     nb(i, j - 1, 0); nb(i, j + 1, 1); nb(i - 1, j, 2); nb(i + 1, j, 3);
-    if (t !== T.STONE && t !== T.WATER && t !== T.LAVA) { const q = (Math.sin(i * .37 + j * .11) + Math.sin(j * .29 - i * .17) + 2) / 4; x.fillStyle = t === T.GRASS ? '#123a1a' : t === T.ASH ? '#120609' : '#6a8fc8'; x.globalAlpha = q * .2; x.fillRect(i * 32, j * 32, 32, 32); x.globalAlpha = 1; }
+    if (t !== T.STONE && t !== T.WATER && t !== T.LAVA && t !== T.CLOUD && t !== T.MARBLE && t !== T.DUNGEON) { const q = (Math.sin(i * .37 + j * .11) + Math.sin(j * .29 - i * .17) + 2) / 4; x.fillStyle = t === T.GRASS ? '#123a1a' : t === T.MOSS ? '#0a1a10' : t === T.ASH ? '#120609' : '#6a8fc8'; x.globalAlpha = q * .2; x.fillRect(i * 32, j * 32, 32, 32); x.globalAlpha = 1; }
     if (!m.solid[j * m.w + i]) decal(x, t, i, j);
   }
   x.imageSmoothingEnabled = true; x.globalAlpha = .55;
@@ -534,7 +546,28 @@ function drawObj(o: GameMap['objs'][number], ts: number) {
   else g.drawImage(s.c, X, Y);
 }
 const npcLooks: Look[] = [{ hc: '#000', hs: 0 }, { hc: '#d8dde6', hs: 2, robe: '#6a3f96' }, { hc: '#b23a2e', hs: 0, armor: '#7a5230', weapon: 'iron_axe', boots: '#3c2a1c' }, { hc: '#2b2230', hs: 0, helm: '#8b95a6', armor: '#8b95a6', pants: '#5c6577', weapon: 'short_sword' }, lookFromGear('Dark Warrior', '#d9b24a', 2, { helm: null, armor: 'lion_armor', pants: 'lion_pants', boots: 'lion_boots', weapon: 'frost_blade' }), { hc: '#d8dde6', hs: 1, armor: '#3e5a9a', pants: '#2a3a68', boots: '#c9a44c' }];
-function drawNpc(n: Npc) { if (n.id === 'artifice') { const w = wingSprites('arcane_wizard', 1)[Math.floor(performance.now() / 135) % 6], fw = w.width / 2; g.imageSmoothingEnabled = true; g.drawImage(w, Math.round(n.x * 32 - fw / 2), Math.round(n.y * 32) - 27 - WING_ROOT, fw, w.height / 2); g.imageSmoothingEnabled = false; } shadow(n.x * 32, n.y * 32 + 2, 15, 6); g.drawImage(heroSprites(npcLooks[n.look])[0][0], Math.round(n.x * 32 - FRAME_W / 2), Math.round(n.y * 32 - FRAME_H + 6)); }
+const skillLock: Record<number, number> = {}, lootTried = new Set<number>();
+/** Modo Auto: usa poções, habilidades, ataca o monstro mais próximo e recolhe o que cair. */
+function autoPlay(a: Ent, ts: number) {
+  const m0 = me!, ready = (s: { n: number; mana: number; lvl?: number }) => m0.level >= (s.lvl ?? 1) && m0.mp >= s.mana && ts > (cds[s.n]?.until ?? 0) && ts > (skillLock[s.n] ?? 0), cast = (s: { n: number }, id: number) => { skillLock[s.n] = ts + 500; send({ t: 'k', n: s.n, id }); };
+  if (m0.hp < m0.maxHp * .4) potion('pot_hp'); else if (m0.mp < m0.maxMp * .25) potion('pot_mp');
+  const near = nearestMob(14), heal = myCls.skills.find(s => s.kind === 'heal');
+  if (heal && m0.hp < m0.maxHp * .6 && ready(heal)) return cast(heal, 0);
+  let t = ents.get(target); if (!t || t.k !== 'm') t = undefined;
+  if (!t) {
+    let drop: Ent | null = null, bd = 6; for (const e of ents.values()) if (e.k === 'd' && !lootTried.has(e.id)) { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; drop = e; } }
+    if (drop) { lootTried.add(drop.id); if (lootTried.size > 300) lootTried.clear(); send({ t: 'g', x: drop.x, y: drop.y }); startPred(drop.x, drop.y); autoAt = ts + Math.min(1400, 250 + bd * 210); return; }
+    if (near) { attack(near); t = near; } else return;
+  }
+  const dist = Math.hypot(t.x - a.x, t.y - a.y);
+  for (const s of [...myCls.skills].reverse()) {
+    if (!ready(s)) continue;
+    if (s.kind === 'buff' || s.kind === 'summon') { if (dist < 9) return cast(s, 0); continue; }
+    if (s.kind === 'heal') continue;
+    if (s.kind === 'spin' ? dist <= s.radius! - .2 : dist <= (s.range ?? 8) - .2) return cast(s, t.id);
+  }
+}
+function drawNpc(n: Npc) { if (n.id === 'bau') { shadow(n.x * 32, n.y * 32 + 4, 24, 8); g.drawImage(chestSprite(), Math.round(n.x * 32) - 22, Math.round(n.y * 32) - 34); return; } if (n.id === 'artifice') { const w = wingSprites('arcane_wizard', 1)[Math.floor(performance.now() / 135) % 6], fw = w.width / 2; g.imageSmoothingEnabled = true; g.drawImage(w, Math.round(n.x * 32 - fw / 2), Math.round(n.y * 32) - 27 - WING_ROOT, fw, w.height / 2); g.imageSmoothingEnabled = false; } shadow(n.x * 32, n.y * 32 + 2, 15, 6); g.drawImage(heroSprites(npcLooks[n.look])[0][0], Math.round(n.x * 32 - FRAME_W / 2), Math.round(n.y * 32 - FRAME_H + 6)); }
 function drawEnt(e: Ent, ts: number) {
   const X = Math.round(e.x * 32), Y = Math.round(e.y * 32);
   if (e.k === 'p') {

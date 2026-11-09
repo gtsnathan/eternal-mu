@@ -51,12 +51,12 @@ export const WING_RECIPES: { gold: number; mats: [string, number][] }[] = [{ gol
 export const EXC_WEAPON = ['atk', 'crit', 'speed', 'lifek', 'manak'], EXC_ARMOR = ['hp', 'mp', 'absorb', 'reflect', 'goldx', 'dodge'];
 export const EXC_TEXT: Record<string, string> = { atk: '+6% de ataque', crit: '+8% de crítico', speed: '+7% de velocidade de ataque', lifek: 'Recupera 8% da vida ao matar', manak: 'Recupera 10% da mana ao matar', hp: '+4% de vida', mp: '+4% de mana', absorb: '-4% de dano recebido', reflect: 'Reflete 5% do dano', goldx: '+30% de moedas', dodge: '+3% de esquiva' };
 // Armas por tipo e nível
-const WEAPON_TIERS: [number, number, number][] = [[12, 30, 1500], [26, 62, 8000], [44, 135, 60000], [56, 200, 400000]];
+const WEAPON_TIERS: [number, number, number][] = [[12, 30, 1500], [26, 62, 8000], [44, 135, 60000], [56, 200, 400000], [70, 310, 2500000]];
 const WEAPON_LINES: Record<'sword' | 'axe' | 'staff' | 'bow', [string, string][]> = {
-  sword: [['Gládio de Aço', '#d6dee8'], ['Sabre Lunar', '#b8d8ff'], ['Espada do Crepúsculo', '#c77dff'], ['Lâmina do Apocalipse', '#ff5a4a']],
-  axe: [['Machadinha de Guerra', '#b4bfcc'], ['Machado Rúnico', '#7fc8ff'], ['Ceifador Sombrio', '#9a6bff'], ['Devastador Titânico', '#ffb13d']],
-  staff: [['Bastão de Cristal', '#9fe8ff'], ['Cajado Astral', '#8f9bff'], ['Cetro do Vazio', '#d86bff'], ['Báculo Divino', '#ffe08a']],
-  bow: [['Arco Composto', '#9a7a4a'], ['Arco Lunar', '#b8d8ff'], ['Arco do Vento Negro', '#6d5a9a'], ['Arco Celestial', '#ffe9a8']],
+  sword: [['Gládio de Aço', '#d6dee8'], ['Sabre Lunar', '#b8d8ff'], ['Espada do Crepúsculo', '#c77dff'], ['Lâmina do Apocalipse', '#ff5a4a'], ['Aurora Eterna', '#fff2b0']],
+  axe: [['Machadinha de Guerra', '#b4bfcc'], ['Machado Rúnico', '#7fc8ff'], ['Ceifador Sombrio', '#9a6bff'], ['Devastador Titânico', '#ffb13d'], ['Juízo Final', '#ffe9a8']],
+  staff: [['Bastão de Cristal', '#9fe8ff'], ['Cajado Astral', '#8f9bff'], ['Cetro do Vazio', '#d86bff'], ['Báculo Divino', '#ffe08a'], ['Cetro do Firmamento', '#b8f0ff']],
+  bow: [['Arco Composto', '#9a7a4a'], ['Arco Lunar', '#b8d8ff'], ['Arco do Vento Negro', '#6d5a9a'], ['Arco Celestial', '#ffe9a8'], ['Arco do Zênite', '#ffd9f0']],
 };
 const WEAPON_ITEMS: ItemDef[] = Object.entries(WEAPON_LINES).flatMap(([wt, l]) => l.map(([name, blade], i) => ({ key: `w_${wt}_${WEAPON_TIERS[i][0]}`, name, kind: 'weapon' as const, lvl: WEAPON_TIERS[i][0], dmg: Math.round(WEAPON_TIERS[i][1] * (wt === 'axe' ? 1.08 : wt === 'bow' ? .92 : 1)), price: WEAPON_TIERS[i][2], blade, wtype: wt as 'sword' })));
 const wep = (lvl: number, ch: number) => (['sword', 'axe', 'staff', 'bow'] as const).map(w => [`w_${w}_${lvl}`, ch] as [string, number]);
@@ -105,7 +105,8 @@ export const SHOPS: Record<string, string[]> = {
   alquimista: ['pot_hp', 'pot_mp'],
   armeira: SET_ITEMS.map(i => i.key),
   wings: [],
-  ferreira: ['jewel_aurora', ...Object.values(ITEMS).filter(i => i.kind === 'weapon').sort((a, b) => a.wtype!.localeCompare(b.wtype!) || a.lvl - b.lvl).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
+  chest: [],
+  ferreira: ['jewel_aurora', ...Object.values(ITEMS).filter(i => i.kind === 'weapon' && i.lvl < 70).sort((a, b) => a.wtype!.localeCompare(b.wtype!) || a.lvl - b.lvl).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
 };
 export interface MobDef {
   key: string; name: string; level: number; hp: number; dmg: number; def: number; speed: number; detect: number; leash: number;
@@ -114,6 +115,21 @@ export interface MobDef {
 const EMBER: [string, number][] = [['ember_blade', 1], ['ember_axe', 1], ['ember_staff', 1], ['ember_bow', 1]];
 const ember = (ch: number) => EMBER.map(([k]) => [k, ch] as [string, number]);
 export const MOBS: Record<string, MobDef> = {
+  spider: { key: 'spider', name: 'Aranha Tecelã', level: 11, hp: 320, dmg: 34, def: 14, speed: 3, detect: 6.5, leash: 12, attackMs: 1200, xp: 130, respawnMs: 11000, gold: [18, 40], drops: [['pot_hp', .2], ['shard', .25], ['plume', .004], ...wep(12, .008), ...setDrops('axolotl', .012), ...setDrops('bat', .012)] },
+  elf: { key: 'elf', name: 'Elfo Renegado', level: 15, hp: 480, dmg: 46, def: 18, speed: 3, detect: 8, leash: 13, attackMs: 1500, xp: 230, respawnMs: 13000, gold: [28, 60], reach: 5.5, bolt: '#d6ffa8', drops: [['pot_mp', .25], ['jewel_aurora', .02], ...wep(12, .012), ...setDrops('salamander', .014), ...setDrops('wolf', .014)] },
+  sprite: { key: 'sprite', name: 'Fada Sombria', level: 17, hp: 620, dmg: 58, def: 16, speed: 3.4, detect: 7, leash: 12, attackMs: 1400, xp: 300, respawnMs: 13000, gold: [32, 70], reach: 4.5, bolt: '#c77dff', drops: [['pot_mp', .3], ['jewel_aurora', .025], ['plume', .008], ...setDrops('griffin', .012)] },
+  treant: { key: 'treant', name: 'Ente Corrompido', level: 19, hp: 1100, dmg: 66, def: 30, speed: 1.6, detect: 6, leash: 11, attackMs: 1800, xp: 520, respawnMs: 18000, gold: [50, 110], drops: [['pot_hp', .3], ['jewel_aurora', .03], ['plume', .012], ...setDrops('bear', .016), ...wep(26, .006)] },
+  aracnia: { key: 'aracnia', name: 'Aracnia, Mãe da Teia', level: 28, hp: 14000, dmg: 110, def: 40, speed: 3, detect: 10, leash: 18, attackMs: 1300, xp: 9000, respawnMs: 900000, gold: [2000, 4000], boss: true, reach: 2.8, nova: '#9dff6b', drops: [['pot_hp', 1], ['plume', 1], ['jewel_aurora', 1], ['jewel_destiny', .6], ...wep(26, .3), ...setDrops('owl', .15), ...setDrops('spider', .15), ...setDrops('scorpion', .15), ...setDrops('lion', .15)] },
+  skeleton: { key: 'skeleton', name: 'Esqueleto Guerreiro', level: 33, hp: 3200, dmg: 150, def: 70, speed: 2.8, detect: 7, leash: 13, attackMs: 1400, xp: 1500, respawnMs: 15000, gold: [150, 300], drops: [['pot_hp', .35], ['jewel_destiny', .012], ...wep(26, .012), ...setDrops('lion', .014), ...setDrops('owl', .014)] },
+  bonearcher: { key: 'bonearcher', name: 'Arqueiro Ossudo', level: 36, hp: 3600, dmg: 170, def: 66, speed: 2.6, detect: 9, leash: 14, attackMs: 1600, xp: 1900, respawnMs: 16000, gold: [170, 340], reach: 6, bolt: '#e8e0cc', drops: [['pot_mp', .35], ['jewel_destiny', .015], ...setDrops('spider', .014), ...setDrops('scorpion', .014)] },
+  ashdemon: { key: 'ashdemon', name: 'Demônio das Cinzas', level: 41, hp: 7000, dmg: 240, def: 100, speed: 3, detect: 8, leash: 13, attackMs: 1500, xp: 4200, respawnMs: 22000, gold: [320, 640], drops: [['magma_heart', .05], ['jewel_destiny', .03], ['jewel_eclipse', .005], ...setDrops('tiger', .012), ...setDrops('manticore', .012), ...wep(44, .008)] },
+  cryptknight: { key: 'cryptknight', name: 'Cavaleiro da Cripta', level: 47, hp: 12000, dmg: 310, def: 150, speed: 2.4, detect: 7, leash: 12, attackMs: 1600, xp: 7800, respawnMs: 26000, gold: [550, 1000], drops: [['magma_heart', .07], ['jewel_eclipse', .01], ...setDrops('phoenix', .012), ...setDrops('kraken', .012), ...wep(44, .014)] },
+  vorgath: { key: 'vorgath', name: 'Vorgath, Rei da Cripta', level: 65, hp: 200000, dmg: 560, def: 220, speed: 2.8, detect: 12, leash: 16, attackMs: 1500, xp: 260000, respawnMs: 2400000, gold: [25000, 50000], boss: true, reach: 3, nova: '#b06bff', drops: [['pot_hp', 1], ['magma_heart', 1], ['ancient_scale', .6], ['jewel_destiny', 1], ['jewel_eclipse', .7], ...wep(44, .3), ...wep(56, .08), ...setDrops('kraken', .2), ...setDrops('phoenix', .25), ...setDrops('dragon', .12)] },
+  sentinel: { key: 'sentinel', name: 'Sentinela de Mármore', level: 62, hp: 30000, dmg: 480, def: 240, speed: 2.2, detect: 7, leash: 12, attackMs: 1700, xp: 26000, respawnMs: 28000, gold: [1200, 2200], drops: [['jewel_destiny', .06], ['jewel_eclipse', .02], ['ancient_scale', .006], ...setDrops('pegasus', .014), ...setDrops('hydra', .012), ...wep(56, .006)] },
+  seraph: { key: 'seraph', name: 'Serafim Caído', level: 68, hp: 34000, dmg: 560, def: 200, speed: 3, detect: 9, leash: 14, attackMs: 1500, xp: 38000, respawnMs: 30000, gold: [1500, 2800], reach: 6.5, bolt: '#fff2b0', drops: [['jewel_eclipse', .03], ['ancient_scale', .01], ...setDrops('chimera', .012), ...setDrops('dragon', .012), ...wep(56, .01)] },
+  ogriffin: { key: 'ogriffin', name: 'Grifo Ancião', level: 74, hp: 52000, dmg: 720, def: 260, speed: 4.2, detect: 9, leash: 15, attackMs: 1200, xp: 62000, respawnMs: 32000, gold: [2200, 4000], drops: [['jewel_eclipse', .04], ['ancient_scale', .016], ...setDrops('demon', .006), ...setDrops('chimera', .016), ...wep(56, .014)] },
+  archon: { key: 'archon', name: 'Arconte Dourado', level: 82, hp: 120000, dmg: 900, def: 340, speed: 2.8, detect: 8, leash: 13, attackMs: 1700, xp: 130000, respawnMs: 40000, gold: [4000, 7000], drops: [['jewel_eclipse', .08], ['ancient_scale', .03], ...setDrops('demon', .012), ...setDrops('dragon', .02), ...wep(70, .006)] },
+  aethon: { key: 'aethon', name: 'Aethon, o Eterno', level: 95, hp: 600000, dmg: 1400, def: 420, speed: 3.4, detect: 14, leash: 20, attackMs: 1400, xp: 1500000, respawnMs: 3600000, gold: [80000, 150000], boss: true, reach: 3.4, nova: '#fff2b0', drops: [['pot_hp', 1], ['ancient_scale', 1], ['jewel_eclipse', 1], ...wep(70, .4), ...setDrops('demon', .2), ...setDrops('chimera', .25), ...setDrops('hydra', .25), ...setDrops('pegasus', .25), ...setDrops('dragon', .25)] },
   imp: { key: 'imp', name: 'Diabrete Cinzento', level: 22, hp: 900, dmg: 70, def: 34, speed: 2.8, detect: 7, leash: 12, attackMs: 1500, xp: 380, respawnMs: 12000, gold: [50, 110], reach: 4.5, bolt: '#ff9d3c',
     drops: [['pot_hp', .3], ['pot_mp', .25], ['shard', .3], ['jewel_aurora', .03], ['jewel_destiny', .004], ...setDrops('griffin', .012)] },
   hound: { key: 'hound', name: 'Cão de Enxofre', level: 29, hp: 1900, dmg: 110, def: 50, speed: 4, detect: 8, leash: 14, attackMs: 1100, xp: 850, respawnMs: 15000, gold: [90, 190],
