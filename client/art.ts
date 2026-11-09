@@ -89,6 +89,8 @@ export function tile(t: number, v: number, frame: number): Cv {
   } else if (t === T.DWALL) {
     r(g, 0, 0, 32, 32, '#14121c'); r(g, 0, 0, 32, 2, '#221e2c'); speck(10, ['#1c1926', '#100e17']);
     if (v === 7) { r(g, 0, 8, 32, 24, '#3a3545'); for (let y = 0; y < 3; y++) for (let x = -1; x < 3; x++) { const bx = x * 16 + (y % 2) * 8 + 1; r(g, bx, 9 + y * 8, 14, 6, y % 2 ? '#4a4556' : '#443f50'); r(g, bx, 9 + y * 8, 14, 1, '#5a5566'); } r(g, 0, 30, 32, 2, '#16131d'); r(g, 0, 6, 32, 2, '#574f63'); }
+  } else if (t === T.SAND) {
+    r(g, 0, 0, 32, 32, '#d9bc7a'); speck(44, ['#e4ca8c', '#ccac68', '#efd9a2', '#c2a05e']); if (v % 2) for (let y = 7 + v * 3; y < 30; y += 11) for (let x = 0; x < 32; x++) r(g, x, y + Math.round(Math.sin(x * .4 + v) * 1.4), 1, 1, '#b9975a');
   } else if (t === T.ASH) {
     r(g, 0, 0, 32, 32, '#3a3136'); speck(40, ['#453a3f', '#2f282d', '#4e4247']);
     if (v % 2) { let x = 4 + R() * 20, y = 2; for (let i = 0; i < 24; i++) { r(g, x | 0, y | 0, 1, 1, v === 3 ? '#b8431c' : '#231d21'); x += R() * 2 - 1; y += 1.1; } }
@@ -103,13 +105,13 @@ export function tile(t: number, v: number, frame: number): Cv {
   tileCache.set(k, c); return c;
 }
 
-const PRIO = [1, 3, 0, 3, 1, 2, 0, 2, 1, 3, 3, 0, -1]; // GRASS, STONE, WATER, SNOW, ICE, DIRT
+const PRIO = [1, 3, 0, 3, 1, 2, 0, 2, 1, 3, 3, 0, -1, 2]; // GRASS, STONE, WATER, SNOW, ICE, DIRT
 export const tilePrio = (t: number) => PRIO[t];
 const edgeCache = new Map<number, Cv>();
 /** Borda irregular do terreno vizinho (0 cima, 1 baixo, 2 esquerda, 3 direita) sobre este tile. */
 export function edge(t: number, side: number, water: boolean): Cv {
   const k = t * 100 + side * 10 + (water ? 1 : 0); let c = edgeCache.get(k); if (c) return c;
-  c = cv(32, 32); const g = ctx(c), src = tile(t, 1, 0), R = rng(k + 3), rim = water ? '#d6eefb' : t === T.STONE ? '#5f584e' : t === T.DIRT ? '#6f5535' : t === T.ASH ? '#ff7a2b' : t === T.MARBLE ? '#d9c98f' : t === T.MOSS ? '#1a3320' : t === T.SNOW ? '#b7c9de' : '#3b6c33';
+  c = cv(32, 32); const g = ctx(c), src = tile(t, 1, 0), R = rng(k + 3), rim = water ? '#d6eefb' : t === T.STONE ? '#5f584e' : t === T.DIRT ? '#6f5535' : t === T.ASH ? '#ff7a2b' : t === T.MARBLE ? '#d9c98f' : t === T.MOSS ? '#1a3320' : t === T.SNOW ? '#b7c9de' : t === T.SAND ? '#b8975a' : '#3b6c33';
   let d = 4;
   for (let i = 0; i < 32; i++) {
     if (i % 3 === 0) d = Math.max(2, Math.min(8, d + Math.round(R() * 4 - 2)));
@@ -143,6 +145,7 @@ const objCache = new Map<string, Cv>();
 function memo(k: string, f: () => Cv) { let c = objCache.get(k); if (!c) { c = f(); objCache.set(k, c); } return c; }
 export function objSprite(o: Obj): { c: Cv; ox: number; oy: number; sway: number } {
   if (o.k === 'tree') return { c: memo('tree' + o.v, () => { const c = cv(56, 72), g = ctx(c), pal = [['#2f6b34', '#3f8740', '#59a652'], ['#2c6440', '#3a7f55', '#58a374'], ['#4f7430', '#6c9238', '#8fb14a']][o.v], R = rng(o.v + 5); r(g, 24, 46, 9, 22, '#5b3d24'); r(g, 24, 46, 3, 22, '#7a5533'); ell(g, 28, 30, 24, 22, pal[0]); ell(g, 25, 26, 19, 17, pal[1]); ell(g, 21, 21, 11, 9, pal[2]); for (let i = 0; i < 26; i++) r(g, 8 + R() * 40 | 0, 12 + R() * 34 | 0, 3, 2, pal[R() * 3 | 0]); return outline(c); }), ox: -12, oy: -40, sway: 1 };
+  if (o.k === 'palm') return { c: memo('palm' + o.v, () => { const c = cv(64, 80), g = ctx(c), a = o.v ? '#3f9a4a' : '#2f8a48', b = o.v ? '#6cc05a' : '#58b264'; for (let y = 24; y < 76; y++) { const x = 30 + Math.round(Math.sin(y * .07) * 3); r(g, x, y, 6, 1, y % 6 < 2 ? '#6b4a2b' : '#8a6238'); } for (const [dx, dy] of [[-1, -.2], [1, -.2], [-1, .35], [1, .35], [-.5, -.7], [.5, -.7]] as number[][]) for (let i = 0; i < 28; i++) { const x = 33 + dx * i, y = 24 + dy * i + i * i * .025; r(g, x, y - 2, 3, 4 - i * .1, i % 3 ? a : b); } ell(g, 33, 25, 4, 3, '#5a3c20'); return outline(c); }), ox: -16, oy: -48, sway: 1 };
   if (o.k === 'pine') return { c: memo('pine' + o.v, () => { const c = cv(48, 72), g = ctx(c), R = rng(o.v * 7 + 3); r(g, 21, 56, 7, 13, '#4f3a2a'); for (let t = 0; t < 4; t++) { const y = 8 + t * 13, w = 8 + t * 5; for (let i = 0; i < 20; i++) { const hw = Math.round(w * i / 19); r(g, 24 - hw, y + i, hw * 2, 1, i < 7 ? '#eef5fb' : (i + t) % 5 ? '#23584f' : '#1b4a44'); } for (let i = 0; i < 5; i++) r(g, 24 - w * .55 + R() * w * 1.1 | 0, y + 8 + R() * 8 | 0, 3, 2, '#dfeaf4'); } return outline(c); }), ox: -8, oy: -40, sway: 1 };
   if (o.k === 'rock') return { c: memo('rock' + o.v, () => { const c = cv(36, 32), g = ctx(c); ell(g, 18, 18, 15, 11, '#6f7c8c'); ell(g, 16, 15, 11, 8, '#8c9aab'); ell(g, 15, 11, 9, 4, '#eef5fb'); r(g, 20, 21, 7, 1, '#556170'); return outline(c); }), ox: -2, oy: -4, sway: 0 };
   if (o.k === 'lamp') return { c: memo('lamp', () => { const c = cv(24, 66), g = ctx(c); r(g, 10, 16, 4, 46, '#3c3a48'); r(g, 11, 16, 1, 46, '#646272'); r(g, 6, 60, 12, 5, '#3c3a48'); r(g, 5, 8, 14, 12, '#3c3a48'); r(g, 7, 10, 10, 8, '#ffd98a'); r(g, 8, 11, 3, 5, '#fff3c8'); r(g, 3, 5, 18, 3, '#2b2a36'); r(g, 9, 1, 6, 4, '#2b2a36'); return outline(c); }), ox: 4, oy: -36, sway: 0 };
@@ -242,7 +245,7 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
     else if (a === 'lion' && dir !== 1) { r(g, mid - 3, Y + 22, 9, 8, t); r(g, mid - 1, Y + 23, 5, 5, '#f6dc8c'); r(g, mid - 1, Y + 24, 1, 1, '#3a2208'); r(g, mid + 3, Y + 24, 1, 1, '#3a2208'); r(g, mid + 1, Y + 26, 1, 1, '#3a2208'); }
     else if (a === 'serpent') { for (let y = 22; y < 29; y += 2) for (let x = (y % 4 ? 1 : 3); x < tw - 1; x += 4) r(g, X + tx + x, Y + y, 2, 1, t); }
     else if (a === 'griffin') { for (let i = 0; i < 6; i++) { r(g, mid - i, Y + 22 + i, 2, 1, t); r(g, mid + 1 + i, Y + 22 + i, 2, 1, t); } }
-    else if (['boar', 'minotaur', 'fox', 'sphinx', 'deer', 'hummingbird', 'falcon', 'wyvern', 'skull', 'reaper'].includes(a)) { if (dir !== 1) { r(g, mid - 3, Y + 23, 9, 6, t); r(g, mid - 1, Y + 24, 5, 4, armor); r(g, mid, Y + 25, 3, 2, '#fff'); } for (let y = 23; y < 29; y += 3) { r(g, X + tx + 1, Y + y, 2, 1, t); r(g, X + tx + tw - 3, Y + y, 2, 1, t); } }
+    else if (['boar', 'minotaur', 'fox', 'sphinx', 'deer', 'hummingbird', 'falcon', 'wyvern', 'skull', 'reaper', 'mammoth', 'titan', 'djinn', 'oracle', 'peacock', 'unicorn', 'rhino', 'basilisk', 'mummy', 'lich'].includes(a)) { if (dir !== 1) { r(g, mid - 3, Y + 23, 9, 6, t); r(g, mid - 1, Y + 24, 5, 4, armor); r(g, mid, Y + 25, 3, 2, '#fff'); } for (let y = 23; y < 29; y += 3) { r(g, X + tx + 1, Y + y, 2, 1, t); r(g, X + tx + tw - 3, Y + y, 2, 1, t); } }
     else if (a === 'spider') { if (dir !== 1) { r(g, mid - 2, Y + 22, 7, 2, t); r(g, mid, Y + 24, 3, 2, t); r(g, mid - 2, Y + 26, 7, 2, t); } else for (let i = 0; i < 4; i++) r(g, X + tx + i * 4 + 1, Y + 23 + i % 2 * 2, 3, 1, t); }
     else if (a === 'bat') { for (let i = 0; i < 6; i++) { r(g, X + tx + i, Y + 22 + i, 2, 1, t); r(g, X + tx + tw - 2 - i, Y + 22 + i, 2, 1, t); } }
     else if (a === 'wolf') { for (let y = 22; y < 29; y += 3) { r(g, mid - 2, Y + y, 6, 1, t); r(g, mid, Y + y - 1, 2, 3, t); } }
@@ -332,6 +335,36 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
     } else if (a === 'pegasus') {
       const b = '#f0e6ff', t = '#ff9fd8'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); for (let y = 0; y < 20; y += 2) r(g, X + 15, Y + y, 3, 2, y % 4 ? t : '#ffc9ea'); r(g, h0 - 6, Y + 4, 6, 3, '#fff'); r(g, h0 - 8, Y + 7, 8, 3, b); if (dir !== 2) { r(g, h0 + hw, Y + 4, 6, 3, '#fff'); r(g, h0 + hw, Y + 7, 8, 3, b); }
       if (f) { r(g, X + 11, Y + 8, 3, 2, '#5a3c8a'); r(g, X + 19, Y + 8, 3, 2, '#5a3c8a'); } else if (dir === 2) r(g, h0 + 10, Y + 8, 3, 2, '#5a3c8a'); else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'titan') {
+      const b = '#2a2630', t = '#ff6a2b'; r(g, h0 - 2, Y + 2, hw + 4, 13, b); for (const sx of (dir === 2 ? [-1] : [-1, 1])) { const xb = sx < 0 ? h0 - 5 : h0 + hw + 1; r(g, xb, Y - 1, 4, 8, b); r(g, xb + sx * 2, Y - 7, 3, 7, t); } for (let x = 1; x < hw; x += 5) r(g, h0 + x, Y + 3, 2, 2, t);
+      helmFace(g, X, Y, h0, hw, f, dir, t, b);
+    } else if (a === 'mammoth') {
+      const b = '#7a5a40', w = '#f2ecdc'; r(g, h0 - 3, Y + 1, hw + 6, 15, b); for (let x = -3; x < hw + 3; x += 3) r(g, h0 + x, Y - 1 + (x & 1), 2, 3, '#a07c58'); for (const sx of (dir === 2 ? [-1] : [-1, 1])) { const xb = sx < 0 ? h0 - 4 : h0 + hw + 1; r(g, xb, Y + 11, 3, 9, w); r(g, xb + sx * 2, Y + 18, 3, 4, w); }
+      helmFace(g, X, Y, h0, hw, f, dir, '#8fd6ff', b);
+    } else if (a === 'djinn') {
+      const b = '#2a6fc0', t = '#ffd76a'; r(g, h0 - 3, Y + 1, hw + 6, 9, b); for (let x = -3; x < hw + 3; x += 4) r(g, h0 + x, Y + 2, 2, 7, '#5a9ae0'); ell(g, X + 16, Y - 1, 8, 5, b); r(g, X + 14, Y + 3, 5, 5, t); r(g, X + 15, Y + 4, 3, 3, '#ff5a7a');
+      helmFace(g, X, Y, h0, hw, f, dir, '#1a2a5a', b);
+    } else if (a === 'oracle') {
+      const b = '#e6b23a', t = '#fff3b8'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); for (let i = -3; i <= 3; i++) { const h = 11 - Math.abs(i) * 2; r(g, X + 15 + i * 4, Y + 3 - h, 3, h, i % 2 ? b : t); } r(g, X + 14, Y + 5, 5, 4, '#ff7a2b');
+      helmFace(g, X, Y, h0, hw, f, dir, '#7a3a0c', b);
+    } else if (a === 'peacock') {
+      const b = '#14808a', t = '#6ae0ff'; for (let i = -3; i <= 3; i++) { const h = 13 - Math.abs(i) * 2, x = X + 15 + i * 4; r(g, x, Y + 2 - h, 2, h, t); r(g, x - 1, Y + 1 - h, 4, 4, '#ffd76a'); r(g, x, Y + 2 - h, 2, 2, '#1a2a7a'); } r(g, h0 - 1, Y + 3, hw + 2, 11, b);
+      helmFace(g, X, Y, h0, hw, f, dir, '#ffd76a', b);
+    } else if (a === 'unicorn') {
+      const b = '#eee8fa', t = '#b48cff'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); r(g, X + 15, Y - 11, 3, 15, '#ffe08a'); for (let y = -10; y < 3; y += 3) r(g, X + 15, Y + y, 3, 1, '#c8922a'); for (let y = 2; y < 20; y += 3) r(g, h0 - 3, Y + y, 4, 3, y % 2 ? t : '#ffc9ea'); if (dir !== 2) for (let y = 2; y < 20; y += 3) r(g, h0 + hw - 1, Y + y, 4, 3, y % 2 ? t : '#ffc9ea');
+      helmFace(g, X, Y, h0, hw, f, dir, '#5a3c8a', b);
+    } else if (a === 'rhino') {
+      const b = '#6c7480', t = '#ffb13d'; r(g, h0 - 2, Y + 2, hw + 4, 14, b); r(g, h0 - 3, Y, 4, 6, b); if (dir !== 2) r(g, h0 + hw - 1, Y, 4, 6, b); if (dir !== 1) { const xc = dir === 2 ? h0 + hw - 1 : X + 15; r(g, xc, Y + 4, 4, 7, t); r(g, xc + 1, Y - 1, 2, 6, '#ffe08a'); }
+      helmFace(g, X, Y, h0, hw, f, dir, t, b);
+    } else if (a === 'basilisk') {
+      const b = '#b8902a', t = '#7dffb0'; r(g, h0 - 2, Y + 3, hw + 4, 12, b); for (let x = -1; x < hw + 1; x += 3) r(g, h0 + x, Y - 3 + (x & 2), 2, 7, t); for (let y = 6; y < 14; y += 3) for (let x = (y % 2) * 2; x < hw; x += 4) r(g, h0 + x, Y + y, 2, 1, '#e6c45a');
+      helmFace(g, X, Y, h0, hw, f, dir, '#ff3c3c', b);
+    } else if (a === 'mummy') {
+      const b = '#c9bb92', k = '#8a7c58', t = '#3fd6c0'; r(g, h0 - 1, Y + 2, hw + 2, 14, b); for (let y = 3; y < 16; y += 3) r(g, h0 - 1, Y + y, hw + 2, 1, k); r(g, h0 + hw - 1, Y + 13, 3, 9, b);
+      helmFace(g, X, Y, h0, hw, f, dir, t, b);
+    } else if (a === 'lich') {
+      const b = '#3a1f5a', t = '#9dff6b', o2 = '#d9c98f'; r(g, h0 - 3, Y + 3, hw + 6, 14, b); r(g, h0, Y + 5, hw, 10, '#e4e0d6'); for (let i = 0; i < 5; i++) { r(g, h0 + 1 + i * ((hw - 3) / 4), Y - 4 + (i % 2) * 3, 3, 7, o2); r(g, h0 + 1 + i * ((hw - 3) / 4), Y - 5 + (i % 2) * 3, 3, 2, t); } r(g, h0, Y + 2, hw, 3, o2);
+      helmFace(g, X, Y, h0, hw, f, dir, t, b);
     } else if (a === 'wolf') {
       const b = '#8a98a8', l = '#c6d2de', t = '#6fd6ff'; r(g, h0 - 1, Y - 2, 5, 8, b); if (dir !== 2) r(g, h0 + hw - 4, Y - 2, 5, 8, b); r(g, h0 - 2, Y + 4, hw + 4, 11, b);
       if (f) { r(g, X + 11, Y + 8, 3, 2, t); r(g, X + 19, Y + 8, 3, 2, t); r(g, X + 13, Y + 10, 7, 5, l); r(g, X + 15, Y + 10, 3, 2, '#1d2230'); } else if (dir === 2) { r(g, h0 + 8, Y + 8, 3, 2, t); r(g, h0 + hw - 3, Y + 10, 8, 4, l); } else r(g, h0, Y + 8, hw, 12, b);
@@ -477,6 +510,7 @@ export function wingSprites(cls: string, tier: number): Cv[] {
   });
   wingCache.set(k, out); return out;
 }
+function helmFace(g: G, X: number, Y: number, h0: number, hw: number, f: boolean, dir: number, eye: string, back: string) { if (f) { r(g, X + 11, Y + 8, 3, 2, eye); r(g, X + 19, Y + 8, 3, 2, eye); } else if (dir === 2) r(g, h0 + 9, Y + 8, 3, 2, eye); else r(g, h0, Y + 8, hw, 12, back); }
 function spiderArt(sz: number, b: string, b2: string, eye: string, f: number) { const W = sz * 2, H = Math.round(sz * 1.4), c = cv(W, H), g = ctx(c), cx = sz, cy = Math.round(H * .55); for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { const y0 = cy - 6 + i * 4, kx = cx + s * (sz * .55), ky = y0 - sz * .25 + (f + i) % 2 * 3, ex = cx + s * (sz - 2), ey = cy + sz * .28 + i * 3; for (let t = 0; t <= 1; t += .04) { r(g, cx + (kx - cx) * t, y0 + (ky - y0) * t, 3, 3, b); r(g, kx + (ex - kx) * t, ky + (ey - ky) * t, 2, 2, b); } } ell(g, cx, cy + sz * .12 | 0, sz * .5 | 0, sz * .36 | 0, b); ell(g, cx - 2, cy + 2 | 0, sz * .34 | 0, sz * .22 | 0, b2); ell(g, cx, cy - sz * .24 | 0, sz * .28 | 0, sz * .22 | 0, b2); for (const x of [-5, -2, 1, 4]) r(g, cx + x, cy - sz * .3 | 0, 2, 2, eye); r(g, cx - 4, cy - sz * .08 | 0, 2, 5, '#e8dcc8'); r(g, cx + 2, cy - sz * .08 | 0, 2, 5, '#e8dcc8'); return outline(c); }
 function colossus(f: number, a: string, gl: string, eye: string, extra?: (g: G) => void) { const c = cv(60, 68), g = ctx(c), s = f ? 2 : 0; r(g, 15 + s, 48, 13, 18, a); r(g, 33 - s, 48, 13, 18, a); r(g, 12, 18, 37, 32, a); r(g, 3, 20 + s, 11, 30, a); r(g, 47, 20 - s, 11, 30, a); r(g, 20, 4, 21, 16, a); r(g, 24, 10, 5, 4, eye); r(g, 33, 10, 5, 4, eye); for (const [x, y, w, h] of [[18, 24, 3, 22], [30, 20, 3, 28], [40, 26, 3, 18], [20, 34, 22, 3], [6, 28, 3, 16], [50, 30, 3, 14]]) r(g, x, y, w, h, gl); extra?.(g); return outline(c); }
 function skel(f: number, bone: string, opt: { bow?: boolean; armor?: string; crown?: boolean; sz?: number }) { const k = opt.sz ?? 1, c = cv(56 * k, 64 * k), g = ctx(c), R2 = (x: number, y: number, w: number, h: number, col: string) => r(g, x * k, y * k, w * k, h * k, col), s = f ? 2 : -1, dk = shade(bone, -70), a = opt.armor; R2(22, 4, 14, 13, bone); R2(25, 9, 3, 4, dk); R2(31, 9, 3, 4, dk); R2(26, 15, 8, 3, bone); for (let x = 26; x < 34; x += 2) R2(x, 15, 1, 3, dk); R2(27, 19, 4, 18, bone); for (let y = 21; y < 33; y += 3) { R2(20, y, 18, 2, bone); } if (a) { R2(18, 19, 22, 18, a); R2(18, 19, 22, 3, shade(a, 40)); R2(27, 24, 4, 8, shade(a, -40)); R2(13, 18, 8, 6, shade(a, 30)); R2(37, 18, 8, 6, shade(a, 30)); R2(21, 2, 16, 6, a); } R2(16, 22 + s, 3, 18, bone); R2(39, 22 - s, 3, 18, bone); R2(23, 37, 4, 22, bone); R2(31, 37, 4, 22, bone); R2(20 + s, 58, 8, 3, bone); R2(30 - s, 58, 8, 3, bone); if (opt.bow) { for (let i = 0; i < 30; i++) R2(46 + Math.round(Math.sin(i / 29 * 3.14) * 6), 14 + i, 2, 1, '#6b4a2b'); R2(46, 14, 1, 30, '#e8e0cc'); } else { R2(42, 2 + (s > 0 ? 3 : 0), 4, 30, '#9aa7b5'); R2(42, 2, 2, 30, '#e6edf5'); R2(38, 30, 12, 3, '#6b4a2b'); } if (opt.crown) { R2(20, -0 + 1, 18, 4, '#d9b24a'); for (let x = 20; x < 38; x += 4) R2(x, 0, 2, 3, '#ffe08a'); R2(27, 22, 4, 4, '#b06bff'); } return outline(c); }
@@ -485,13 +519,13 @@ function ogriffin(f: number) { const c = cv(84, 72), g = ctx(c), b = '#c9a264', 
 function imp2(f: number) { const c = cv(70, 76), g = ctx(c), s = f ? 3 : 0, b = '#4a3a3a', gl = '#ff7a2b'; r(g, 2, 16 + s, 18, 26 - s, '#2a2024'); r(g, 50, 16 + s, 18, 26 - s, '#2a2024'); for (const x of [6, 12, 54, 60]) r(g, x, 18 + s, 2, 22 - s, gl); r(g, 22, 26, 26, 28, b); r(g, 22, 26, 26, 4, '#6a5252'); r(g, 21, 6, 28, 22, b); r(g, 18, 0, 5, 12, '#e8dcc8'); r(g, 47, 0, 5, 12, '#e8dcc8'); r(g, 27, 13, 5, 4, '#ffe14a'); r(g, 38, 13, 5, 4, '#ffe14a'); r(g, 29, 22, 12, 3, '#1a1012'); for (let x = 30; x < 40; x += 3) r(g, x, 22, 1, 3, '#fff'); for (const [x, y, h] of [[28, 32, 16], [41, 34, 12], [34, 30, 20]]) r(g, x, y, 2, h, gl); r(g, 24, 54, 8, 19, '#332628'); r(g, 38, 54, 8, 19, '#332628'); return outline(c); }
 function treant(f: number) { return colossus(f, '#4a3626', '#6fbf4a', '#d6ff6a', g => { for (const [x, y, rx, ry] of [[16, 8, 9, 7], [44, 8, 9, 7], [30, 2, 10, 6], [8, 22, 6, 5], [54, 22, 6, 5]]) { ell(g, x, y, rx, ry, '#2f6b38'); ell(g, x - 2, y - 2, rx - 4, ry - 3, '#4f9a50'); } }); }
 function elfArt(f: number) { return heroFrame(2, f ? 1 : 3, { hc: '#d8e8a0', hs: 2, cls: 'mystic_archer', armor: '#2f5a42', pants: '#223f30', weapon: 'long_bow' }); }
-const NEW_MOBS: Record<string, (f: number) => Cv> = { spider: f => spiderArt(26, '#3a2c3a', '#5a4458', '#ff5a5a', f), aracnia: f => spiderArt(70, '#241a28', '#463448', '#9dff6b', f), elf: elfArt, sprite: f => { const c = cv(40, 44), g = ctx(c), s = f ? 3 : 0; r(g, 3, 8 + s, 13, 18, '#b58cff'); r(g, 24, 8 + s, 13, 18, '#b58cff'); r(g, 5, 10 + s, 9, 12, '#e0c6ff'); r(g, 26, 10 + s, 9, 12, '#e0c6ff'); ell(g, 20, 14, 7, 7, '#2a1a44'); r(g, 16, 13, 2, 2, '#ff6ad5'); r(g, 22, 13, 2, 2, '#ff6ad5'); r(g, 15, 21, 10, 14, '#5a2f9a'); r(g, 18, 35, 4, 7, '#3a1f6a'); return outline(c); }, treant, skeleton: f => skel(f, '#e0d8c4', {}), bonearcher: f => skel(f, '#d0c8b0', { bow: true }), ashdemon: imp2, cryptknight: f => skel(f, '#c8c0ac', { armor: '#3a3a52', sz: 1.3 as number }), vorgath: f => skel(f, '#efe8d4', { armor: '#3c2458', crown: true, sz: 2 }), sentinel: f => colossus(f, '#d6d1e0', '#d9b24a', '#7fe3ff'), seraph: f => winged(f, '#6a3f96', '#3a3050', { head: '#a8a0b8' }), ogriffin, archon: f => winged(f, '#d9a62e', '#fff2d0', { halo: '#ffe08a', sz: 1.25 }), aethon: f => winged(f, '#efe6ff', '#ffffff', { halo: '#fff2b0', sz: 2 }) };
+const NEW_MOBS: Record<string, (f: number) => Cv> = { sandscarab: f => spiderArt(30, '#1f5a5a', '#2fa08a', '#ffd76a', f), dunemummy: f => skel(f, '#d6c9a0', { armor: '#9a8a60', sz: 1.3 as number }), sanddjinn: f => colossus(f, '#2a6fc0', '#6ae0ff', '#ffe08a'), khepri: f => skel(f, '#e9cf6a', { armor: '#1f6a7a', crown: true, sz: 2.2 }), spider: f => spiderArt(26, '#3a2c3a', '#5a4458', '#ff5a5a', f), aracnia: f => spiderArt(70, '#241a28', '#463448', '#9dff6b', f), elf: elfArt, sprite: f => { const c = cv(40, 44), g = ctx(c), s = f ? 3 : 0; r(g, 3, 8 + s, 13, 18, '#b58cff'); r(g, 24, 8 + s, 13, 18, '#b58cff'); r(g, 5, 10 + s, 9, 12, '#e0c6ff'); r(g, 26, 10 + s, 9, 12, '#e0c6ff'); ell(g, 20, 14, 7, 7, '#2a1a44'); r(g, 16, 13, 2, 2, '#ff6ad5'); r(g, 22, 13, 2, 2, '#ff6ad5'); r(g, 15, 21, 10, 14, '#5a2f9a'); r(g, 18, 35, 4, 7, '#3a1f6a'); return outline(c); }, treant, skeleton: f => skel(f, '#e0d8c4', {}), bonearcher: f => skel(f, '#d0c8b0', { bow: true }), ashdemon: imp2, cryptknight: f => skel(f, '#c8c0ac', { armor: '#3a3a52', sz: 1.3 as number }), vorgath: f => skel(f, '#efe8d4', { armor: '#3c2458', crown: true, sz: 2 }), sentinel: f => colossus(f, '#d6d1e0', '#d9b24a', '#7fe3ff'), seraph: f => winged(f, '#6a3f96', '#3a3050', { head: '#a8a0b8' }), ogriffin, archon: f => winged(f, '#d9a62e', '#fff2d0', { halo: '#ffe08a', sz: 1.25 }), aethon: f => winged(f, '#efe6ff', '#ffffff', { halo: '#fff2b0', sz: 2 }) };
 export function mobSprites(key: string): Cv[][] {
   let s = mobCache.get(key); if (s) return s;
   const f = key === 'wisp' ? wisp : key === 'shade' ? shadeMob : NEW_MOBS[key] ?? (key === 'imp' ? imp : key === 'hound' ? hound : key === 'magma' ? magma : key === 'wyrm' ? wyrm : key === 'ignarok' ? ignarok : key === 'slime' ? slime : key === 'wolf' ? wolf : key === 'golem' ? golem : boss);
   s = [0, 1].map(i => { const c = f(i); return [c, flip(c)]; }); mobCache.set(key, s); return s;
 }
-export const mobSize = (k: string) => ({ spider: 38, aracnia: 150, elf: 50, sprite: 40, treant: 62, skeleton: 62, bonearcher: 62, ashdemon: 72, cryptknight: 80, vorgath: 126, sentinel: 62, seraph: 80, ogriffin: 70, archon: 110, aethon: 180 } as Record<string, number>)[k] ?? (k === 'ignarok' ? 130 : k === 'wyrm' ? 60 : k === 'magma' ? 62 : k === 'hound' ? 40 : k === 'imp' ? 32 : MOBS[k]?.boss ? 96 : k === 'golem' ? 56 : k === 'wolf' ? 36 : 28);
+export const mobSize = (k: string) => ({ sandscarab: 52, dunemummy: 80, sanddjinn: 96, khepri: 170, spider: 38, aracnia: 150, elf: 50, sprite: 40, treant: 62, skeleton: 62, bonearcher: 62, ashdemon: 72, cryptknight: 80, vorgath: 126, sentinel: 62, seraph: 80, ogriffin: 70, archon: 110, aethon: 180 } as Record<string, number>)[k] ?? (k === 'ignarok' ? 130 : k === 'wyrm' ? 60 : k === 'magma' ? 62 : k === 'hound' ? 40 : k === 'imp' ? 32 : MOBS[k]?.boss ? 96 : k === 'golem' ? 56 : k === 'wolf' ? 36 : 28);
 
 // ---------- ícones ----------
 const iconCache = new Map<string, Cv>();

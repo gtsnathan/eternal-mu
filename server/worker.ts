@@ -1,5 +1,5 @@
 import { ITEMS, cleanSettings, DEFAULT_SETTINGS, JEWELS, MOBS, CLASSES, CONFIG, derive, HAIR_COLORS, HAIR_STYLES } from '../shared/data';
-import { getMap, MAP_IDS } from '../shared/world';
+import { getMap, MAP_IDS, travelList } from '../shared/world';
 export { MapRoom } from './room';
 
 const SESSION_MS = 30 * 864e5, COOKIE = 'em_session', ITER = 100000;
@@ -126,7 +126,7 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   }
   if (path === '/api/guide' && req.method === 'GET') {
     const r = await db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>(), c = r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, v = getMap('valoria');
-    return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { name: m.name, req: v.portals.find(p => p.to === id)?.lvl ?? 1, mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { name: d.name, level: d.level, boss: !!d.boss, drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });
+    return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { name: m.name, req: travelList().find(p => p.to === id)?.lvl || 1, mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { name: d.name, level: d.level, boss: !!d.boss, drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });
   }
   const me = await auth(req, env);
   if (!me) return err('Sessão expirada.', 401);

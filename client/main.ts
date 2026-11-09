@@ -248,7 +248,7 @@ function renderShop() {
   for (const i of bag) { const r = document.createElement('div'); r.className = 'shopitem'; r.dataset.sell = i.key; const c = cv(56, 56); c.getContext('2d')!.drawImage(hdOf(icon(i.key)), 0, 0); c.style.imageRendering = 'pixelated'; const s = document.createElement('span'); s.textContent = `${ITEMS[i.key].name}${i.qty > 1 ? ` ×${i.qty}` : ''} · ${sellPrice(i)} moedas`; s.style.color = RARITY[i.rarity].color; s.title = itemText(i); const b = document.createElement('button'); b.textContent = 'Vender'; b.onclick = () => { if (i.rarity && !confirm(`Vender ${ITEMS[i.key].name} (${RARITY[i.rarity].name})?`)) return; send({ t: 'se', npc: npc.id, slot: i.slot }); }; r.append(c, s, b); L.appendChild(r); }
 }
 let miniBase: Cv | null = null;
-const TILE_COL = ['#4c8a3f', '#a29a8b', '#2f74b5', '#e4edf6', '#a6d6ee', '#94734b', '#e8601c', '#3b3236', '#2a4a30', '#45404f', '#e6e2ee', '#7fa3dc', '#14121c'];
+const TILE_COL = ['#4c8a3f', '#a29a8b', '#2f74b5', '#e4edf6', '#a6d6ee', '#94734b', '#e8601c', '#3b3236', '#2a4a30', '#45404f', '#e6e2ee', '#7fa3dc', '#14121c', '#d9bc7a'];
 function bakeMini() { if (!map) return; miniBase = cv(map.w, map.h); const x = miniBase.getContext('2d')!; for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) { const sol = map.solid[j * map.w + i], t = map.tiles[j * map.w + i]; x.fillStyle = sol && t !== T.WATER && t !== T.LAVA && t !== T.CLOUD && t !== T.DWALL ? (map.safe ? '#3a5b34' : '#274c48') : TILE_COL[t]; x.fillRect(i, j, 1, 1); } }
 function paintMap(c: HTMLCanvasElement, sx: number, sy: number, wv: number, hv: number) {
   if (!map || !miniBase) return; const x = c.getContext('2d')!, k = c.width / wv; x.imageSmoothingEnabled = false; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); x.drawImage(miniBase, sx, sy, wv, hv, 0, 0, c.width, c.height);
@@ -285,7 +285,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Enter') { const i = $<HTMLInputElement>('#chati'); if (!tgtTyping()) { e.preventDefault(); i.focus(); } return; }
   if (e.key === 'Escape') { $('#chati').blur(); closeWins(); return; }
   if (e.repeat) return;
-  if (k === '1' || k === '2' || k === '3' || k === '4') selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
+  if (k >= '1' && k <= '6' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
 let chan: 'l' | 'g' | 'p' = 'l';
@@ -459,7 +459,7 @@ function frame(ts: number) {
     if (Math.random() < .5) { const ri = x0 + Math.floor(Math.random() * (x1 - x0 + 1)), rj = y0 + Math.floor(Math.random() * (y1 - y0 + 1)), tt = map.tiles[rj * map.w + ri]; if (tt === T.LAVA) parts.push({ x: ri + Math.random(), y: rj + .9, vx: 0, vy: -1.6, life: 0, max: .5, c: '#ffd76a', s: 3, g: 3 }); else if (tt === T.WATER) parts.push({ x: ri + Math.random(), y: rj + Math.random() + .3, vx: 0, vy: 0, life: 0, max: .3, c: '#ffffff', s: 2 }); else if (tt === T.ICE) parts.push({ x: ri + Math.random(), y: rj + Math.random() + .3, vx: 0, vy: 0, life: 0, max: .4, c: '#ffffff', s: 2 }); }
   }
   // luz do dia/noite e fontes de luz
-  const night = map.id === 'ashen' ? .95 : map.id === 'celestial' ? 0 : map.id === 'eldergrove' ? Math.max(.42, nightFactor()) : nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
+  const night = map.id === 'dunas' ? 0 : map.id === 'ashen' ? .95 : map.id === 'celestial' ? 0 : map.id === 'eldergrove' ? Math.max(.42, nightFactor()) : nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
   if (night > .02) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : map.id === 'infernal' ? [255, 214, 190] : map.id === 'eldergrove' ? [214, 240, 214] : map.id === 'celestial' ? [255, 248, 228] : [226, 236, 255], [122, 130, 188], night); g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   const light = (x: number, y: number, r: number, c: string, al: number) => { g.globalAlpha = Math.min(1, al); g.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
   for (const p of map.portals) light(p.x * 32, p.y * 32 - 26, 96 + Math.sin(ts / 300) * 8, '#8a55ff', .55 + night * .35);
@@ -497,11 +497,11 @@ function frame(ts: number) {
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (map.id === 'infernal') { for (const f of snow) { f.y -= f.s * dt * 4; f.x += Math.sin(ts / 700 + f.d) * .0008; if (f.y < 0) f.y = 1; g.globalAlpha = .45 + f.s * 7; g.fillStyle = f.s > .055 ? '#ffd76a' : '#ff7a2b'; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), 2 * Z, 2 * Z); } g.globalAlpha = 1; }
   else if (!map.safe) {
-    g.fillStyle = map.id === 'eldergrove' ? '#b6f06a' : map.id === 'celestial' ? '#ffe9a8' : map.id === 'ashen' ? '#6a6478' : '#fff'; for (const f of snow) { f.y += f.s * dt * 5; f.x += Math.sin(ts / 900 + f.d) * .0006; if (f.y > 1) f.y = 0; g.globalAlpha = .35 + f.s * 8; const sz = (f.s > .055 ? 3 : 2) * Z; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), sz, sz); } g.globalAlpha = 1;
+    g.fillStyle = map.id === 'dunas' ? '#e9cf94' : map.id === 'eldergrove' ? '#b6f06a' : map.id === 'celestial' ? '#ffe9a8' : map.id === 'ashen' ? '#6a6478' : '#fff'; for (const f of snow) { f.y += f.s * dt * 5; f.x += Math.sin(ts / 900 + f.d) * .0006; if (f.y > 1) f.y = 0; g.globalAlpha = .35 + f.s * 8; const sz = (f.s > .055 ? 3 : 2) * Z; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), sz, sz); } g.globalAlpha = 1;
   }
   const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : map.id === 'infernal' ? '#40080888' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   if (me?.dead) { g.fillStyle = '#50000066'; g.fillRect(0, 0, W, H); }
-  for (const n of [1, 2, 3, 4]) { const c = cds[n], el = cdEl[n] ??= document.querySelector(`[data-sk="${n}"] .cd`) as HTMLElement, h = c && c.until > ts ? `${Math.ceil((c.until - ts) / c.ms * 20) * 5}%` : '0'; if (cdVal[n] !== h) { cdVal[n] = h; el.style.height = h; } }
+  for (const n of [1, 2, 3, 4, 5, 6]) { const c = cds[n], el = cdEl[n] ??= document.querySelector(`[data-sk="${n}"] .cd`) as HTMLElement, h = c && c.until > ts ? `${Math.ceil((c.until - ts) / c.ms * 20) * 5}%` : '0'; if (cdVal[n] !== h) { cdVal[n] = h; el.style.height = h; } }
   if (ts > miniAt) { miniAt = ts + 200; renderMini(); { const te = ents.get(target), tf = $('#tframe'); if (te?.k === 'm') { const d = MOBS[te.info.mob]; tf.style.display = 'block'; $('#tfn').textContent = `${d.name} · Nv ${d.level}`; $('#tfb').style.width = `${te.hp}%`; } else if (tf.style.display !== 'none') tf.style.display = 'none'; } if (party) document.querySelectorAll<HTMLElement>('.pm').forEach(r => { const e = [...ents.values()].find(x => x.k === 'p' && x.info.name === r.dataset.n), b = r.querySelector('i') as HTMLElement; b.style.width = `${e ? e.hp : 0}%`; r.style.opacity = e ? '1' : '.55'; }); }
 }
 function ell2(x: number, y: number, rx: number, ry: number) { g.beginPath(); g.ellipse(Math.round(x), Math.round(y), Math.max(.1, rx), Math.max(.1, ry), 0, 0, 6.3); g.fill(); }
@@ -543,7 +543,7 @@ function decal(x: CanvasRenderingContext2D, t: number, i: number, j: number) {
 }
 function objShadow(x: CanvasRenderingContext2D, o: GameMap['objs'][number]) {
   const sh = glowSprite('#0a0814'), put = (cx: number, cy: number, rx: number, ry: number) => x.drawImage(sh, cx - rx, cy - ry, rx * 2, ry * 2), X = o.x * 32 + 16, Y = o.y * 32;
-  if (o.k === 'tree' || o.k === 'pine') put(X, Y + 28, 28, 11); else if (o.k === 'oak') put(X, Y + 28, 34, 13); else if (o.k === 'rock' || o.k === 'lamp' || o.k === 'barrel' || o.k === 'spire' || o.k === 'deadtree' || o.k === 'shroom' || o.k === 'pillar' || o.k === 'statue') put(X, Y + 28, 20, 8); else if (o.k === 'house' || o.k === 'stall') put(o.x * 32 + o.w * 16, (o.y + o.h) * 32, o.w * 18, 12);
+  if (o.k === 'tree' || o.k === 'pine') put(X, Y + 28, 28, 11); else if (o.k === 'oak') put(X, Y + 28, 34, 13); else if (o.k === 'rock' || o.k === 'lamp' || o.k === 'barrel' || o.k === 'spire' || o.k === 'deadtree' || o.k === 'shroom' || o.k === 'pillar' || o.k === 'statue' || o.k === 'palm') put(X, Y + 28, 20, 8); else if (o.k === 'house' || o.k === 'stall') put(o.x * 32 + o.w * 16, (o.y + o.h) * 32, o.w * 18, 12);
 }
 /** Bloco 12×12 do chão já desenhado: tiles, bordas e sombras saem prontos de uma vez. */
 function chunk(m: GameMap, cx: number, cy: number) {
@@ -555,7 +555,7 @@ function chunk(m: GameMap, cx: number, cy: number) {
     if (t === T.DWALL) continue;
     const P = tilePrio(t), nb = (a: number, b: number, side: number) => { if (a < 0 || b < 0 || a >= m.w || b >= m.h) return; const nt = m.tiles[b * m.w + a]; if (tilePrio(nt) > P) x.drawImage(edge(nt, side, t === T.WATER), i * 32, j * 32); };
     nb(i, j - 1, 0); nb(i, j + 1, 1); nb(i - 1, j, 2); nb(i + 1, j, 3);
-    if (t !== T.STONE && t !== T.WATER && t !== T.LAVA && t !== T.CLOUD && t !== T.MARBLE && t !== T.DUNGEON) { const q = (Math.sin(i * .37 + j * .11) + Math.sin(j * .29 - i * .17) + 2) / 4; x.fillStyle = t === T.GRASS ? '#123a1a' : t === T.MOSS ? '#0a1a10' : t === T.ASH ? '#120609' : '#6a8fc8'; x.globalAlpha = q * .2; x.fillRect(i * 32, j * 32, 32, 32); x.globalAlpha = 1; }
+    if (t !== T.STONE && t !== T.WATER && t !== T.LAVA && t !== T.CLOUD && t !== T.MARBLE && t !== T.DUNGEON && t !== T.SAND) { const q = (Math.sin(i * .37 + j * .11) + Math.sin(j * .29 - i * .17) + 2) / 4; x.fillStyle = t === T.GRASS ? '#123a1a' : t === T.MOSS ? '#0a1a10' : t === T.ASH ? '#120609' : '#6a8fc8'; x.globalAlpha = q * .2; x.fillRect(i * 32, j * 32, 32, 32); x.globalAlpha = 1; }
     if (!m.solid[j * m.w + i]) decal(x, t, i, j);
   }
   x.imageSmoothingEnabled = true; x.globalAlpha = .55;

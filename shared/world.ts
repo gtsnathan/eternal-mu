@@ -1,6 +1,6 @@
-export const T = { GRASS: 0, STONE: 1, WATER: 2, SNOW: 3, ICE: 4, DIRT: 5, LAVA: 6, ASH: 7, MOSS: 8, DUNGEON: 9, MARBLE: 10, CLOUD: 11, DWALL: 12 };
+export const T = { GRASS: 0, STONE: 1, WATER: 2, SNOW: 3, ICE: 4, DIRT: 5, LAVA: 6, ASH: 7, MOSS: 8, DUNGEON: 9, MARBLE: 10, CLOUD: 11, DWALL: 12, SAND: 13 };
 export const trapUp = (now: number) => now % 3000 < 900;
-export interface Obj { k: 'tree' | 'pine' | 'rock' | 'house' | 'wall' | 'fountain' | 'lamp' | 'stall' | 'barrel' | 'spire' | 'deadtree' | 'oak' | 'shroom' | 'torch' | 'pillar' | 'statue'; x: number; y: number; w: number; h: number; v: number }
+export interface Obj { k: 'tree' | 'pine' | 'rock' | 'house' | 'wall' | 'fountain' | 'lamp' | 'stall' | 'barrel' | 'spire' | 'deadtree' | 'oak' | 'shroom' | 'torch' | 'pillar' | 'statue' | 'palm'; x: number; y: number; w: number; h: number; v: number }
 export interface Portal { x: number; y: number; to: string; tx: number; ty: number; label: string; lvl?: number }
 export interface Npc { id: string; name: string; x: number; y: number; shop?: string; line: string; look: number }
 export interface Zone { mob: string; n: number; cx: number; cy: number; r: number }
@@ -25,7 +25,7 @@ function valoria() {
   const free = new Uint8Array(50 * 40);
   const mark = (x0: number, y0: number, x1: number, y1: number) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) free[y * 50 + x] = 1; };
   mark(14, 10, 36, 30); mark(34, 16, 49, 23); mark(21, 28, 28, 39); mark(1, 17, 16, 23); mark(21, 1, 29, 12); mark(33, 7, 47, 12);
-  rect(m, 2, 19, 15, 21, T.DIRT); rect(m, 24, 2, 26, 11, T.DIRT); rect(m, 34, 9, 46, 11, T.DIRT);
+  mark(1, 13, 16, 16); rect(m, 2, 14, 16, 15, T.DIRT); rect(m, 2, 19, 15, 21, T.DIRT); rect(m, 24, 2, 26, 11, T.DIRT); rect(m, 34, 9, 46, 11, T.DIRT);
   for (let x = 0; x < 50; x++) for (const y of [0, 39]) obj(m, 'wall', x, y);
   for (let y = 1; y < 39; y++) for (const x of [0, 49]) if (!(x === 49 && y >= 18 && y <= 21)) obj(m, 'wall', x, y);
   for (let y = 18; y <= 21; y++) m.solid[y * 50 + 49] = 1;
@@ -40,7 +40,7 @@ function valoria() {
   m.spawn = { x: 25.5, y: 25 };
   m.portals.push({ x: 46.5, y: 19.5, to: 'frostvale', tx: 12, ty: 70, label: 'Frostvale' },
     { x: 24.5, y: 36.5, to: 'infernal', tx: 14, ty: 80, label: 'Infernal Dominion', lvl: 20 },
-    { x: 3.5, y: 20.5, to: 'eldergrove', tx: 14, ty: 80, label: 'Eldergrove', lvl: 10 }, { x: 25.5, y: 3.5, to: 'ashen', tx: 18, ty: 70, label: 'Ashen Depths', lvl: 32 }, { x: 45.5, y: 9.5, to: 'celestial', tx: 22, ty: 70, label: 'Celestial Ruins', lvl: 60 });
+    { x: 3.5, y: 20.5, to: 'eldergrove', tx: 14, ty: 80, label: 'Eldergrove', lvl: 10 }, { x: 25.5, y: 3.5, to: 'ashen', tx: 18, ty: 70, label: 'Ashen Depths', lvl: 32 }, { x: 45.5, y: 9.5, to: 'celestial', tx: 22, ty: 70, label: 'Celestial Ruins', lvl: 60 }, { x: 3.5, y: 14.5, to: 'solmira', tx: 6, ty: 20.5, label: 'Solmira', lvl: 70 });
   m.npcs.push({ id: 'alquimista', name: 'Odila, Alquimista', x: 21.5, y: 17.5, shop: 'alquimista', line: 'Frascos frescos! Não vá ao gelo sem eles.', look: 1 },
     { id: 'ferreira', name: 'Brunna, Ferreira', x: 30.5, y: 17.5, shop: 'ferreira', line: 'O aço de Valoria nunca falha.', look: 2 },
     { id: 'artifice', name: 'Alaric, Artífice de Asas', x: 23.5, y: 23, shop: 'wings', line: 'Traga-me as relíquias dos monstros e eu forjo suas asas.', look: 5 },
@@ -49,6 +49,37 @@ function valoria() {
     { id: 'bau', name: 'Baú', x: 27.5, y: 23, shop: 'chest', line: 'Seus itens ficam guardados aqui.', look: 0 },
     { id: 'armeira', name: 'Isaura, Armeira de Sets', x: 25.5, y: 15.5, shop: 'armeira', line: 'Armaduras de lenda, para quem pode pagar.', look: 4 },
     { id: 'guarda', name: 'Guarda Teodoro', x: 44.5, y: 17.5, line: 'O portal leva a Frostvale. Lá fora, os monstros não perdoam.', look: 3 });
+  return m;
+}
+function solmira() {
+  const m = makeMap('solmira', 'Solmira', 50, 40, true, T.SAND), r = rng(909), plaza = (x: number, y: number) => x >= 12 && x <= 38 && y >= 9 && y <= 31, road = (y: number) => y >= 18 && y <= 22;
+  rect(m, 13, 10, 37, 30, T.STONE); rect(m, 2, 19, 13, 21, T.DIRT); rect(m, 37, 19, 47, 21, T.DIRT);
+  for (let x = 0; x < 50; x++) for (const y of [0, 39]) obj(m, 'wall', x, y);
+  for (let y = 1; y < 39; y++) for (const x of [0, 49]) obj(m, 'wall', x, y);
+  rect(m, 22, 17, 28, 22, T.WATER); for (let y = 17; y <= 22; y++) for (let x = 22; x <= 28; x++) m.solid[y * 50 + x] = 1;
+  ([[15, 12, 5, 3, 2], [31, 12, 5, 3, 0], [15, 27, 5, 3, 1], [31, 27, 5, 3, 2]] as number[][]).forEach(([x, y, w, h, v]) => obj(m, 'house', x, y, w, h, v));
+  ([[21, 16], [29, 16], [21, 23], [29, 23], [38, 18], [38, 22], [12, 18], [12, 22]] as number[][]).forEach(([x, y]) => obj(m, 'lamp', x, y));
+  ([[20, 18], [30, 21], [20, 22], [30, 17]] as number[][]).forEach(([x, y], i) => obj(m, 'palm', x, y, 1, 1, i % 2));
+  obj(m, 'stall', 14, 18, 3, 2, 1); obj(m, 'stall', 33, 22, 3, 2, 0);
+  for (let y = 2; y < 38; y++) for (let x = 2; x < 48; x++) if (!plaza(x, y) && !road(y) && !m.solid[y * 50 + x] && r() < .07) obj(m, r() < .75 ? 'palm' : 'rock', x, y, 1, 1, r() * 2 | 0);
+  m.spawn = { x: 25.5, y: 25 };
+  m.portals.push({ x: 3.5, y: 20.5, to: 'valoria', tx: 6, ty: 14.5, label: 'Valoria' }, { x: 46.5, y: 20.5, to: 'dunas', tx: 14, ty: 70, label: 'Dunas de Solmira', lvl: 70 });
+  m.npcs.push({ id: 'alquimista', name: 'Zahra, Alquimista', x: 20.5, y: 25.5, shop: 'alquimista', line: 'Bebam antes de cruzar as dunas.', look: 1 },
+    { id: 'ferreira', name: 'Kasim, Ferreiro', x: 30.5, y: 25.5, shop: 'ferreira', line: 'Lâminas temperadas ao sol do deserto.', look: 2 },
+    { id: 'armeira', name: 'Samira, Armeira de Sets', x: 25.5, y: 14.5, shop: 'armeira', line: 'As armaduras mais raras do reino chegam aqui.', look: 4 },
+    { id: 'bau', name: 'Baú', x: 22.5, y: 14.5, shop: 'chest', line: 'Seus itens ficam guardados aqui.', look: 0 },
+    { id: 'mestre', name: 'Mestre Ancião', x: 28.5, y: 14.5, shop: 'reset', line: 'Quem alcança o topo pode renascer ainda mais forte.', look: 6 },
+    { id: 'guarda', name: 'Guarda Nadir', x: 44.5, y: 17.5, line: 'Depois deste portal, só as dunas e o Rei das Areias.', look: 3 });
+  return m;
+}
+function dunas() {
+  const W = 92, H = 70, m = makeMap('dunas', 'Dunas de Solmira', W, H, false, T.SAND), r = rng(4242);
+  for (let x = 0; x < W; x++) for (const y of [0, H - 1]) m.solid[y * W + x] = 1; for (let y = 0; y < H; y++) for (const x of [0, W - 1]) m.solid[y * W + x] = 1;
+  const camps = [[7, 35, 7], [26, 20, 7], [26, 50, 7], [47, 14, 7], [47, 56, 7], [47, 35, 6], [68, 22, 7], [68, 50, 7], [82, 35, 9]], near = (x: number, y: number) => camps.some(([a, b, c]) => Math.hypot(x - a, y - b) < c) || Math.abs(y - 35) < 3;
+  rect(m, 42, 30, 52, 40, T.ASH); rect(m, 77, 29, 87, 41, T.MARBLE);
+  for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) if (!near(x, y) && r() < .05) { const q = r(); obj(m, q < .45 ? 'palm' : q < .75 ? 'rock' : q < .9 ? 'deadtree' : 'pillar', x, y, 1, 1, r() * 2 | 0); }
+  m.spawn = { x: 7, y: 35 }; m.portals.push({ x: 3.5, y: 35.5, to: 'solmira', tx: 44, ty: 20.5, label: 'Solmira' });
+  m.zones.push({ mob: 'sandscarab', n: 12, cx: 26, cy: 20, r: 6 }, { mob: 'sandscarab', n: 12, cx: 26, cy: 50, r: 6 }, { mob: 'dunemummy', n: 9, cx: 47, cy: 14, r: 6 }, { mob: 'dunemummy', n: 9, cx: 47, cy: 56, r: 6 }, { mob: 'dunemummy', n: 8, cx: 47, cy: 35, r: 5 }, { mob: 'sanddjinn', n: 8, cx: 68, cy: 22, r: 6 }, { mob: 'sanddjinn', n: 8, cx: 68, cy: 50, r: 6 }, { mob: 'khepri', n: 1, cx: 82, cy: 35, r: 1 });
   return m;
 }
 function frostvale() {
@@ -162,9 +193,9 @@ function enlarge(m: GameMap, k = MAP_SCALE): GameMap {
 const MOBS_IS_BOSS = (k: string) => ['boss', 'ignarok', 'aracnia', 'vorgath', 'aethon'].includes(k);
 const cache: Record<string, GameMap> = {};
 /** Destinos da janela de viagem (tecla M): mesmas regras e chegadas dos portais de Valoria. */
-export function travelList() { const v = getMap('valoria'); return [{ to: 'valoria', name: v.name, lvl: 0, x: v.spawn.x, y: v.spawn.y }, ...v.portals.map(g => ({ to: g.to, name: getMap(g.to).name, lvl: g.lvl ?? 0, x: g.tx, y: g.ty }))].sort((a, b) => a.lvl - b.lvl); }
-export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial'];
-export function getMap(id: string): GameMap { return cache[id] ??= id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
+export function travelList() { const v = getMap('valoria'); return [{ to: 'valoria', name: v.name, lvl: 0, x: v.spawn.x, y: v.spawn.y }, ...[...v.portals, ...getMap('solmira').portals.filter(g => g.to !== 'valoria')].map(g => ({ to: g.to, name: getMap(g.to).name, lvl: g.lvl ?? 0, x: g.tx, y: g.ty }))].sort((a, b) => a.lvl - b.lvl); }
+export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial', 'solmira', 'dunas'];
+export function getMap(id: string): GameMap { return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
 
 export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return i < 0 || j < 0 || i >= m.w || j >= m.h || m.solid[j * m.w + i] === 1; };
 const R = .3;
