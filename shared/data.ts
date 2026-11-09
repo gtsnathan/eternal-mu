@@ -7,7 +7,7 @@ export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings';
 export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings'];
 export const SLOT_NAMES: Record<Slot, string> = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', pants: 'Calças', boots: 'Botas', wings: 'Asas' };
 export interface ItemDef {
-  key: string; name: string; kind: Slot | 'potion' | 'material' | 'jewel'; lvl: number; price: number;
+  key: string; name: string; kind: Slot | 'potion' | 'material' | 'jewel' | 'pack'; lvl: number; price: number;
   dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: 'sword' | 'axe' | 'staff' | 'bow'; set?: string; cls?: string; wtier?: number;
 }
 // Sets: cada peça equipada do mesmo set soma bônus (2 peças: defesa, 3: vida, 4: ataque %)
@@ -68,6 +68,9 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'jewel_aurora', name: 'Joia da Aurora', kind: 'jewel', lvl: 1, price: 6000, blade: '#ffe08a' },
   { key: 'jewel_destiny', name: 'Joia do Destino', kind: 'jewel', lvl: 1, price: 30000, blade: '#6fd6ff' },
   { key: 'jewel_eclipse', name: 'Joia do Eclipse', kind: 'jewel', lvl: 1, price: 120000, blade: '#d86bff' },
+  { key: 'pack_aurora', name: 'Pacote de 10 Joias da Aurora', kind: 'pack', lvl: 1, price: 60000, blade: '#ffe08a' },
+  { key: 'pack_destiny', name: 'Pacote de 10 Joias do Destino', kind: 'pack', lvl: 1, price: 300000, blade: '#6fd6ff' },
+  { key: 'pack_eclipse', name: 'Pacote de 10 Joias do Eclipse', kind: 'pack', lvl: 1, price: 1200000, blade: '#d86bff' },
   { key: 'plume', name: 'Pluma Gélida', kind: 'material', lvl: 1, price: 2000, blade: '#cfefff' },
   { key: 'magma_heart', name: 'Coração de Magma', kind: 'material', lvl: 1, price: 8000, blade: '#ff6a2b' },
   { key: 'ancient_scale', name: 'Escama Ancestral', kind: 'material', lvl: 1, price: 60000, blade: '#ffd76a' },
@@ -96,7 +99,8 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
 ] as ItemDef[]).concat(SET_ITEMS, WING_ITEMS, WEAPON_ITEMS).map(i => [i.key, i]));
 // Joias: faixa de melhoria, chance e quantos + perde ao falhar
 export const JEWELS: Record<string, { min: number; max: number; chance: number; fail: number }> = { jewel_aurora: { min: 0, max: 6, chance: 1, fail: 0 }, jewel_destiny: { min: 6, max: 9, chance: .6, fail: 1 }, jewel_eclipse: { min: 9, max: 15, chance: .4, fail: 2 } };
-export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material' || d.kind === 'jewel';
+export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material';
+export const JEWEL_PACKS: Record<string, string> = { jewel_aurora: 'pack_aurora', jewel_destiny: 'pack_destiny', jewel_eclipse: 'pack_eclipse' };
 export const glowTier = (p: number) => p >= 13 ? '#ff6ad5' : p >= 11 ? '#ffd76a' : p >= 9 ? '#7dffb0' : p >= 7 ? '#9fc8ff' : null;
 export const RARITY = [
   { name: 'Comum', mult: 1, color: '#e8e6df' }, { name: 'Incomum', mult: 1.25, color: '#6fdc7e' }, { name: 'Raro', mult: 1.6, color: '#68b6ff' }, { name: 'Excelente', mult: 1.8, color: '#7dffb0' },
@@ -106,6 +110,7 @@ export const SHOPS: Record<string, string[]> = {
   armeira: SET_ITEMS.map(i => i.key),
   wings: [],
   chest: [],
+  press: [],
   ferreira: ['jewel_aurora', ...Object.values(ITEMS).filter(i => i.kind === 'weapon' && i.lvl < 70).sort((a, b) => a.wtype!.localeCompare(b.wtype!) || a.lvl - b.lvl).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
 };
 export interface MobDef {
