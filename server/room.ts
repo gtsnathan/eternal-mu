@@ -1,4 +1,4 @@
-import { EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
+import { WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
 import { blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step } from '../shared/world';
 
 type Pt = { x: number; y: number };
@@ -159,7 +159,7 @@ export class MapRoom {
     if (m.t === 'c') return this.chat(p, m);
     if (p.deadUntil) return;
     const now = Date.now();
-    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
+    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up', 'cw'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
     switch (m.t) {
       case 'i': {
         if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
@@ -176,6 +176,7 @@ export class MapRoom {
       case 'st': return this.addStat(p, m.s, m.n);
       case 'b': return this.buy(p, m.npc, m.key, m.qty);
       case 'se': return this.sell(p, m.npc, m.slot);
+      case 'cw': return this.craftWings(p, m.tier);
       case 'up': return this.upgrade(p, m.j, m.item);
       case 'ti': return this.tradeInvite(p, m.id);
       case 'ta': return this.tradeAccept(p);
@@ -365,6 +366,21 @@ export class MapRoom {
     if (p.level < set.lvl) { p.points += (set.lvl - p.level) * CONFIG.pointsPerLevel; p.level = set.lvl; p.xp = 0; const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; }
     p.dirty = true; p.meDirty = true; this.sendInv(p); for (const o of this.players.values()) o.known.delete(p.eid);
     this.sys(p, `Teste: Set ${set.name}, joias e 500.000 moedas. Abra a Bolsa (I) para equipar.`);
+  }
+  private craftWings(p: Player, tier: unknown) {
+    const n = this.nearNpc(p, 'artifice'), r = WING_RECIPES[tier as number]; if (!n || !r || !Number.isInteger(tier)) return;
+    const c = classOf(p.cls).key, t = tier as number, have = (k: string) => p.items.filter(i => i.key === k && !i.equip).reduce((a, i) => a + i.qty, 0);
+    const prev = t > 0 ? p.items.find(i => i.key === `wing_${c}_${t - 1}` && !i.equip) : undefined;
+    if (t > 0 && !prev) return this.sys(p, 'Tire as asas do nível anterior e deixe-as na bolsa.');
+    if (p.level < WING_TIER[t].lvl) return this.sys(p, `Requer nível ${WING_TIER[t].lvl}.`);
+    if (p.gold < r.gold || r.mats.some(([k, q]) => have(k) < q)) return this.sys(p, 'Faltam materiais ou moedas.');
+    if (!prev && this.freeSlot(p) < 0) return this.sys(p, 'Inventário cheio.');
+    const now = Date.now(), keepPlus = prev?.plus ?? 0;
+    for (const [k, q] of r.mats) for (let left = q; left > 0; left--) this.takeOne(p, p.items.find(i => i.key === k && !i.equip)!);
+    if (prev) { p.items.splice(p.items.indexOf(prev), 1); p.dirtyItems.delete(prev.id); p.delItems.add(prev.id); p.logs.push(['craft_consume', prev.id, prev.key, 1, 0, now]); }
+    p.gold -= r.gold; p.logs.push(['craft_pay', null, null, 0, -r.gold, now]);
+    const key = `wing_${c}_${t}`; this.give(p, key, 1, 0, 'craft'); const made = p.items.find(i => i.key === key && !i.equip && !i.plus)!; made.plus = keepPlus;
+    p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 }); this.sys(p, `Você criou: ${ITEMS[key].name}!`);
   }
   private bumpLoot(p: Player, now: number) { p.streak = Math.min(10, (now < p.streakUntil ? p.streak : 0) + 1); p.streakUntil = now + 15000; p.meDirty = true; }
   // ---------- grupos ----------

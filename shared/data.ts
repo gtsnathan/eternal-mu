@@ -45,7 +45,8 @@ export const WING_THEME: Record<string, { name: string; style: 'bat' | 'feather'
 };
 export const WING_TIER = [{ name: 'Noviças', lvl: 20, def: 15, hp: 100, atk: .12, abs: .1, price: 30000 }, { name: 'Ancestrais', lvl: 40, def: 45, hp: 300, atk: .22, abs: .2, price: 250000 }, { name: 'Soberanas', lvl: 60, def: 100, hp: 700, atk: .35, abs: .3, price: 1500000 }];
 const WING_ITEMS: ItemDef[] = Object.entries(WING_THEME).flatMap(([c, t]) => WING_TIER.map((w, i) => ({ key: `wing_${c}_${i}`, name: `Asas ${w.name} ${t.name}`, kind: 'wings' as const, lvl: w.lvl, price: w.price, def: w.def, hp: w.hp, tint: t.c, blade: t.c2, cls: c, wtier: i })));
-const wingDrops = (t: number, ch: number) => Object.keys(WING_THEME).map(c => [`wing_${c}_${t}`, ch] as [string, number]);
+// Receitas do Artífice: asas só existem por criação
+export const WING_RECIPES: { gold: number; mats: [string, number][] }[] = [{ gold: 30000, mats: [['shard', 10], ['plume', 1]] }, { gold: 250000, mats: [['plume', 3], ['magma_heart', 2]] }, { gold: 1500000, mats: [['plume', 5], ['magma_heart', 5], ['ancient_scale', 1]] }];
 // Itens excelentes: opções especiais sorteadas no drop
 export const EXC_WEAPON = ['atk', 'crit', 'speed', 'lifek', 'manak'], EXC_ARMOR = ['hp', 'mp', 'absorb', 'reflect', 'goldx', 'dodge'];
 export const EXC_TEXT: Record<string, string> = { atk: '+6% de ataque', crit: '+8% de crítico', speed: '+7% de velocidade de ataque', lifek: 'Recupera 8% da vida ao matar', manak: 'Recupera 10% da mana ao matar', hp: '+4% de vida', mp: '+4% de mana', absorb: '-4% de dano recebido', reflect: 'Reflete 5% do dano', goldx: '+30% de moedas', dodge: '+3% de esquiva' };
@@ -67,6 +68,9 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'jewel_aurora', name: 'Joia da Aurora', kind: 'jewel', lvl: 1, price: 6000, blade: '#ffe08a' },
   { key: 'jewel_destiny', name: 'Joia do Destino', kind: 'jewel', lvl: 1, price: 30000, blade: '#6fd6ff' },
   { key: 'jewel_eclipse', name: 'Joia do Eclipse', kind: 'jewel', lvl: 1, price: 120000, blade: '#d86bff' },
+  { key: 'plume', name: 'Pluma Gélida', kind: 'material', lvl: 1, price: 2000, blade: '#cfefff' },
+  { key: 'magma_heart', name: 'Coração de Magma', kind: 'material', lvl: 1, price: 8000, blade: '#ff6a2b' },
+  { key: 'ancient_scale', name: 'Escama Ancestral', kind: 'material', lvl: 1, price: 60000, blade: '#ffd76a' },
   { key: 'shard', name: 'Estilhaço Gélido', kind: 'material', lvl: 1, price: 15 },
   { key: 'short_sword', name: 'Espada Curta', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#cfd8e3', wtype: 'sword' },
   { key: 'app_staff', name: 'Cajado do Aprendiz', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#b58cff', wtype: 'staff' },
@@ -99,8 +103,9 @@ export const RARITY = [
 ];
 export const SHOPS: Record<string, string[]> = {
   alquimista: ['pot_hp', 'pot_mp'],
-  armeira: [...SET_ITEMS, ...WING_ITEMS].map(i => i.key),
-  ferreira: ['jewel_aurora', 'short_sword', 'app_staff', 'oak_bow', ...WEAPON_ITEMS.filter(i => i.lvl <= 26).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
+  armeira: SET_ITEMS.map(i => i.key),
+  wings: [],
+  ferreira: ['jewel_aurora', ...Object.values(ITEMS).filter(i => i.kind === 'weapon').sort((a, b) => a.wtype!.localeCompare(b.wtype!) || a.lvl - b.lvl).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
 };
 export interface MobDef {
   key: string; name: string; level: number; hp: number; dmg: number; def: number; speed: number; detect: number; leash: number;
@@ -114,19 +119,19 @@ export const MOBS: Record<string, MobDef> = {
   hound: { key: 'hound', name: 'Cão de Enxofre', level: 29, hp: 1900, dmg: 110, def: 50, speed: 4, detect: 8, leash: 14, attackMs: 1100, xp: 850, respawnMs: 15000, gold: [90, 190],
     drops: [['pot_hp', .35], ['pot_mp', .25], ...setDrops('griffin', .02), ...setDrops('lion', .01), ...wep(26, .01), ...setDrops('owl', .012), ['jewel_aurora', .05], ['jewel_destiny', .01]] },
   magma: { key: 'magma', name: 'Colosso de Magma', level: 37, hp: 5200, dmg: 190, def: 85, speed: 2, detect: 6.5, leash: 12, attackMs: 1800, xp: 2400, respawnMs: 22000, gold: [220, 420],
-    drops: [['pot_hp', .4], ...setDrops('lion', .02), ...setDrops('serpent', .01), ...setDrops('tiger', .012), ...wep(44, .006), ...setDrops('manticore', .012), ...wingDrops(0, .006), ['jewel_destiny', .03], ['jewel_eclipse', .004], ...ember(.012)] },
+    drops: [['pot_hp', .4], ...setDrops('lion', .02), ...setDrops('serpent', .01), ...setDrops('tiger', .012), ['magma_heart', .03], ...wep(44, .006), ...setDrops('manticore', .012), ['jewel_destiny', .03], ['jewel_eclipse', .004], ...ember(.012)] },
   wyrm: { key: 'wyrm', name: 'Serpe Carbonizada', level: 45, hp: 9500, dmg: 260, def: 120, speed: 3, detect: 8, leash: 14, attackMs: 1700, xp: 6000, respawnMs: 30000, gold: [500, 900], reach: 5.5, bolt: '#ff5a2c',
-    drops: [['pot_hp', .5], ...setDrops('serpent', .025), ...setDrops('phoenix', .012), ...setDrops('kraken', .012), ...wep(44, .012), ...setDrops('pegasus', .01), ...wingDrops(1, .004), ['jewel_destiny', .05], ['jewel_eclipse', .012], ...ember(.03)] },
+    drops: [['pot_hp', .5], ...setDrops('serpent', .025), ...setDrops('phoenix', .012), ...setDrops('kraken', .012), ['magma_heart', .06], ...wep(44, .012), ...setDrops('pegasus', .01), ['jewel_destiny', .05], ['jewel_eclipse', .012], ...ember(.03)] },
   ignarok: { key: 'ignarok', name: 'Ignarok, o Dragão Ancestral', level: 60, hp: 120000, dmg: 420, def: 170, speed: 3, detect: 12, leash: 20, attackMs: 1500, xp: 150000, respawnMs: 1800000, gold: [15000, 30000], boss: true, reach: 3.2, nova: '#ff7a2b',
-    drops: [['pot_hp', 1], ['pot_mp', 1], ...ember(.4), ...setDrops('phoenix', .3), ...setDrops('dragon', .15), ...setDrops('kraken', .2), ...wep(44, .2), ...wep(56, .05), ...setDrops('demon', .05), ...wingDrops(1, .06), ...wingDrops(2, .012), ['jewel_destiny', 1], ['jewel_eclipse', .6], ...setDrops('pegasus', .1), ...setDrops('hydra', .08), ...setDrops('chimera', .08)] },
+    drops: [['pot_hp', 1], ['pot_mp', 1], ...ember(.4), ...setDrops('phoenix', .3), ...setDrops('dragon', .15), ...setDrops('kraken', .2), ['plume', 1], ['magma_heart', 1], ['ancient_scale', .5], ...wep(44, .2), ...wep(56, .05), ...setDrops('demon', .05), ['jewel_destiny', 1], ['jewel_eclipse', .6], ...setDrops('pegasus', .1), ...setDrops('hydra', .08), ...setDrops('chimera', .08)] },
   slime: { key: 'slime', name: 'Gelatina Gélida', level: 2, hp: 45, dmg: 9, def: 1, speed: 1.6, detect: 4.5, leash: 10, attackMs: 1500, xp: 20, respawnMs: 8000, gold: [3, 9],
     drops: [['pot_hp', .12], ['shard', .2], ['leather_boots', .03], ['leather_helm', .03]] },
   wolf: { key: 'wolf', name: 'Lobo Geladiço', level: 7, hp: 150, dmg: 22, def: 7, speed: 3.4, detect: 7, leash: 13, attackMs: 1200, xp: 70, respawnMs: 12000, gold: [10, 25],
     drops: [['pot_hp', .15], ['pot_mp', .1], ['shard', .25], ['leather_armor', .04], ['leather_pants', .04], ['iron_axe', .02], ['rune_staff', .02], ['long_bow', .02], ['jewel_aurora', .01]] },
   golem: { key: 'golem', name: 'Colosso de Granizo', level: 14, hp: 520, dmg: 44, def: 20, speed: 1.9, detect: 6, leash: 12, attackMs: 1800, xp: 240, respawnMs: 20000, gold: [35, 80],
-    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rune_staff', .05], ['long_bow', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02], ...setDrops('griffin', .012), ['jewel_aurora', .03], ...wep(12, .02), ...setDrops('axolotl', .02), ...setDrops('salamander', .015), ...setDrops('bat', .015), ...setDrops('wolf', .015)] },
+    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rune_staff', .05], ['long_bow', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02], ...setDrops('griffin', .012), ['plume', .015], ['jewel_aurora', .03], ...wep(12, .02), ...setDrops('axolotl', .02), ...setDrops('salamander', .015), ...setDrops('bat', .015), ...setDrops('wolf', .015)] },
   boss: { key: 'boss', name: 'Hrímara, a Soberana', level: 24, hp: 6500, dmg: 70, def: 32, speed: 2.7, detect: 9, leash: 16, attackMs: 1400, xp: 4000, respawnMs: 600000, gold: [800, 1500], boss: true,
-    drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ['jewel_aurora', 1], ['jewel_destiny', .5], ...wep(26, .2), ...wingDrops(0, .03), ...setDrops('scorpion', .1), ...setDrops('spider', .1), ...setDrops('bear', .25), ...setDrops('owl', .1), ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
+    drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ['plume', .6], ['jewel_aurora', 1], ['jewel_destiny', .5], ...wep(26, .2), ...setDrops('scorpion', .1), ...setDrops('spider', .1), ...setDrops('bear', .25), ...setDrops('owl', .1), ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
 };
 export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse' | 'buff' | 'heal' | 'drain';
 export interface Skill { lvl?: number; slow?: number; buff?: 'atk' | 'def'; heal?: number; curse?: number; n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number }
