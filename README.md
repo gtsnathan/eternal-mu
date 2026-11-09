@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.3
+# Eternal MU · versão 0.4
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -51,7 +51,9 @@ Abra `http://localhost:8787`. Para testar com dois jogadores, use uma janela nor
 
 Depois de alterar `client/` ou `shared/`, rode `npm run build`.
 
-## Situação da 0.3
+## Situação da 0.4
+
+Novo na 0.4: 5 sets com visual próprio (Grifo Celeste, Leão Dourado, Serpente Esmeralda, Fênix Rubra, Dragão Dessecado), bônus por peças, aura de set completo e a Armeira em Valoria.
 
 Novo na 0.3: visual refeito (transições de terreno, ciclo de dia e noite, iluminação dinâmica, roupas por classe, interface com orbes de vida e mana, ícones de habilidade) e venda de itens listada na loja.
 
