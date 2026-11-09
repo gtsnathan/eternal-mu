@@ -15,12 +15,19 @@ const ctx = (c: Cv) => c.getContext('2d', { willReadFrequently: true })!;
 const r = (g: G, x: number, y: number, w: number, h: number, col: string) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
 function rng(s: number) { return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
 function ell(g: G, cx: number, cy: number, rx: number, ry: number, col: string) { for (let y = -ry; y <= ry; y++) { const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y / (ry + .3)) ** 2))); r(g, cx - w, cy + y, w * 2, 1, col); } }
+/** Dá volume ao sprite: luz de cima/esquerda, sombra embaixo/direita e contorno colorido. */
 function outline(c: Cv, col = [24, 18, 34, 255]) {
   const g = ctx(c), d = g.getImageData(0, 0, c.width, c.height), a = d.data, W = c.width, H = c.height, o = new Uint8ClampedArray(a);
+  const on = (i: number, j: number) => i >= 0 && j >= 0 && i < W && j < H && a[(j * W + i) * 4 + 3] > 0;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (a[(y * W + x) * 4 + 3]) continue;
-    const on = (i: number, j: number) => i >= 0 && j >= 0 && i < W && j < H && a[(j * W + i) * 4 + 3] > 0;
-    if (on(x + 1, y) || on(x - 1, y) || on(x, y + 1) || on(x, y - 1)) o.set(col, (y * W + x) * 4);
+    const p = (y * W + x) * 4;
+    if (a[p + 3]) {
+      let k = (.5 - y / H) * 16;
+      if (!on(x, y - 1) || !on(x - 1, y)) k += 24; else if (!on(x, y + 1) || !on(x + 1, y)) k -= 30;
+      o[p] = a[p] + k; o[p + 1] = a[p + 1] + k; o[p + 2] = a[p + 2] + k * .9; continue;
+    }
+    const q = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].find(([i, j]) => on(i, j));
+    if (q) { const n = (q[1] * W + q[0]) * 4; o[p] = a[n] * .26 + col[0] * .74; o[p + 1] = a[n + 1] * .26 + col[1] * .74; o[p + 2] = a[n + 2] * .26 + col[2] * .74; o[p + 3] = 255; }
   }
   d.data.set(o); g.putImageData(d, 0, 0); return c;
 }
@@ -56,8 +63,8 @@ export function tile(t: number, v: number, frame: number): Cv {
     for (let i = 0; i < 6; i++) { const x = (i * 11 + q) % 28, y = (i * 7 + frame * 3 + 2) % 28; r(g, x, y, 9, 4, '#ff8a2b'); r(g, x + 2, y + 1, 5, 2, '#ffd76a'); }
     for (let i = 0; i < 4; i++) r(g, (i * 17 + q * 2) % 30, (i * 13 + 5) % 30, 6, 2, '#9c2a12');
   } else {
-    r(g, 0, 0, 32, 32, '#2f74b5'); const f = frame * 8;
-    for (let i = 0; i < 7; i++) { const x = (i * 13 + f + v * 5) % 32, y = (i * 9 + 3) % 30; r(g, x, y, 7, 1, '#5ba3dc'); r(g, (x + 16) % 32, (y + 15) % 31, 4, 1, '#8cc6ee'); }
+    r(g, 0, 0, 32, 32, '#2f74b5'); r(g, 0, 0, 32, 10, '#3580c0'); r(g, 0, 22, 32, 10, '#2a6aa8'); const f = frame * 8;
+    for (let i = 0; i < 7; i++) { const x = (i * 13 + f + v * 5) % 32, y = (i * 9 + 3) % 30; r(g, x, y, 7, 1, '#5ba3dc'); r(g, (x + 16) % 32, (y + 15) % 31, 4, 1, '#8cc6ee'); if (i % 3 === 0) r(g, (x + 5) % 31, (y + 7) % 31, 2, 1, '#e6f6ff'); }
   }
   tileCache.set(k, c); return c;
 }
@@ -115,6 +122,8 @@ export function objSprite(o: Obj): { c: Cv; ox: number; oy: number; sway: number
     const wallY = H - 54; r(g, 4, wallY, W, 54, '#d6c7a4');
     for (let x = 0; x < W; x += 28) r(g, 4 + x, wallY, 4, 54, '#7d5a3a');
     r(g, 4, wallY + 24, W, 4, '#7d5a3a'); r(g, 4, H - 6, W, 6, '#7a7468');
+    r(g, W - 46, 4, 16, 28, '#6d5f54'); r(g, W - 46, 4, 16, 4, '#9a8a7a'); r(g, W - 44, 0, 12, 5, '#3c342e');
+    for (const wx of [14, W - 32]) { r(g, wx, wallY + 23, 24, 5, '#6b4a2b'); for (let i = 0; i < 6; i++) r(g, wx + 1 + i * 4, wallY + 19 + (i % 2), 3, 4, ['#e0425a', '#f4e36b', '#f2a0c0'][i % 3]); r(g, wx, wallY + 22, 24, 1, '#3f8740'); }
     const dx = W / 2 - 8 | 0; r(g, dx, H - 36, 24, 36, '#5a3a22'); r(g, dx + 2, H - 34, 20, 34, '#7a5533'); r(g, dx + 17, H - 18, 3, 3, '#f4d35e');
     for (const wx of [18, W - 28]) { r(g, wx, wallY + 8, 16, 14, '#7d5a3a'); r(g, wx + 2, wallY + 10, 12, 10, '#ffe08a'); r(g, wx + 7, wallY + 10, 2, 10, '#7d5a3a'); }
     const rh = wallY + 4; for (let y = 0; y < rh; y++) { r(g, 0, y, W + 8, 1, y % 8 < 1 ? pal[2] : y % 16 < 8 ? pal[0] : pal[1]); }
@@ -319,7 +328,7 @@ export function lookFromGear(cls: string | undefined, hc: string, hs: number, e:
 
 // ---------- monstros: [quadro][direita/esquerda] ----------
 const mobCache = new Map<string, Cv[][]>();
-function slime(f: number) { const c = cv(36, 30), g = ctx(c), h = f ? 10 : 12, w = f ? 15 : 13; ell(g, 18, 28 - h, w, h, '#66c6e6'); ell(g, 16, 25 - h, w - 4, h - 4, '#93e0f5'); ell(g, 13, 22 - h + 1, 3, 2, '#effcff'); r(g, 12, 25 - h + 6, 3, 4, '#17344a'); r(g, 21, 25 - h + 6, 3, 4, '#17344a'); return outline(c); }
+function slime(f: number) { const c = cv(36, 30), g = ctx(c), h = f ? 10 : 12, w = f ? 15 : 13; ell(g, 18, 28 - h, w, h, '#4fb0d8'); ell(g, 17, 26 - h, w - 2, h - 2, '#66c6e6'); ell(g, 16, 25 - h, w - 5, h - 5, '#93e0f5'); ell(g, 13, 22 - h + 1, 3, 2, '#effcff'); for (const [bx, by] of [[24, 20], [9, 22], [21, 25]]) r(g, bx, by, 2, 2, '#bdeeff'); r(g, 7, 26, 22, 1, '#3a8fbb'); r(g, 12, 25 - h + 6, 3, 4, '#17344a'); r(g, 21, 25 - h + 6, 3, 4, '#17344a'); return outline(c); }
 function wolf(f: number) { const c = cv(48, 38), g = ctx(c), b = '#8ea3b8', d = '#64788e', l = '#c8d6e3', s = f ? 3 : -3; r(g, 10, 14, 24, 13, b); r(g, 10, 14, 24, 4, l); r(g, 4, 11, 7, 5, b); r(g, 2, 8, 4, 5, l); r(g, 30, 8, 12, 12, b); r(g, 38, 13, 8, 5, l); r(g, 44, 13, 2, 2, '#1d2230'); r(g, 37, 11, 2, 2, '#ff6b4a'); r(g, 31, 3, 4, 7, d); r(g, 37, 3, 3, 6, d); for (const [x, o] of [[11, s], [17, -s], [26, -s], [31, s]]) r(g, x + o, 26, 4, 10, d); return outline(c); }
 function golem(f: number) { const c = cv(56, 62), g = ctx(c), a = '#7f9fbe', b = '#a8c6e0', d = '#567595', s = f ? 2 : 0; r(g, 14 + s, 44, 12, 15, d); r(g, 31 - s, 44, 12, 15, d); r(g, 12, 18, 33, 28, a); r(g, 12, 18, 33, 5, b); r(g, 3, 20 + s, 10, 27, d); r(g, 44, 20 - s, 10, 27, d); r(g, 19, 6, 19, 14, a); r(g, 19, 6, 19, 3, b); r(g, 23, 12, 4, 3, '#7ff0ff'); r(g, 31, 12, 4, 3, '#7ff0ff'); for (const [x, y, h] of [[16, 11, 8], [41, 12, 7], [8, 13, 8], [48, 14, 7], [28, 25, 11]]) { r(g, x, y, 4, h, '#d6f5ff'); r(g, x + 1, y - 3, 2, 3, '#effcff'); } return outline(c); }
 function boss(f: number) { const c = cv(92, 110), g = ctx(c), s = f ? 2 : 0, rb = '#3f5fa8', rb2 = '#6186d4'; for (let y = 0; y < 62; y++) { const w = 14 + y * .42 | 0; r(g, 46 - w, 42 + y, w * 2, 1, y % 9 < 2 ? rb2 : rb); } r(g, 33, 42, 26, 16, '#88a8e2'); r(g, 37, 22, 18, 20, '#dfeaf7'); r(g, 41, 30, 3, 4, '#2552c9'); r(g, 49, 30, 3, 4, '#2552c9'); r(g, 34, 20, 24, 8, '#f3f8ff'); r(g, 33, 24, 5, 42, '#f3f8ff'); r(g, 54, 24, 5, 42, '#f3f8ff'); for (const [x, h] of [[35, 8], [41, 12], [46, 16], [51, 12], [56, 8]]) r(g, x, 20 - h, 3, h, '#7fe3ff'); r(g, 75, 12, 4, 92, '#a4e8ff'); ell(g, 77, 12 + s, 8, 8, '#d9f7ff'); r(g, 67, 56, 10, 4, '#88a8e2'); for (const [x, y] of [[12, 30 + s], [8, 62 - s], [20, 14 - s]]) { r(g, x, y, 5, 10, '#7fe3ff'); r(g, x + 1, y, 1, 10, '#fff'); } return outline(c); }

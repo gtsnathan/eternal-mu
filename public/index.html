@@ -88,6 +88,9 @@ label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
 @media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:124px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(4,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
 
 /* tema */
+#xp{height:15px!important;z-index:3}#xp i{position:absolute;left:0;top:0;bottom:0}#xpt{position:absolute;inset:0;text-align:center;font:700 10px/14px ui-monospace,monospace;color:#fff;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;pointer-events:none}
+#hud #bar{margin-bottom:6px}.touch #stick{margin-bottom:6px}
+#tframe{display:none;position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(280px,60vw);background:linear-gradient(180deg,#2a1420ee,#150c14ee);border:2px solid #8a6a32;padding:5px 9px;text-align:center;font-size:12px;font-weight:700;color:#ffd9c9;box-shadow:0 0 0 1px #0a0814}.touch #tframe{top:calc(100px + env(safe-area-inset-top));width:220px}
 .slot.lock{opacity:.4;filter:grayscale(1)}.cell u{position:absolute;left:2px;top:0;font-size:10px;font-weight:700;text-decoration:none;text-shadow:1px 1px 0 #000}.cell.jsel{outline:2px solid #ffe08a}
 @media (orientation:landscape){.touch #bar{grid-template-columns:repeat(4,60px)}}
 #lootc{display:none;position:absolute;left:50%;bottom:112px;transform:translateX(-50%);background:#2a1f08dd;border:2px solid var(--gold);color:#ffe08a;padding:3px 12px;font-weight:700;font-size:13px;white-space:nowrap}.touch #lootc{bottom:auto;top:calc(8px + 70px)}
@@ -126,6 +129,7 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
 <canvas id="game"></canvas>
 <div id="hud">
   <div class="frame p"><canvas id="portrait" width="40" height="48"></canvas><div class="col"><div class="nm" id="nm"></div><div class="bar hp"><i id="hpb"></i><em id="hpt"></em></div><div class="bar mp"><i id="mpb"></i><em id="mpt"></em></div></div></div>
+  <div id="tframe"><div id="tfn"></div><div class="bar hp"><i id="tfb"></i></div></div>
   <div id="party" class="p"></div>
   <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
@@ -155,7 +159,7 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
     <div class="row" style="margin-top:10px"><button id="tcancel">Cancelar</button><button class="main" id="tok">Travar oferta</button></div></div>
   <div class="win p" id="w-shop"><h3><span id="shopt"></span> <button data-close>×</button></h3><div id="shopl"></div></div>
 </div>
-<div id="xp"><i></i></div>
+<div id="xp"><i></i><span id="xpt"></span></div>
 <div id="root"></div>
 <div id="over"></div>
 <script src="game.js"></script>
