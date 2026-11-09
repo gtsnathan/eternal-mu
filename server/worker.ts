@@ -133,6 +133,17 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   const clear = { 'set-cookie': `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` };
   if (path === '/api/logout' && req.method === 'POST') { await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await sha(readCookie(req)!)).run(); return json({ ok: 1 }, 200, clear); }
   if (path === '/api/logout-all' && req.method === 'POST') { await db.prepare('DELETE FROM sessions WHERE account_id=?').bind(me.id).run(); return json({ ok: 1 }, 200, clear); }
+  if (path === '/api/password' && req.method === 'POST') {
+    const { current, password, confirm } = body;
+    if (typeof current !== 'string' || typeof password !== 'string' || current.length > 128) return err('Dados inválidos.');
+    if (password.length < 8 || password.length > 128) return err('A nova senha precisa ter de 8 a 128 caracteres.');
+    if (password !== confirm) return err('As senhas não coincidem.');
+    if (!await limit(db, `password:${me.id}`, 10, 9e5)) return err('Muitas tentativas. Aguarde 15 minutos.', 429);
+    const a = await db.prepare('SELECT pass_hash FROM accounts WHERE id=?').bind(me.id).first<{ pass_hash: string }>();
+    if (!a || !await verifyPw(current, a.pass_hash)) return err('Senha atual incorreta.');
+    await db.batch([db.prepare('UPDATE accounts SET pass_hash=? WHERE id=?').bind(await hashPw(password), me.id), db.prepare('DELETE FROM sessions WHERE account_id=?').bind(me.id)]);
+    return startSession(req, env, me.id, me.username);
+  }
   if (path === '/api/site/characters') {
     const { results } = await db.prepare('SELECT id,name,class,hair_color,hair_style,level,xp,points,str,agi,vit,ene,gold,map,resets,master_level,master_points FROM characters WHERE account_id=? ORDER BY id').bind(me.id).all();
     const gear = results.length ? (await db.prepare(`SELECT char_id,item_key,equip,plus FROM items WHERE equip IS NOT NULL AND char_id IN (${results.map(() => '?').join(',')})`).bind(...results.map(r => r.id)).all()).results : [];
