@@ -120,6 +120,7 @@ export const SHOPS: Record<string, string[]> = {
   armeira: SET_ITEMS.map(i => i.key),
   wings: [],
   chest: [],
+  reset: [],
   press: [],
   ferreira: ['jewel_aurora', ...Object.values(ITEMS).filter(i => i.kind === 'weapon' && i.lvl < 70).sort((a, b) => a.wtype!.localeCompare(b.wtype!) || a.lvl - b.lvl).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
 };
@@ -194,7 +195,9 @@ export const HAIR_COLORS = ['#2b2230', '#7a4a22', '#d9b24a', '#b23a2e', '#d8dde6
 export const HAIR_STYLES = ['Curto', 'Espetado', 'Longo'];
 export const xpToNext = (lv: number) => Math.floor(50 * Math.pow(lv, 1.9) + 40);
 
-export interface Base { cls?: string; level: number; str: number; agi: number; vit: number; ene: number }
+export const MASTER_MAX = 200, MASTER_NODE_MAX = 30, masterNext = (ml: number) => Math.floor(5e6 * Math.pow(1.06, ml));
+export const MASTER_NODES: Record<string, string> = { atk: 'Ataque +1%', def: 'Defesa +1%', hp: 'Vida +1%', crit: 'Crítico +0,3%' };
+export interface Base { mtree?: Record<string, number>; cls?: string; level: number; str: number; agi: number; vit: number; ene: number }
 export interface ItemInst { id: string; key: string; qty: number; slot: number; equip: string | null; rarity: number; plus?: number; opts?: string[] }
 export const sellPrice = (i: ItemInst) => Math.floor(ITEMS[i.key].price * .3 * (1 + i.rarity * .5) * (1 + (i.plus ?? 0) * .3));
 export const itemStat = (i: ItemInst, f: 'dmg' | 'def' | 'hp') => Math.round((ITEMS[i.key][f] ?? 0) * RARITY[i.rarity].mult * (1 + (i.plus ?? 0) * .08));
@@ -205,11 +208,12 @@ export function derive(b: Base, items: ItemInst[]) {
   for (const i of items) if (i.equip) { dmg += itemStat(i, 'dmg'); def += itemStat(i, 'def'); hp += itemStat(i, 'hp'); }
   let wa = 0, wabs = 0; const O: Record<string, number> = {}; for (const i of items) if (i.equip) { const d = ITEMS[i.key]; if (d.kind === 'wings') { wa += WING_TIER[d.wtier!].atk; wabs += WING_TIER[d.wtier!].abs; } for (const o of i.opts ?? []) O[o] = (O[o] ?? 0) + 1; }
   const q0 = (k: string) => O[k] ?? 0;
-  let pct = 0; for (const [k, n] of Object.entries(setCounts(items))) { const q = SETS[k].bonus; if (n >= 2) def += q.def; if (n >= 3) hp += q.hp; if (n >= 4) pct += q.atk; }
+  const mt = b.mtree ?? {}, mv = (k: string) => mt[k] ?? 0;
+  let pct = mv('atk') * .01; for (const [k, n] of Object.entries(setCounts(items))) { const q = SETS[k].bonus; if (n >= 2) def += q.def; if (n >= 3) hp += q.hp; if (n >= 4) pct += q.atk; }
   return {
-    maxHp: Math.floor((70 + b.level * 3 + b.vit * 3 + hp) * (1 + q0('hp') * .04)), maxMp: Math.floor((20 + b.level + b.ene * 2) * (1 + q0('mp') * .04)),
-    atk: Math.floor((b.str * w[0] + b.agi * w[1] + b.ene * w[2] + dmg) * (1 + pct + wa + q0('atk') * .06)), def: Math.floor(b.agi / 5 + def),
-    attackMs: Math.max(280, (1000 - b.agi * 3) * (1 - q0('speed') * .07)), crit: Math.min(.5, .05 + b.agi * .0007 + q0('crit') * .08), dodge: Math.min(.4, b.agi * .0008 + q0('dodge') * .03),
+    maxHp: Math.floor((70 + b.level * 3 + b.vit * 3 + hp) * (1 + q0('hp') * .04 + mv('hp') * .01)), maxMp: Math.floor((20 + b.level + b.ene * 2) * (1 + q0('mp') * .04)),
+    atk: Math.floor((b.str * w[0] + b.agi * w[1] + b.ene * w[2] + dmg) * (1 + pct + wa + q0('atk') * .06)), def: Math.floor((b.agi / 5 + def) * (1 + mv('def') * .01)),
+    attackMs: Math.max(280, (1000 - b.agi * 3) * (1 - q0('speed') * .07)), crit: Math.min(.6, .05 + b.agi * .0007 + q0('crit') * .08 + mv('crit') * .003), dodge: Math.min(.4, b.agi * .0008 + q0('dodge') * .03),
     absorb: Math.min(.6, wabs + q0('absorb') * .04), reflect: q0('reflect') * .05, goldPct: q0('goldx') * .3, lifeK: q0('lifek') * .08, manaK: q0('manak') * .1,
   };
 }
@@ -217,14 +221,15 @@ export const rollDamage = (atk: number, def: number, rnd: number) => Math.max(1,
 
 // ---------- configurações editáveis no painel /admin ----------
 export interface MobOverride { hp?: number; dmg?: number; def?: number; xp?: number; respawnMs?: number; drop?: number }
-export interface Settings { exc: number; xp: number; gold: number; drop: number; jewel: number; hp: number; dmg: number; respawn: number; test: boolean; jewels: Record<string, number>; mobs: Record<string, MobOverride> }
-export const DEFAULT_SETTINGS: Settings = { exc: 1, xp: 1, gold: 1, drop: 1, jewel: 1, hp: 1, dmg: 1, respawn: 1, test: CONFIG.testCommands, jewels: {}, mobs: {} };
+export interface Settings { resetLevel: number; resetPoints: number; resetGold: number; exc: number; xp: number; gold: number; drop: number; jewel: number; hp: number; dmg: number; respawn: number; test: boolean; jewels: Record<string, number>; mobs: Record<string, MobOverride> }
+export const DEFAULT_SETTINGS: Settings = { resetLevel: 400, resetPoints: 500, resetGold: 1000000, exc: 1, xp: 1, gold: 1, drop: 1, jewel: 1, hp: 1, dmg: 1, respawn: 1, test: CONFIG.testCommands, jewels: {}, mobs: {} };
 const clampN = (v: unknown, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null; };
 /** Aceita só campos conhecidos e dentro de limites seguros. */
 export function cleanSettings(x: any): Settings {
   const s: Settings = { ...DEFAULT_SETTINGS, jewels: {}, mobs: {} };
   for (const k of ['exc', 'xp', 'gold', 'drop', 'jewel', 'hp', 'dmg', 'respawn'] as const) s[k] = clampN(x?.[k], k === 'respawn' || k === 'hp' ? .05 : 0, 1000) ?? 1;
   s.test = x?.test === true;
+  s.resetLevel = Math.round(clampN(x?.resetLevel, 2, CONFIG.maxLevel) ?? 400); s.resetPoints = Math.round(clampN(x?.resetPoints, 0, 100000) ?? 500); s.resetGold = Math.round(clampN(x?.resetGold, 0, 2e9) ?? 1000000);
   for (const k of Object.keys(JEWELS)) { const v = clampN(x?.jewels?.[k], 0, 1); if (v !== null && x?.jewels?.[k] !== '' && x?.jewels?.[k] != null) s.jewels[k] = v; }
   for (const k of Object.keys(MOBS)) { const o = x?.mobs?.[k]; if (!o || typeof o !== 'object') continue; const r: MobOverride = {}; const lim: Record<keyof MobOverride, [number, number]> = { hp: [1, 1e9], dmg: [0, 1e7], def: [0, 1e6], xp: [0, 1e9], respawnMs: [1000, 864e5], drop: [0, 1000] };
     for (const f of Object.keys(lim) as (keyof MobOverride)[]) if (o[f] !== '' && o[f] != null) { const v = clampN(o[f], lim[f][0], lim[f][1]); if (v !== null) r[f] = v; } if (Object.keys(r).length) s.mobs[k] = r; }

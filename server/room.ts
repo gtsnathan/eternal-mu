@@ -1,9 +1,9 @@
-import { JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
+import { masterNext, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; ml: number; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -90,7 +90,7 @@ export class MapRoom {
     const all: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity, plus: i.plus ?? 0, opts: (() => { try { return i.opts ? JSON.parse(i.opts) : []; } catch { return []; } })() }));
     const items = all.filter(i => i.equip || i.slot < 1000), chest = all.filter(i => !i.equip && i.slot >= 1000);
     const p: Player = {
-      accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
+      accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     for (const it of [...p.items]) while (ITEMS[it.key]?.kind === 'jewel' && !it.equip && it.qty > 1) { const s = this.freeSlot(p); if (s < 0) break; it.qty--; p.dirtyItems.add(it.id); const n: ItemInst = { id: crypto.randomUUID(), key: it.key, qty: 1, slot: s, equip: null, rarity: 0, plus: 0, opts: [] }; p.items.push(n); p.dirtyItems.add(n.id); p.dirty = true; }
@@ -127,7 +127,7 @@ export class MapRoom {
       for (const id of p.delItems) dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId));
       const dirtyIds = [...p.dirtyItems], changed = [...p.items, ...p.chest].filter(i => p.dirtyItems.has(i.id));
       for (const i of changed) { dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId)); ins.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity,plus,opts) VALUES(?,?,?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity, i.plus ?? 0, i.opts?.length ? JSON.stringify(i.opts) : null)); }
-      rest.push(db.prepare('UPDATE characters SET level=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(p.level, p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), p.charId));
+      rest.push(db.prepare('UPDATE characters SET resets=?,master_level=?,master_xp=?,master_points=?,master_tree=?,level=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(p.resets, p.ml, p.mxp, p.mpts, JSON.stringify(p.mtree), p.level, p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), p.charId));
       for (const l of logs) rest.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
       const delIds = [...p.delItems]; p.delItems.clear(); p.dirtyItems.clear(); p.dirty = false;
       undo.push(() => { p.dirty = true; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); p.logs.unshift(...logs); });
@@ -145,7 +145,7 @@ export class MapRoom {
   private stub(id: string) { return this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }); }
   private sendMe(p: Player) {
     const s = this.stats(p); p.meDirty = false;
-    this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, gold: p.gold, dead: p.deadUntil > 0, loot: p.streak, lootMs: Math.max(0, p.streakUntil - Date.now()) });
+    this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, resets: p.resets, ml: p.ml, mxp: p.mxp, mxpNext: masterNext(p.ml), mpts: p.mpts, mtree: p.mtree, gold: p.gold, dead: p.deadUntil > 0, loot: p.streak, lootMs: Math.max(0, p.streakUntil - Date.now()) });
   }
   private sendInv(p: Player) { this.send(p, { t: 'inv', items: p.items, chest: p.chest }); }
   private sys(p: Player, m: string) { this.send(p, { t: 'sys', m }); }
@@ -180,6 +180,8 @@ export class MapRoom {
       case 'se': return this.sell(p, m.npc, m.slot);
       case 'pj': return this.packJewels(p, m.key);
       case 'uj': return this.unpackJewels(p, m.slot);
+      case 'rs': return this.doReset(p);
+      case 'mt': return this.spendMaster(p, m.k);
       case 'dep': return this.chestDeposit(p, m.slot);
       case 'wd': return this.chestWithdraw(p, m.slot);
       case 'cw': return this.craftWings(p, m.tier);
@@ -396,6 +398,19 @@ export class MapRoom {
     if (p.items.filter(i => !i.equip).length + 9 > CONFIG.invSize) return this.sys(p, 'Libere 9 espaços na bolsa para desmontar.');
     const key = Object.keys(JEWEL_PACKS).find(k => JEWEL_PACKS[k] === it.key)!; this.takeOne(p, it); p.logs.push(['unpack', it.id, it.key, 1, 0, Date.now()]); this.give(p, key, 10, 0, 'unpack'); p.dirty = true; this.sendInv(p); this.sys(p, `Desmontado: 10x ${ITEMS[key].name}.`);
   }
+  private doReset(p: Player) {
+    if (!this.nearNpc(p, 'mestre')) return;
+    if (p.level < this.cfg.resetLevel) return this.sys(p, `É preciso alcançar o nível ${this.cfg.resetLevel}.`);
+    const cost = this.cfg.resetGold * (p.resets + 1); if (p.gold < cost) return this.sys(p, `São necessárias ${cost.toLocaleString('pt-BR')} moedas.`);
+    const b = classOf(p.cls).base; p.gold -= cost; p.resets++; p.level = 1; p.xp = 0; p.str = b.str; p.agi = b.agi; p.vit = b.vit; p.ene = b.ene; p.points = p.resets * this.cfg.resetPoints;
+    const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; p.logs.push(['reset', null, null, p.resets, -cost, Date.now()]); p.dirty = true; p.meDirty = true; this.flush(p);
+    for (const o of this.players.values()) { o.known.delete(p.eid); this.sys(o, `${p.name} completou o Reset ${p.resets}!`); }
+    this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid });
+  }
+  private spendMaster(p: Player, k: unknown) {
+    if (typeof k !== 'string' || !Object.hasOwn(MASTER_NODES, k) || p.mpts < 1 || (p.mtree[k] ?? 0) >= MASTER_NODE_MAX) return;
+    p.mtree[k] = (p.mtree[k] ?? 0) + 1; p.mpts--; p.dirty = true; p.meDirty = true;
+  }
   private craftWings(p: Player, tier: unknown) {
     const n = this.nearNpc(p, 'artifice'), r = WING_RECIPES[tier as number]; if (!n || !r || !Number.isInteger(tier)) return;
     const c = classOf(p.cls).key, t = tier as number, have = (k: string) => p.items.filter(i => i.key === k && !i.equip).reduce((a, i) => a + i.qty, 0);
@@ -495,6 +510,7 @@ export class MapRoom {
   }
   private addXp(p: Player, xp: number) {
     const gain = Math.floor(xp * (1 + p.streak * .05)); p.xp += gain; p.dirty = true; p.meDirty = true; this.send(p, { t: 'xpg', v: gain });
+    if (p.level >= CONFIG.maxLevel) { if (p.resets > 0 && p.ml < MASTER_MAX) { p.mxp += gain; let up = false; while (p.ml < MASTER_MAX && p.mxp >= masterNext(p.ml)) { p.mxp -= masterNext(p.ml); p.ml++; p.mpts++; up = true; } if (up) { this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Master Level ${p.ml}! +1 ponto mestre (tecla C).`); } } p.xp = 0; return; }
     let up = false;
     while (p.level < CONFIG.maxLevel && p.xp >= xpToNext(p.level)) { p.xp -= xpToNext(p.level); p.level++; p.points += CONFIG.pointsPerLevel; up = true; }
     if (up) { const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Você alcançou o nível ${p.level}! +${CONFIG.pointsPerLevel} pontos (tecla C).`); for (const o of this.players.values()) o.known.delete(p.eid); }
@@ -635,7 +651,7 @@ export class MapRoom {
     const near = (o: Pt) => Math.abs(o.x - p.x) < R && Math.abs(o.y - p.y) < R;
     const note = (id: number, full: () => unknown) => { seen.add(id); if (!p.known.has(id)) { p.known.add(id); news.push(full()); } };
     for (const o of this.players.values()) if (near(o)) {
-      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
+      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
       e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
     for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => ({ id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }

@@ -98,6 +98,7 @@ input[type=text],input[type=password],input[type=email]{border-radius:8px;border
 h1{font-weight:800;letter-spacing:4px}.shopitem canvas{width:28px;height:28px}.orb em{font-family:inherit}
 .touch #bar{background:none!important;border:0!important;box-shadow:none!important}
 /* tema */
+.rk{border-collapse:collapse;width:100%;font-size:13px}.rk th{color:var(--gold);text-align:left}.rk th,.rk td{padding:5px 6px;border-bottom:1px solid #3f3458;white-space:nowrap}
 .cell em{position:absolute;right:2px;top:0;font:700 11px/13px system-ui,sans-serif;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;pointer-events:none}
 #toast{position:absolute;left:50%;top:64px;transform:translateX(-50%);padding:7px 18px;border-radius:999px;background:#120e1fdd;border:1px solid #c9a24f88;color:#ffe08a;font-weight:700;font-size:14px;white-space:nowrap;opacity:0;pointer-events:none;z-index:6}#toast.show{animation:toast 4s ease forwards}@keyframes toast{0%{opacity:0;transform:translate(-50%,-10px)}8%{opacity:1;transform:translate(-50%,0)}85%{opacity:1}100%{opacity:0}}.touch #toast{top:150px;font-size:12px}
 #xp{height:15px!important;z-index:3}#xp i{position:absolute;left:0;top:0;bottom:0}#xpt{position:absolute;inset:0;text-align:center;font:700 10px/14px ui-monospace,monospace;color:#fff;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;pointer-events:none}
@@ -147,7 +148,7 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
   <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
-  <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button id="auto">Auto</button><button id="gfx">Gráf: Auto</button><button id="exit">Sair</button></div>
+  <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button data-w="rank">Rank</button><button id="auto">Auto</button><button id="gfx">Gráf: Auto</button><button id="exit">Sair</button></div>
   <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
   <div id="stick" class="p"><i></i></div>
   <div id="bar" class="p">
@@ -170,6 +171,7 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
     <div><b>Oferta dele</b> <small id="tstt"></small><div class="tgrid" id="ttheirs"></div><div id="ttg" class="info"></div></div></div>
     <div class="info">Sua bolsa (toque para oferecer):</div><div class="grid" id="tbag"></div>
     <div class="row" style="margin-top:10px"><button id="tcancel">Cancelar</button><button class="main" id="tok">Travar oferta</button></div></div>
+  <div class="win p" id="w-rank"><h3>Ranking <button data-close>×</button></h3><div style="overflow:auto;max-height:70dvh"><table class="rk"><thead><tr><th>#</th><th>Nome</th><th>Classe</th><th>Resets</th><th>Master</th><th>Nível</th></tr></thead><tbody id="rankb"></tbody></table></div></div>
   <div class="win p" id="w-shop"><h3><span id="shopt"></span> <button data-close>×</button></h3><div id="shopl"></div></div>
 </div>
 <div id="xp"><i></i><span id="xpt"></span></div>

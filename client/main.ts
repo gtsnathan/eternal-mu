@@ -1,4 +1,4 @@
-import { JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
+import { MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
 import { trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
 import { pressSprite, chestSprite, WING_ROOT, wingSprites, gfx, hdCtx, hdOf, noHd, tintFrame, archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
 
@@ -64,7 +64,7 @@ function showCreate(ed?: any) {
 
 // ---------- jogo ----------
 interface Ent { id: number; k: string; info: any; snaps: { t: number; x: number; y: number }[]; x: number; y: number; hp: number; dir: number; moving: boolean; anim: number; atkUntil: number; look?: Cv[][]; flash?: number; stepN?: number }
-interface Me { hp: number; mp: number; maxHp: number; maxMp: number; xp: number; xpNext: number; level: number; points: number; str: number; agi: number; vit: number; ene: number; atk: number; def: number; gold: number; dead: boolean; loot: number; lootMs: number }
+interface Me { hp: number; mp: number; maxHp: number; maxMp: number; xp: number; xpNext: number; level: number; points: number; str: number; agi: number; vit: number; ene: number; atk: number; def: number; gold: number; dead: boolean; loot: number; lootMs: number; resets: number; ml: number; mxp: number; mxpNext: number; mpts: number; mtree: Record<string, number> }
 const canvas = $<HTMLCanvasElement>('#game'), g = canvas.getContext('2d')!; hdCtx(g);
 let ws: WebSocket | null = null, charId = 0, running = false, you = 0, myName = '', map: GameMap | null = null, me: Me | null = null, items: ItemInst[] = [];
 let ents = new Map<number, Ent>(), target = 0, auto = false, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
@@ -172,7 +172,7 @@ function updateHud() {
   { const c = $('#lootc'); if (me.loot) { c.style.display = 'block'; c.textContent = `Coleta ×${me.loot} · +${me.loot * 5}% XP e moedas`; lootHidden = false; } else if (!lootHidden) { c.style.display = 'none'; lootHidden = true; } }
   myCls.skills.forEach(s => $(`[data-sk="${s.n}"]`).classList.toggle('lock', me!.level < (s.lvl ?? 1)));
   $<HTMLElement>('#orbh i').style.height = pct(me.hp, me.maxHp); $<HTMLElement>('#orbm i').style.height = pct(me.mp, me.maxMp); $('#orbh em').textContent = String(me.hp); $('#orbm em').textContent = String(me.mp);
-  $('#nm').innerHTML = `${esc(myName)} <span>Nv ${me.level}</span>`; $('#hpb').style.width = pct(me.hp, me.maxHp); $('#mpb').style.width = pct(me.mp, me.maxMp); $('#hpt').textContent = `${me.hp}/${me.maxHp}`; $('#mpt').textContent = `${me.mp}/${me.maxMp}`; $('#xp i').style.width = pct(me.xp, me.xpNext); $('#xpt').textContent = `XP ${(me.xp / Math.max(1, me.xpNext) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% · ${me.xp.toLocaleString('pt-BR')} / ${me.xpNext.toLocaleString('pt-BR')}`;
+  $('#nm').innerHTML = `${esc(myName)} <span>Nv ${me.level}</span>`; $('#hpb').style.width = pct(me.hp, me.maxHp); $('#mpb').style.width = pct(me.mp, me.maxMp); $('#hpt').textContent = `${me.hp}/${me.maxHp}`; $('#mpt').textContent = `${me.mp}/${me.maxMp}`; $('#xp i').style.width = pct(me.xp, me.xpNext); $('#xpt').textContent = me.level >= CONFIG.maxLevel && me.resets > 0 ? `Master Level ${me.ml} · ${(me.mxp / me.mxpNext * 100).toFixed(2).replace('.', ',')}%` : `XP ${(me.xp / Math.max(1, me.xpNext) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% · ${me.xp.toLocaleString('pt-BR')} / ${me.xpNext.toLocaleString('pt-BR')}`;
   document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { b.querySelector('s')!.textContent = String(items.find(i => i.key === b.dataset.pot)?.qty ?? 0); });
   $('#invinfo').dataset.gold = String(me.gold); if (!$('#invinfo').dataset.hover) $('#invinfo').textContent = `Moedas: ${me.gold}`;
   if ($('#w-char').style.display === 'block') renderChar();
@@ -182,9 +182,10 @@ function drawPortrait() { const c = $<HTMLCanvasElement>('#portrait'), x = c.get
 function myGear(): Look { const by = (s: string) => items.find(i => i.equip === s)?.key ?? null; return lookFromGear(myCls.name, HAIR_COLORS[myLook.hc], myLook.hs, { helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots'), weapon: by('weapon') }); }
 
 // ---------- janelas ----------
-const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); };
+const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); };
 function closeWin(w: string) { $('#w-' + w).style.display = 'none'; if (w === 'shop') shop = null; }
-function closeWins() { ['inv', 'char', 'map', 'shop'].forEach(closeWin); }
+function closeWins() { ['inv', 'char', 'map', 'shop', 'rank'].forEach(closeWin); }
+async function renderRank() { const b = $('#rankb'); b.replaceChildren(); try { const { ranking } = await api('ranking'); ranking.forEach((r: any, n: number) => { const tr = document.createElement('tr'); for (const v of [n + 1, r.name, r.class, r.resets, r.ml, r.level]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } b.appendChild(tr); }); } catch { /* sem conexão */ } }
 const toggle = (w: string) => $('#w-' + w).style.display === 'block' ? closeWin(w) : openW(w);
 document.querySelectorAll<HTMLElement>('[data-w]').forEach(b => b.onclick = () => toggle(b.dataset.w!));
 document.querySelectorAll<HTMLElement>('[data-close]').forEach(b => b.onclick = () => closeWin(b.closest('.win')!.id.slice(2)));
@@ -212,12 +213,16 @@ function renderInv() {
 }
 function renderChar() {
   if (!me) return; const P = $('#charp'), m = me, st = (k: 'str' | 'agi' | 'vit' | 'ene', n: string) => `<div class="stat"><span>${n}</span><span>${m[k]}${m.points ? `<button data-s="${k}">+1</button>` : ''}</span></div>`;
-  P.innerHTML = `<div class="stat"><b>${esc(myName)}</b><span>${myCls.name} · Nível ${m.level}</span></div><div class="stat"><span>Experiência</span><span>${m.xp} / ${m.xpNext}</span></div><div class="stat" style="color:var(--gold)"><span>Pontos livres</span><span>${m.points}</span></div>${st('str', 'Força')}${st('agi', 'Agilidade')}${st('vit', 'Vitalidade')}${st('ene', 'Energia')}<div class="stat"><span>Ataque</span><span>${m.atk}</span></div><div class="stat"><span>Defesa</span><span>${m.def}</span></div>${Object.entries(setCounts(items)).map(([k, n]) => `<div class="stat" style="color:${SETS[k].trim}"><span>${esc(SETS[k].name)} (${n}/4)</span><span>${setBonus(k, n)}</span></div>`).join('')}`;
+  P.innerHTML = `<div class="stat"><b>${esc(myName)}</b><span>${myCls.name} · Nível ${m.level}</span></div><div class="stat"><span>Experiência</span><span>${m.xp} / ${m.xpNext}</span></div><div class="stat" style="color:var(--gold)"><span>Pontos livres</span><span>${m.points}</span></div>${st('str', 'Força')}${st('agi', 'Agilidade')}${st('vit', 'Vitalidade')}${st('ene', 'Energia')}<div class="stat"><span>Ataque</span><span>${m.atk}</span></div><div class="stat"><span>Defesa</span><span>${m.def}</span></div><div class="stat" style="color:var(--gold)"><span>Resets</span><span>${m.resets}</span></div><div class="stat" style="color:var(--gold)"><span>Master Level (pontos: ${m.mpts})</span><span>${m.ml}</span></div>${Object.entries(MASTER_NODES).map(([k, n]) => `<div class="stat"><span>${n}</span><span>${m.mtree[k] ?? 0}/${MASTER_NODE_MAX}${m.mpts && (m.mtree[k] ?? 0) < MASTER_NODE_MAX ? `<button data-mt="${k}">+1</button>` : ''}</span></div>`).join('')}${Object.entries(setCounts(items)).map(([k, n]) => `<div class="stat" style="color:${SETS[k].trim}"><span>${esc(SETS[k].name)} (${n}/4)</span><span>${setBonus(k, n)}</span></div>`).join('')}`;
   P.querySelectorAll<HTMLElement>('[data-s]').forEach(b => b.onclick = () => send({ t: 'st', s: b.dataset.s, n: 1 }));
+  P.querySelectorAll<HTMLElement>('[data-mt]').forEach(b => b.onclick = () => send({ t: 'mt', k: b.dataset.mt }));
 }
 const setBonus = (k: string, n: number) => { const b = SETS[k].bonus, o: string[] = []; if (n >= 2) o.push(`+${b.def} def`); if (n >= 3) o.push(`+${b.hp} vida`); if (n >= 4) o.push(`+${Math.round(b.atk * 100)}% atq`); return o.join(' · ') || 'sem bônus'; };
 function renderShop() {
   if (!shop || !me) return; const sk = `${you}|${shop.id}|${me.level}|${me.gold}|${JSON.stringify(items)}|${JSON.stringify(chest)}`; if (sk === shopKey) return; shopKey = sk; $('#shopt').textContent = shop.name; const L = $('#shopl'), npc = shop; L.replaceChildren();
+  if (npc.shop === 'reset') {
+    const info = document.createElement('div'); info.className = 'info'; info.textContent = 'O Reset volta o personagem ao nível 1 e zera os atributos, mas concede pontos extras permanentes a cada Reset. Itens, moedas e Master Level continuam. Com ao menos 1 Reset, ao chegar no nível máximo a XP passa a subir o Master Level.'; const st = document.createElement('div'); st.className = 'stat'; st.innerHTML = `<span>Seus resets: ${me.resets}</span><span>Nível atual: ${me.level}</span>`; const b = document.createElement('button'); b.className = 'main'; b.style.width = '100%'; b.textContent = 'Fazer Reset'; b.onclick = () => { if (confirm('Fazer Reset agora? Seu personagem volta ao nível 1.')) send({ t: 'rs' }); }; L.append(info, st, b); return;
+  }
   if (npc.shop === 'press') {
     const count = (k: string) => items.filter(i => i.key === k && !i.equip).reduce((a, i) => a + i.qty, 0);
     for (const k of Object.keys(JEWEL_PACKS)) { const pk = JEWEL_PACKS[k], n = count(k), r = document.createElement('div'); r.className = 'shopitem'; const c = cv(56, 56); c.getContext('2d')!.drawImage(hdOf(icon(k)), 0, 0); const s = document.createElement('span'); s.textContent = `${ITEMS[k].name}: ${n}/10`; const b = document.createElement('button'); b.textContent = 'Juntar 10'; b.disabled = n < 10; b.onclick = () => send({ t: 'pj', key: k }); r.append(c, s, b); L.appendChild(r);
@@ -483,7 +488,7 @@ function frame(ts: number) {
     if (e.k === 's') continue;
     if (e.k === 'd') { label(e.x * 32, e.y * 32 - 22, e.info.key ? `${cmpItem({ key: e.info.key, rarity: e.info.rarity })?.arrow === '▲' ? '▲ ' : ''}${ITEMS[e.info.key].name}` : `${e.info.gold} moedas`, e.info.key ? (ITEMS[e.info.key].set ? '#ffd76a' : RARITY[e.info.rarity].color) : '#f0d27a'); continue; }
     const h = e.k === 'p' ? 50 : mobSize(e.info.mob) + 10, X = Math.round(e.x * 32), Y = Math.round(e.y * 32) - h, boss = e.k === 'm' && MOBS[e.info.mob].boss, bw = boss ? 72 : 32;
-    if (e.k === 'p' || e.id === target || boss) label(X, Y - 6, e.k === 'p' ? e.info.name : `${MOBS[e.info.mob].name} Nv${MOBS[e.info.mob].level}`, e.id === target ? '#ffd24a' : e.k === 'p' ? '#fff' : '#ffb4a8');
+    if (e.k === 'p' || e.id === target || boss) label(X, Y - 6, e.k === 'p' ? `${e.info.res ? `[R${e.info.res}] ` : ''}${e.info.name}` : `${MOBS[e.info.mob].name} Nv${MOBS[e.info.mob].level}`, e.id === target ? '#ffd24a' : e.k === 'p' ? '#fff' : '#ffb4a8');
     g.fillStyle = '#0a0814'; g.fillRect(X - bw / 2 - 1, Y - 3, bw + 2, 6); g.fillStyle = '#3a2f4a'; g.fillRect(X - bw / 2, Y - 2, bw, 4); { const w = Math.round(bw * e.hp / 100); g.fillStyle = e.k !== 'p' ? '#e0425a' : e.hp > 50 ? '#58d36a' : e.hp > 25 ? '#f0cf65' : '#ff6b6b'; g.fillRect(X - bw / 2, Y - 2, w, 4); g.fillStyle = '#ffffff66'; g.fillRect(X - bw / 2, Y - 2, w, 1); }
   }
   texts = texts.filter(t => (t.t += dt) < .85); for (const t of texts) { const u = t.t / .85; g.font = `bold ${Math.round((t.big ? 17 : 12) * (1 + Math.max(0, .12 - t.t) * 4))}px system-ui,Segoe UI,Roboto,sans-serif`; g.globalAlpha = 1 - u * u; g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = '#0a0814'; const y = t.y * 32 - 38 - u * 26; g.strokeText(t.s, t.x * 32, y); g.fillStyle = t.c; g.fillText(t.s, t.x * 32, y); } g.globalAlpha = 1;
@@ -567,7 +572,7 @@ function drawObj(o: GameMap['objs'][number], ts: number) {
   if (s.sway) { const q = Math.sin(ts / 700 + o.x * 1.7 + o.y) * 2, a = 18, b = 38; g.drawImage(s.c, 0, 0, s.c.width, a, X + Math.round(q), Y, s.c.width, a); g.drawImage(s.c, 0, a, s.c.width, b - a, X + Math.round(q * .5), Y + a, s.c.width, b - a); g.drawImage(s.c, 0, b, s.c.width, s.c.height - b, X, Y + b, s.c.width, s.c.height - b); }
   else g.drawImage(s.c, X, Y);
 }
-const npcLooks: Look[] = [{ hc: '#000', hs: 0 }, { hc: '#d8dde6', hs: 2, robe: '#6a3f96' }, { hc: '#b23a2e', hs: 0, armor: '#7a5230', weapon: 'iron_axe', boots: '#3c2a1c' }, { hc: '#2b2230', hs: 0, helm: '#8b95a6', armor: '#8b95a6', pants: '#5c6577', weapon: 'short_sword' }, lookFromGear('Dark Warrior', '#d9b24a', 2, { helm: null, armor: 'lion_armor', pants: 'lion_pants', boots: 'lion_boots', weapon: 'frost_blade' }), { hc: '#d8dde6', hs: 1, armor: '#3e5a9a', pants: '#2a3a68', boots: '#c9a44c' }];
+const npcLooks: Look[] = [{ hc: '#000', hs: 0 }, { hc: '#d8dde6', hs: 2, robe: '#6a3f96' }, { hc: '#b23a2e', hs: 0, armor: '#7a5230', weapon: 'iron_axe', boots: '#3c2a1c' }, { hc: '#2b2230', hs: 0, helm: '#8b95a6', armor: '#8b95a6', pants: '#5c6577', weapon: 'short_sword' }, lookFromGear('Dark Warrior', '#d9b24a', 2, { helm: null, armor: 'lion_armor', pants: 'lion_pants', boots: 'lion_boots', weapon: 'frost_blade' }), { hc: '#d8dde6', hs: 1, armor: '#3e5a9a', pants: '#2a3a68', boots: '#c9a44c' }, { hc: '#e8e6df', hs: 2, robe: '#7a2f3a', weapon: 'glacier_staff' }];
 const skillLock: Record<number, number> = {}, lootTried = new Set<number>();
 /** Modo Auto: usa poções, habilidades, ataca o monstro mais próximo e recolhe o que cair. */
 function autoPlay(a: Ent, ts: number) {

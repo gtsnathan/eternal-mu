@@ -114,6 +114,10 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
     if (a.banned) return err('Esta conta foi suspensa.', 403);
     return startSession(req, env, a.id, a.username);
   }
+  if (path === '/api/ranking' && req.method === 'GET') {
+    const { results } = await db.prepare('SELECT c.name,c.class,c.level,c.resets,c.master_level AS ml FROM characters c JOIN accounts a ON a.id=c.account_id WHERE a.banned=0 ORDER BY c.resets DESC, c.master_level DESC, c.level DESC, c.xp DESC LIMIT 50').all();
+    return json({ ranking: results });
+  }
   if (path === '/api/guide' && req.method === 'GET') {
     const r = await db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>(), c = r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, v = getMap('valoria');
     return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { name: m.name, req: v.portals.find(p => p.to === id)?.lvl ?? 1, mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { name: d.name, level: d.level, boss: !!d.boss, drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });

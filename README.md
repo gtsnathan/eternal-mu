@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.21
+# Eternal MU · versão 0.22
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -94,4 +94,4 @@ Diferenças em relação à especificação:
 - Senhas com PBKDF2-SHA256 (100 mil iterações, o máximo do Workers) no lugar de Argon2id.
 - Sprites em 4 direções.
 
-Ainda faltam: verificação de e-mail e recuperação de senha (exigem serviço de e-mail), captcha, reset e Master Level, guildas, amigos, mercado, baú, quests, eventos, ranking, painel administrativo, música e app Android (Capacitor).
+Ainda faltam: verificação de e-mail e recuperação de senha (exigem serviço de e-mail), captcha, guildas, amigos, mercado, baú, quests, eventos, ranking, painel administrativo, música e app Android (Capacitor).

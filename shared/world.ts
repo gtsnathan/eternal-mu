@@ -45,6 +45,7 @@ function valoria() {
     { id: 'ferreira', name: 'Brunna, Ferreira', x: 30.5, y: 17.5, shop: 'ferreira', line: 'O aço de Valoria nunca falha.', look: 2 },
     { id: 'artifice', name: 'Alaric, Artífice de Asas', x: 23.5, y: 23, shop: 'wings', line: 'Traga-me as relíquias dos monstros e eu forjo suas asas.', look: 5 },
     { id: 'prensa', name: 'Prensa de Joias', x: 23.5, y: 26.5, shop: 'press', line: 'Junta 10 joias em um pacote ou desmonta um pacote em 10 joias.', look: 0 },
+    { id: 'mestre', name: 'Mestre Ancião', x: 33.5, y: 23, shop: 'reset', line: 'Quem alcança o topo pode renascer ainda mais forte.', look: 6 },
     { id: 'bau', name: 'Baú', x: 27.5, y: 23, shop: 'chest', line: 'Seus itens ficam guardados aqui.', look: 0 },
     { id: 'armeira', name: 'Isaura, Armeira de Sets', x: 25.5, y: 15.5, shop: 'armeira', line: 'Armaduras de lenda, para quem pode pagar.', look: 4 },
     { id: 'guarda', name: 'Guarda Teodoro', x: 44.5, y: 17.5, line: 'O portal leva a Frostvale. Lá fora, os monstros não perdoam.', look: 3 });
