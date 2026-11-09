@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.11
+# Eternal MU · versão 0.13
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -65,6 +65,10 @@ O painel edita taxas de XP, moedas, drops e joias, cada monstro, as chances das 
 - `migrations/`: esquema do banco
 
 Depois de alterar `client/` ou `shared/`, rode `npm run build`.
+
+## Novidades da 0.13
+
+Asas por classe em 3 níveis, itens excelentes e 16 armas novas.
 
 ## Situação da 0.8
 
