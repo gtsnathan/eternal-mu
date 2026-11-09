@@ -242,6 +242,7 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
     else if (a === 'lion' && dir !== 1) { r(g, mid - 3, Y + 22, 9, 8, t); r(g, mid - 1, Y + 23, 5, 5, '#f6dc8c'); r(g, mid - 1, Y + 24, 1, 1, '#3a2208'); r(g, mid + 3, Y + 24, 1, 1, '#3a2208'); r(g, mid + 1, Y + 26, 1, 1, '#3a2208'); }
     else if (a === 'serpent') { for (let y = 22; y < 29; y += 2) for (let x = (y % 4 ? 1 : 3); x < tw - 1; x += 4) r(g, X + tx + x, Y + y, 2, 1, t); }
     else if (a === 'griffin') { for (let i = 0; i < 6; i++) { r(g, mid - i, Y + 22 + i, 2, 1, t); r(g, mid + 1 + i, Y + 22 + i, 2, 1, t); } }
+    else if (['boar', 'minotaur', 'fox', 'sphinx', 'deer', 'hummingbird', 'falcon', 'wyvern', 'skull', 'reaper'].includes(a)) { if (dir !== 1) { r(g, mid - 3, Y + 23, 9, 6, t); r(g, mid - 1, Y + 24, 5, 4, armor); r(g, mid, Y + 25, 3, 2, '#fff'); } for (let y = 23; y < 29; y += 3) { r(g, X + tx + 1, Y + y, 2, 1, t); r(g, X + tx + tw - 3, Y + y, 2, 1, t); } }
     else if (a === 'spider') { if (dir !== 1) { r(g, mid - 2, Y + 22, 7, 2, t); r(g, mid, Y + 24, 3, 2, t); r(g, mid - 2, Y + 26, 7, 2, t); } else for (let i = 0; i < 4; i++) r(g, X + tx + i * 4 + 1, Y + 23 + i % 2 * 2, 3, 1, t); }
     else if (a === 'bat') { for (let i = 0; i < 6; i++) { r(g, X + tx + i, Y + 22 + i, 2, 1, t); r(g, X + tx + tw - 2 - i, Y + 22 + i, 2, 1, t); } }
     else if (a === 'wolf') { for (let y = 22; y < 29; y += 3) { r(g, mid - 2, Y + y, 6, 1, t); r(g, mid, Y + y - 1, 2, 3, t); } }
@@ -294,6 +295,34 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
       r(g, h0 - 1, Y + 3, hw + 2, 10, '#eef3fb'); r(g, h0 - 4, Y + 4, 4, 11, '#7fb3e8'); if (dir !== 2) r(g, h0 + hw, Y + 4, 4, 11, '#7fb3e8');
       for (let x = 0; x < hw; x += 4) r(g, h0 + x, Y + 1, 3, 3, '#7fb3e8');
       if (f) { r(g, X + 11, Y + 7, 2, 2, '#241c2c'); r(g, X + 20, Y + 7, 2, 2, '#241c2c'); r(g, X + 14, Y + 8, 5, 4, '#e8b93e'); r(g, X + 15, Y + 12, 3, 2, '#c98f2a'); } else if (dir === 2) r(g, h0 + hw - 1, Y + 8, 6, 4, '#e8b93e'); else r(g, h0, Y + 8, hw, 12, '#c9d8ee');
+    } else if (a === 'boar' || a === 'minotaur') {
+      const b = a === 'boar' ? '#6a5a4e' : '#5a2a1e', tusk = '#efe6cc'; r(g, h0 - 2, Y + 3, hw + 4, 12, b); r(g, h0 - 3, Y + 1, 5, 5, b); if (dir !== 2) r(g, h0 + hw - 2, Y + 1, 5, 5, b);
+      if (a === 'minotaur') for (const sx of (dir === 2 ? [-1] : [-1, 1])) { const xb = sx < 0 ? h0 - 4 : h0 + hw + 1; r(g, xb, Y + 2, 3, 5, tusk); r(g, xb + sx * 3, Y - 1, 3, 5, tusk); r(g, xb + sx * 5, Y - 6, 2, 6, '#e0a03a'); }
+      if (f) { r(g, X + 11, Y + 7, 3, 2, a === 'boar' ? '#2a1a10' : '#ff5a3a'); r(g, X + 19, Y + 7, 3, 2, a === 'boar' ? '#2a1a10' : '#ff5a3a'); r(g, X + 12, Y + 10, 9, 5, shade(b, 28)); r(g, X + 14, Y + 11, 2, 2, '#1a120c'); r(g, X + 17, Y + 11, 2, 2, '#1a120c'); r(g, X + 11, Y + 13, 2, 5, tusk); r(g, X + 20, Y + 13, 2, 5, tusk); } else if (dir === 2) { r(g, h0 + 8, Y + 7, 3, 2, '#2a1a10'); r(g, h0 + hw - 3, Y + 9, 8, 6, shade(b, 28)); r(g, h0 + hw, Y + 13, 2, 5, tusk); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'fox') {
+      const o2 = '#d9702a', w = '#fff0d8'; r(g, h0 - 1, Y - 3, 6, 9, o2); r(g, h0 + 1, Y - 1, 2, 5, w); if (dir !== 2) { r(g, h0 + hw - 5, Y - 3, 6, 9, o2); r(g, h0 + hw - 3, Y - 1, 2, 5, w); } r(g, h0 - 2, Y + 4, hw + 4, 11, o2);
+      if (f) { r(g, X + 11, Y + 8, 3, 2, '#2a4a8a'); r(g, X + 19, Y + 8, 3, 2, '#2a4a8a'); r(g, X + 12, Y + 11, 9, 4, w); r(g, X + 15, Y + 11, 3, 2, '#1a120c'); } else if (dir === 2) { r(g, h0 + 8, Y + 8, 3, 2, '#2a4a8a'); r(g, h0 + hw - 3, Y + 10, 8, 4, w); } else r(g, h0, Y + 8, hw, 12, o2);
+    } else if (a === 'sphinx') {
+      const go = '#c9a85a', bl = '#3a7fd0'; r(g, h0 - 3, Y + 2, hw + 6, 4, go); r(g, h0 - 4, Y + 5, 5, 20, go); if (dir !== 2) r(g, h0 + hw - 1, Y + 5, 5, 20, go); for (let y = 7; y < 25; y += 4) { r(g, h0 - 4, Y + y, 5, 2, bl); if (dir !== 2) r(g, h0 + hw - 1, Y + y, 5, 2, bl); } r(g, h0, Y + 2, hw, 10, go); r(g, X + 15, Y - 3, 3, 6, bl); r(g, X + 14, Y - 5, 5, 3, '#ffe08a');
+      if (f) { r(g, X + 11, Y + 8, 3, 2, '#1a2a5a'); r(g, X + 19, Y + 8, 3, 2, '#1a2a5a'); } else if (dir === 1) r(g, h0, Y + 8, hw, 16, go);
+    } else if (a === 'deer') {
+      const b = '#9a6a3c', w = '#e8dcc0'; for (const sx of (dir === 2 ? [0] : [0, 1])) { const xb = sx ? h0 + hw - 2 : h0 - 1; r(g, xb, Y - 8, 3, 12, w); r(g, xb + (sx ? 2 : -3), Y - 6, 4, 2, w); r(g, xb + (sx ? 2 : -3), Y - 2, 4, 2, w); } r(g, h0 - 1, Y + 3, hw + 2, 12, b);
+      if (f) { r(g, X + 11, Y + 7, 3, 3, '#1a120c'); r(g, X + 19, Y + 7, 3, 3, '#1a120c'); r(g, X + 13, Y + 11, 7, 4, w); r(g, X + 15, Y + 11, 3, 2, '#1a120c'); } else if (dir === 2) { r(g, h0 + 9, Y + 7, 3, 3, '#1a120c'); r(g, h0 + hw - 2, Y + 10, 6, 4, w); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'hummingbird') {
+      const b = '#2fa89a', t = '#ff6ad5'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); for (let x = 0; x < hw; x += 3) r(g, h0 + x, Y + 2 + (x & 1), 2, 3, x % 2 ? t : '#ffd76a'); r(g, h0 - 5, Y + 5, 5, 10, t); if (dir !== 2) r(g, h0 + hw, Y + 5, 5, 10, t);
+      if (f) { r(g, X + 11, Y + 7, 3, 2, '#14283a'); r(g, X + 19, Y + 7, 3, 2, '#14283a'); r(g, X + 15, Y + 9, 3, 9, '#ffd76a'); } else if (dir === 2) { r(g, h0 + 9, Y + 7, 3, 2, '#14283a'); r(g, h0 + hw - 1, Y + 9, 9, 2, '#ffd76a'); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'falcon') {
+      const b = '#6a5442', t = '#6fd6ff'; r(g, h0 - 1, Y + 3, hw + 2, 11, b); r(g, h0, Y + 2, hw, 4, '#efe6d4'); r(g, h0 - 5, Y + 6, 5, 9, b); r(g, h0 - 6, Y + 7, 3, 2, t); if (dir !== 2) { r(g, h0 + hw, Y + 6, 5, 9, b); r(g, h0 + hw + 3, Y + 7, 3, 2, t); }
+      if (f) { r(g, X + 11, Y + 8, 3, 2, t); r(g, X + 19, Y + 8, 3, 2, t); r(g, X + 15, Y + 9, 3, 4, '#e8b93e'); r(g, X + 16, Y + 13, 2, 2, '#b08a2a'); } else if (dir === 2) { r(g, h0 + 9, Y + 8, 3, 2, t); r(g, h0 + hw - 1, Y + 9, 5, 3, '#e8b93e'); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'wyvern') {
+      const b = '#aab6c6', t = '#7dffb0'; for (const sx of (dir === 2 ? [-1] : [-1, 1])) { const xb = sx < 0 ? h0 - 4 : h0 + hw; r(g, xb, Y + 1, 4, 11, b); r(g, xb + sx * 3, Y - 3, 3, 8, '#dbe4ee'); } r(g, h0 - 1, Y + 3, hw + 2, 12, b); for (let x = 1; x < hw; x += 4) r(g, h0 + x, Y + 3, 2, 3, '#dbe4ee');
+      if (f) { r(g, X + 11, Y + 8, 3, 2, t); r(g, X + 19, Y + 8, 3, 2, t); r(g, X + 13, Y + 12, 7, 2, '#4a5a6e'); for (let x = 13; x < 20; x += 2) r(g, X + x, Y + 12, 1, 3, '#fff'); } else if (dir === 2) { r(g, h0 + 9, Y + 8, 3, 2, t); r(g, h0 + hw - 3, Y + 10, 8, 4, b); } else r(g, h0, Y + 8, hw, 12, b);
+    } else if (a === 'skull') {
+      const b = '#e4e0d6', k = '#141019', t = '#cfe0ff'; r(g, h0 - 2, Y + 1, hw + 4, 8, '#2e2a3a'); r(g, h0 - 1, Y + 4, hw + 2, 12, b); ell(g, X + 16, Y + 1, 5, 3, t); ell(g, X + 18, Y + 0, 4, 2, '#2e2a3a');
+      if (f) { r(g, X + 11, Y + 8, 4, 4, k); r(g, X + 18, Y + 8, 4, 4, k); r(g, X + 12, Y + 9, 2, 2, t); r(g, X + 19, Y + 9, 2, 2, t); r(g, X + 15, Y + 12, 3, 2, k); for (let x = 12; x < 21; x += 2) r(g, X + x, Y + 14, 1, 2, k); } else if (dir === 2) { r(g, h0 + 8, Y + 8, 4, 4, k); r(g, h0 + 9, Y + 9, 2, 2, t); } else r(g, h0, Y + 8, hw, 10, '#2e2a3a');
+    } else if (a === 'reaper') {
+      const b = '#1a1a24', t = '#7dfff0'; r(g, h0 - 3, Y + 1, hw + 6, 20, b); r(g, h0 - 1, Y - 2, hw + 2, 5, b); r(g, h0 + 2, Y - 3, hw - 4, 2, '#32323f');
+      if (dir !== 1) { r(g, h0 + 1, Y + 6, hw - 2, 11, '#050508'); if (f) { r(g, X + 12, Y + 10, 3, 2, t); r(g, X + 18, Y + 10, 3, 2, t); } else r(g, h0 + 8, Y + 10, 3, 2, t); }
     } else if (a === 'salamander') {
       const b = '#c2452d', t = '#ffd23f'; r(g, h0 - 3, Y + 4, hw + 6, 10, b); for (let x = -2; x < hw + 2; x += 4) r(g, h0 + x, Y + 1 + (x & 2), 3, 4, t); for (const [dx, dy] of [[1, 5], [9, 4], [13, 7]]) r(g, h0 + dx, Y + dy, 2, 2, t);
       if (f) { r(g, X + 11, Y + 8, 3, 3, t); r(g, X + 19, Y + 8, 3, 3, t); r(g, X + 12, Y + 9, 1, 2, '#241c2c'); r(g, X + 20, Y + 9, 1, 2, '#241c2c'); } else if (dir === 2) r(g, h0 + 10, Y + 8, 3, 3, t); else r(g, h0, Y + 8, hw, 12, b);

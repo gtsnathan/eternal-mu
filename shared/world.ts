@@ -38,9 +38,9 @@ function valoria() {
   rect(m, 4, 30, 11, 35, T.WATER); mark(3, 29, 12, 36); for (let y = 30; y <= 35; y++) for (let x = 4; x <= 11; x++) m.solid[y * 50 + x] = 1;
   for (let y = 1; y < 39; y++) for (let x = 1; x < 49; x++) if (!free[y * 50 + x] && !m.solid[y * 50 + x] && r() < .13) obj(m, 'tree', x, y, 1, 1, r() * 3 | 0);
   m.spawn = { x: 25.5, y: 25 };
-  m.portals.push({ x: 46.5, y: 19.5, to: 'frostvale', tx: 6, ty: 35, label: 'Frostvale' },
-    { x: 24.5, y: 36.5, to: 'infernal', tx: 7, ty: 40, label: 'Infernal Dominion', lvl: 20 },
-    { x: 3.5, y: 20.5, to: 'eldergrove', tx: 7, ty: 40, label: 'Eldergrove', lvl: 10 }, { x: 25.5, y: 3.5, to: 'ashen', tx: 9, ty: 35, label: 'Ashen Depths', lvl: 32 }, { x: 45.5, y: 9.5, to: 'celestial', tx: 11, ty: 35, label: 'Celestial Ruins', lvl: 60 });
+  m.portals.push({ x: 46.5, y: 19.5, to: 'frostvale', tx: 12, ty: 70, label: 'Frostvale' },
+    { x: 24.5, y: 36.5, to: 'infernal', tx: 14, ty: 80, label: 'Infernal Dominion', lvl: 20 },
+    { x: 3.5, y: 20.5, to: 'eldergrove', tx: 14, ty: 80, label: 'Eldergrove', lvl: 10 }, { x: 25.5, y: 3.5, to: 'ashen', tx: 18, ty: 70, label: 'Ashen Depths', lvl: 32 }, { x: 45.5, y: 9.5, to: 'celestial', tx: 22, ty: 70, label: 'Celestial Ruins', lvl: 60 });
   m.npcs.push({ id: 'alquimista', name: 'Odila, Alquimista', x: 21.5, y: 17.5, shop: 'alquimista', line: 'Frascos frescos! Não vá ao gelo sem eles.', look: 1 },
     { id: 'ferreira', name: 'Brunna, Ferreira', x: 30.5, y: 17.5, shop: 'ferreira', line: 'O aço de Valoria nunca falha.', look: 2 },
     { id: 'artifice', name: 'Alaric, Artífice de Asas', x: 23.5, y: 23, shop: 'wings', line: 'Traga-me as relíquias dos monstros e eu forjo suas asas.', look: 5 },
@@ -139,9 +139,29 @@ function celestial() {
   m.zones.push({ mob: 'sentinel', n: 11, cx: 30, cy: 20, r: 6 }, { mob: 'sentinel', n: 10, cx: 30, cy: 52, r: 6 }, { mob: 'seraph', n: 9, cx: 52, cy: 14, r: 6 }, { mob: 'seraph', n: 9, cx: 52, cy: 56, r: 6 }, { mob: 'ogriffin', n: 9, cx: 52, cy: 35, r: 5 }, { mob: 'archon', n: 7, cx: 73, cy: 22, r: 6 }, { mob: 'archon', n: 7, cx: 73, cy: 50, r: 6 }, { mob: 'aethon', n: 1, cx: 85, cy: 35, r: 1 });
   return m;
 }
+export const MAP_SCALE = 2; // quantas vezes cada lado dos mapas de caça é ampliado
+const DENSE = new Set(['tree', 'pine', 'oak', 'rock', 'spire', 'deadtree']);
+/** Amplia um mapa de caça mantendo caminhos, áreas e mais monstros proporcionais. */
+function enlarge(m: GameMap, k = MAP_SCALE): GameMap {
+  const r = rng(m.w * 31 + m.h * 17 + m.id.length), n = makeMap(m.id, m.name, m.w * k, m.h * k, m.safe, 0), objSolid = new Set(m.objs.filter(o => o.k !== 'torch').map(o => o.y * m.w + o.x));
+  for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) { const i = y * m.w + x; for (let b = 0; b < k; b++) for (let a = 0; a < k; a++) { const j = (y * k + b) * n.w + x * k + a; n.tiles[j] = m.tiles[i]; n.solid[j] = m.solid[i] && !objSolid.has(i) ? 1 : 0; } }
+  for (const o of m.objs) {
+    if (o.k === 'torch') { const yy = o.y * k + k - 1; for (const dx of [0, 3]) n.objs.push({ ...o, x: o.x * k + dx, y: yy }); continue; }
+    const edge = o.x === 0 || o.y === 0 || o.x === m.w - 1 || o.y === m.h - 1, cells: number[][] = [[0, 0]];
+    if (DENSE.has(o.k)) for (let b = 0; b < k; b++) for (let a = 0; a < k; a++) if ((a || b) && (edge || r() < .72)) cells.push([a, b]);
+    if (o.k === 'shroom' && r() < .3) cells.push([1, 1]);
+    for (const [a, b] of cells) obj(n, o.k, o.x * k + a, o.y * k + b, o.w, o.h, r() < .5 ? o.v : (r() * 3 | 0) % (o.k === 'shroom' || o.k === 'pillar' || o.k === 'statue' ? 2 : 3));
+  }
+  n.spawn = { x: m.spawn.x * k, y: m.spawn.y * k }; n.npcs = m.npcs;
+  n.portals = m.portals.map(p => ({ ...p, x: Math.floor(p.x) * k + .5, y: Math.floor(p.y) * k + .5 }));
+  n.zones = m.zones.map(z => ({ ...z, cx: z.cx * k, cy: z.cy * k, r: z.r * k, n: MOBS_IS_BOSS(z.mob) ? 1 : z.n * k }));
+  if (m.traps) { n.traps = new Set(); for (const t of m.traps) for (let b = 0; b < k; b++) for (let a = 0; a < k; a++) n.traps.add(((t / m.w | 0) * k + b) * n.w + (t % m.w) * k + a); }
+  return n;
+}
+const MOBS_IS_BOSS = (k: string) => ['boss', 'ignarok', 'aracnia', 'vorgath', 'aethon'].includes(k);
 const cache: Record<string, GameMap> = {};
 export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial'];
-export function getMap(id: string): GameMap { return cache[id] ??= id === 'frostvale' ? frostvale() : id === 'infernal' ? infernal() : id === 'eldergrove' ? eldergrove() : id === 'ashen' ? ashen() : id === 'celestial' ? celestial() : valoria(); }
+export function getMap(id: string): GameMap { return cache[id] ??= id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
 
 export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return i < 0 || j < 0 || i >= m.w || j >= m.h || m.solid[j * m.w + i] === 1; };
 const R = .3;

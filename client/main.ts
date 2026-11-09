@@ -251,7 +251,7 @@ function paintMap(c: HTMLCanvasElement, sx: number, sy: number, wv: number, hv: 
   for (const e of ents.values()) if (e.k !== 'd') dot(e.x, e.y, e.id === you ? '#fff' : e.k === 'p' ? '#6fdc7e' : '#ff5a5a');
 }
 function renderMini() { const e = ents.get(you); if (!e || !map) return; const w = Math.min(map.w, 42), h = w * 112 / 146, sx = Math.max(0, Math.min(map.w - w, e.x - w / 2)), sy = Math.max(0, Math.min(map.h - h, e.y - h / 2)); paintMap($<HTMLCanvasElement>('#minimap'), sx, sy, w, h); $('#where').textContent = `${map.name} ${e.x | 0},${e.y | 0}`; }
-function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap'); c.width = map.w * 5; c.height = map.h * 5; $('#mapt').firstChild!.textContent = `${map.name} `; paintMap(c, 0, 0, map.w, map.h); }
+function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap'); c.width = map.w * 4; c.height = map.h * 4; $('#mapt').firstChild!.textContent = `${map.name} `; paintMap(c, 0, 0, map.w, map.h); }
 
 // ---------- entrada ----------
 let joy = { x: 0, y: 0 }, lastInput = '';
@@ -259,7 +259,18 @@ function syncInput() { let x = joy.x, y = joy.y; const l = Math.hypot(x, y); if 
 function nearestMob(r: number) { const a = ents.get(you); if (!a) return null; let b: Ent | null = null, bd = r; for (const e of ents.values()) if (e.k === 'm') { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; b = e; } } return b; }
 function startPred(x: number, y: number, stop = 0) { const a = ents.get(you); if (!a || !map || me?.dead) return; const path = findPath(map, a.x, a.y, x, y); if (path) pred = { x: a.x, y: a.y, path, stop, tx: x, ty: y, hold: performance.now() + 700 }; }
 function attack(e: Ent) { target = e.id; send({ t: 'a', id: e.id }); const a = ents.get(you); if (!a) return; if (Math.hypot(a.x - e.x, a.y - e.y) <= myCls.range) { faceTo(a, e.x, e.y); a.atkUntil = performance.now() + 180; pred = null; } else startPred(e.x, e.y, myCls.range - .05); }
-function skill(n: number) { const sk = myCls.skills.find(s => s.n === n)!; let t = ents.get(target); if (sk.kind !== 'spin' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal' && (!t || t.k !== 'm')) { const nm = nearestMob(sk.range ?? 8); if (nm) { attack(nm); t = nm; } } send({ t: 'k', n, id: t?.id ?? 0 }); }
+let holdAtk = false, holdSkill = false, skillAt = 0, queued: { n: number; until: number } | null = null, warnAt = 0;
+function warn(s: string) { const a = ents.get(you), n = performance.now(); if (a && n > warnAt) { warnAt = n + 900; texts.push({ x: a.x, y: a.y - 1.1, s, c: '#ffb0a0', t: 0, big: false }); } }
+function skill(n: number, quiet = false) {
+  const sk = myCls.skills.find(s => s.n === n)!, now = performance.now(), a = ents.get(you); if (!a || !me) return;
+  if (me.level < (sk.lvl ?? 1)) { if (!quiet) warn(`Nível ${sk.lvl}`); return; }
+  if ((cds[n]?.until ?? 0) > now) return;
+  if (me.mp < sk.mana) { warn('Sem mana'); return; }
+  const needs = sk.kind !== 'spin' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal'; let t = ents.get(target);
+  if (needs && (!t || t.k !== 'm')) { const nm = nearestMob(Math.max(sk.range ?? 8, 8)); if (!nm) { if (!quiet) warn('Sem alvo'); return; } attack(nm); t = nm; }
+  if (needs && t && Math.hypot(t.x - a.x, t.y - a.y) > (sk.range ?? 8)) { queued = { n, until: now + 4000 }; attack(t); return; }
+  send({ t: 'k', n, id: t?.id ?? 0 });
+}
 function potion(k: string) { const i = items.find(x => x.key === k && !x.equip); if (i) send({ t: 'u', slot: i.slot }); }
 const tgtTyping = () => document.activeElement === $('#chati');
 addEventListener('keydown', e => {
@@ -323,16 +334,16 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 function pixelCursor(c1: string, c2: string, attack: boolean) { const c = cv(32, 32), x = c.getContext('2d')!, r = (a: number, b: number, w: number, h: number, k: string) => { x.fillStyle = k; x.fillRect(a, b, w, h); }; for (let i = 0; i < 14; i++) { r(2 + i, 2 + i, 4, 3, '#1a1426'); r(3 + i, 3 + i, 2, 1, i < 3 ? '#fff' : c1); } for (let i = 0; i < 6; i++) r(9 + i, 19 - i, 2, 2, c2); r(16, 17, 6, 3, '#6b4a2b'); r(20, 19, 3, 6, '#6b4a2b'); return `url(${c.toDataURL()}) 2 2, ${attack ? 'crosshair' : 'default'}`; }
 const curNormal = pixelCursor('#e8dfc9', '#e9c46a', false), curAttack = pixelCursor('#ff6b5a', '#ff9d3c', true); let curAtk: boolean | null = null, curCheck = 0;
 canvas.addEventListener('pointermove', e => { curX = e.clientX; curY = e.clientY; const n = performance.now(); if (n > curCheck && map) { curCheck = n + 60; const w = toWorld(e.clientX, e.clientY), at = !!mobAt(w.x, w.y); if (at !== curAtk) { curAtk = at; canvas.style.cursor = at ? curAttack : curNormal; } } });
-addEventListener('pointerup', () => { holding = false; });
+addEventListener('pointerup', () => { holding = false; holdAtk = false; holdSkill = false; });
 canvas.addEventListener('pointerdown', e => {
   if (!map || !running) return;
   curX = e.clientX; curY = e.clientY;
   const { x: wx, y: wy } = toWorld(e.clientX, e.clientY);
-  if (e.button === 2) { const m = mobAt(wx, wy); if (m) target = m.id; skill(activeSkill); return; } // botão direito: habilidade selecionada
+  if (e.button === 2) { const m = mobAt(wx, wy); if (m) target = m.id; skill(activeSkill); if (e.pointerType === 'mouse') holdSkill = true; return; } // botão direito: habilidade selecionada
   if (e.button !== 0) return;
   $('#pmenu').style.display = 'none';
   const best = mobAt(wx, wy);
-  if (best) return attack(best);
+  if (best) { if (e.pointerType === 'mouse') holdAtk = true; return attack(best); }
   if (e.pointerType !== 'mouse') for (const en of ents.values()) if (en.k === 'p' && en.id !== you && Math.hypot(en.x - wx, en.y - .6 - wy) < .9) { playerMenu(en, e.clientX, e.clientY); return; }
   for (const n of map.npcs) if (Math.hypot(n.x - wx, n.y - .6 - wy) < 1.1) { const a = ents.get(you); pendingNpc = n; target = 0; if (a && Math.hypot(a.x - n.x, a.y - n.y) > 2.5) { send({ t: 'g', x: n.x, y: n.y + 1.4 }); startPred(n.x, n.y + 1.4); } return; }
   autoAt = performance.now() + 1500; target = 0; pendingNpc = null; marker = { x: wx, y: wy, t: 0 }; closeWin('shop'); send({ t: 'g', x: wx, y: wy }); startPred(wx, wy);
@@ -400,6 +411,11 @@ function frame(ts: number) {
   const ox = Math.round((vw / 2 - (vw > map.w * 32 ? map.w * 16 : cx)) * Z) / Z, oy = Math.round((vh / 2 - (vh > map.h * 32 ? map.h * 16 : cy)) * Z) / Z;
   g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false; g.fillStyle = '#0a0814'; g.fillRect(0, 0, W, H); g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   viewX = ox; viewY = oy;
+  if (a) {
+    if (holdAtk && !target) { const w = toWorld(curX, curY), m = mobAt(w.x, w.y) ?? nearestMob(7); if (m) attack(m); }
+    if (holdSkill && ts > skillAt) { skillAt = ts + 180; const w = toWorld(curX, curY), m = mobAt(w.x, w.y); if (m) target = m.id; skill(activeSkill, true); }
+    if (queued) { const q = queued, sk = myCls.skills.find(s => s.n === q.n)!, t = ents.get(target); if (ts > q.until || !t) queued = null; else if (Math.hypot(t.x - a.x, t.y - a.y) <= (sk.range ?? 8)) { queued = null; send({ t: 'k', n: q.n, id: t.id }); } }
+  }
   if (holding && ts > holdAt) { holdAt = ts + 200; const w = toWorld(curX, curY); target = 0; pendingNpc = null; send({ t: 'g', x: w.x, y: w.y }); startPred(w.x, w.y); }
   const x0 = Math.max(0, Math.floor(-ox / 32)), y0 = Math.max(0, Math.floor(-oy / 32)), x1 = Math.min(map.w - 1, Math.ceil((-ox + vw) / 32)), y1 = Math.min(map.h - 1, Math.ceil((-oy + vh) / 32));
   const wf = Math.floor(ts / 260) % 4;
