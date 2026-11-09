@@ -35,6 +35,8 @@ export class MapRoom {
     if (route === '/news') { const b: any = await req.json(); this.send_all(JSON.stringify({ t: 'news', m: b.m })); return new Response('{}'); }
     if (route === '/kick') { const b: any = await req.json(); for (const p of [...this.players.values()]) if (p.accountId === b.account) { this.send(p, { t: 'kick', m: 'Conta suspensa.' }); try { p.ws.close(4000, 'banned'); } catch { /* */ } this.leave(p); } return new Response('{}'); }
     if (route === '/player') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); if (b.level > p.level) p.points += (b.level - p.level) * CONFIG.pointsPerLevel; p.level = b.level; p.xp = 0; p.gold = b.gold; p.dirty = true; p.meDirty = true; for (const o of this.players.values()) o.known.delete(p.eid); await this.flush(p); return new Response('{"handled":true}'); }
+    if (route === '/count') return new Response(JSON.stringify({ n: this.players.size }));
+    if (route === '/addstats') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); const t = b.add.reduce((x: number, y: number) => x + y, 0); if (t > p.points) return new Response('{"handled":true,"error":"Pontos insuficientes."}'); p.str += b.add[0]; p.agi += b.add[1]; p.vit += b.add[2]; p.ene += b.add[3]; p.points -= t; p.dirty = true; p.meDirty = true; await this.flush(p); return new Response('{"handled":true}'); }
     if (route === '/global') { this.send_all(await req.text()); return new Response('ok'); }
     if (route === '/partychat') { const b: any = await req.json(); this.partySend(b.pid, b.msg); return new Response('ok'); }
     if (route === '/party') { await this.reloadParty(((await req.json()) as any).pid); return new Response('ok'); }

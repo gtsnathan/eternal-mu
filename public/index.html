@@ -1,182 +1,57 @@
 <!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#120f1f">
-<title>Eternal MU</title>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#120a1e"><title>Eternal MU · MMORPG</title><meta name="description" content="MMORPG online em pixel art. Crie seu herói, conquiste sets lendários e suba no ranking.">
 <style>
-:root{--bg:#120f1f;--pn:#1e1930;--pn2:#2a2342;--ln:#4d4268;--gold:#e9c46a;--tx:#ece6d8;--dim:#a79fb8;--hp:#d7384f;--mp:#3f7fe8;--xp:#e9c46a}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px/1.35 ui-monospace,Menlo,Consolas,"DejaVu Sans Mono",monospace;overflow:hidden;overscroll-behavior:none}
-button,input{font:inherit;color:inherit}
-button{background:var(--pn2);border:2px solid var(--ln);padding:8px 12px;cursor:pointer;box-shadow:inset 0 2px 0 #ffffff14}
-button:hover{border-color:var(--gold)} button:disabled{opacity:.45;cursor:default}
-button.main{background:#8a6420;border-color:var(--gold);color:#fff5d8;font-weight:700}
-input[type=text],input[type=password],input[type=email]{width:100%;background:#120f1f;border:2px solid var(--ln);padding:9px;outline:0} input:focus{border-color:var(--gold)}
-#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
-.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;background:radial-gradient(circle at 50% 18%,#3a2c63,#120f1f 65%)}
-.card{width:min(420px,100%);background:var(--pn);border:3px solid var(--ln);padding:20px;box-shadow:0 0 0 3px #0a0814,0 18px 50px #0009;margin:auto}
-.card.wide{width:min(720px,100%)}
-h1{font-size:34px;letter-spacing:3px;text-align:center;margin:0;color:var(--gold);text-shadow:3px 3px 0 #5a2d0c,6px 6px 0 #0a0814}
-.sub{text-align:center;color:var(--dim);margin:6px 0 18px}
-label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
-.check{display:flex;gap:8px;align-items:flex-start}
-.err{color:#ff8b8b;min-height:20px;margin:10px 0 6px}
-.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
-.link{background:none;border:0;box-shadow:none;color:var(--gold);padding:4px;text-decoration:underline}
-.chars{display:grid;gap:8px;margin:12px 0}
-.char{display:flex;align-items:center;gap:12px;padding:8px;background:var(--pn2);border:2px solid var(--ln);text-align:left;width:100%}
-.char canvas,.preview canvas{image-rendering:pixelated}
-.char b{color:var(--gold)}.char small{color:var(--dim);display:block}
-.char .open{flex:1;background:none;border:0;box-shadow:none;display:flex;gap:12px;align-items:center;text-align:left;padding:0}
-.swatches{display:flex;gap:6px;flex-wrap:wrap}.sw{width:34px;height:34px;padding:0}.sw.on,.opt.on{border-color:var(--gold);outline:2px solid var(--gold)}
-.preview{display:flex;justify-content:center;margin-top:12px}
-#hud{position:fixed;inset:0;pointer-events:none;display:none}
-#hud .p{pointer-events:auto}
-.frame{position:absolute;top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));display:flex;gap:8px;background:#120f1fcc;border:2px solid var(--ln);padding:6px;width:min(270px,48vw)}
-#portrait{width:48px;height:58px;image-rendering:pixelated;background:#2a2342;flex:none}
-.frame .col{flex:1;min-width:0}
-.nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nm span{color:var(--gold)}
-.bar{position:relative;height:13px;background:#0a0814;border:1px solid #000;margin-top:3px;overflow:hidden}
-.bar i{display:block;height:100%;width:0;transition:width .12s}.bar em{position:absolute;inset:0;text-align:center;font:10px/12px ui-monospace,monospace;font-style:normal;text-shadow:1px 1px 0 #000}
-.hp i{background:var(--hp)}.mp i{background:var(--mp)}
-#xp{position:fixed;left:0;right:0;bottom:0;height:5px;background:#0a0814}#xp i{display:block;height:100%;background:var(--xp);width:0}
-.mini{position:absolute;top:calc(8px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));background:#120f1fcc;border:2px solid var(--ln);padding:4px;width:158px}
-#minimap{width:146px;height:112px;display:block;image-rendering:pixelated}
-.minfo{display:flex;flex-wrap:wrap;justify-content:space-between;font-size:11px;margin-top:3px;gap:4px;white-space:nowrap}#conn{color:#79e08a}
-.menu{position:absolute;right:calc(8px + env(safe-area-inset-right));top:172px;display:flex;flex-direction:column;gap:4px}
-.menu button{white-space:nowrap;padding:5px 8px;font-size:12px;background:#1e1930dd;min-width:42px}
-#chat{position:absolute;left:8px;bottom:14px;width:min(380px,44vw)}
-#log{height:128px;overflow-y:auto;background:#120f1fa8;padding:6px;font-size:12px;word-break:break-word;pointer-events:none}
-#log div{text-shadow:1px 1px 0 #000}#log .sys{color:var(--gold)}#log .g{color:#9fd6ff}#log b{color:#c9f0b0}
-.chatline{display:flex}.chatline button{padding:4px 7px;font-size:12px}.chatline input{padding:5px;font-size:13px;background:#120f1fcc}
-#bar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
-.slot{position:relative;width:52px;height:52px;padding:0;background:#1e1930e6;display:flex;align-items:center;justify-content:center;font-size:9px;line-height:1.05;touch-action:manipulation;overflow:hidden}
-.slot u{position:absolute;left:2px;top:1px;text-decoration:none;color:var(--gold)}.slot .cd{position:absolute;left:0;right:0;bottom:0;height:0;background:#000b}
-.slot s{position:absolute;right:2px;bottom:1px;text-decoration:none;text-shadow:1px 1px 0 #000}
-.win{position:absolute;display:none;left:50%;top:50%;transform:translate(-50%,-50%);width:min(450px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow:auto;background:var(--pn);border:3px solid var(--ln);padding:12px;box-shadow:0 0 0 3px #0a0814;z-index:5}
-.win h3{margin:0 0 10px;color:var(--gold);display:flex;justify-content:space-between;align-items:center}.win h3 button{padding:1px 9px}
-.gear{display:flex;gap:5px;margin-bottom:10px;justify-content:center}
-.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
-.cell{position:relative;aspect-ratio:1;background:#120f1f;border:2px solid #3a3150;padding:0;display:flex;align-items:center;justify-content:center;box-shadow:none;min-width:0}
-.cell canvas{width:80%;height:80%;image-rendering:pixelated}.cell s{position:absolute;right:1px;bottom:0;font-size:10px;text-decoration:none;text-shadow:1px 1px 0 #000}
-.gear .cell{width:50px;font-size:9px;color:var(--dim)}
-.info{min-height:36px;margin-top:8px;color:var(--dim);font-size:12px}
-.shopitem{display:flex;align-items:center;gap:8px;padding:5px;border-bottom:1px solid var(--ln)}.shopitem span{flex:1}.shopitem button{padding:4px 8px}
-.stat{display:flex;align-items:center;justify-content:space-between;padding:4px 0}.stat button{padding:1px 10px;margin-left:8px}
-#over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#0009;font-size:20px;color:var(--gold);text-align:center;z-index:9;padding:20px}
-#stick{display:none;position:absolute;left:calc(20px + env(safe-area-inset-left));bottom:30px;width:130px;height:130px;border-radius:50%;background:#ffffff14;border:3px solid #ffffff35;touch-action:none}
-#stick i{position:absolute;left:37px;top:37px;width:50px;height:50px;border-radius:50%;background:#ffffff55}
-.touch #stick{display:block}
-.touch #chat{left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top));bottom:auto;width:min(210px,calc(100vw - 460px))}
-.touch #log{height:58px;font-size:10px}
-.touch #bar{left:auto;right:calc(12px + env(safe-area-inset-right));bottom:22px;transform:none;display:grid;grid-template-columns:repeat(3,60px);gap:7px}
-.touch .slot{width:60px;height:60px}
-.touch #atk{display:flex}
-.touch .menu{top:auto;bottom:170px;flex-direction:row;right:12px}
-#atk{display:none}
-.slot.sel{border-color:var(--gold);outline:2px solid var(--gold)}.touch .slot.sel{outline:0;border-color:var(--ln)}
-.slot b{font-weight:400;display:block;padding:9px 2px 0}
-#party{display:none;position:absolute;left:calc(8px + env(safe-area-inset-left));top:calc(88px + env(safe-area-inset-top));width:190px;background:#120f1fcc;border:2px solid var(--ln);padding:5px;font-size:11px}
-.pm{position:relative;margin-bottom:4px}.pm button{float:right;padding:0 5px;font-size:11px}.pm .bar{height:6px}#party .row button{padding:3px;font-size:10px}
-#pmenu{display:none;position:fixed;background:var(--pn);border:2px solid var(--gold);padding:6px;z-index:6}#pmname{color:var(--gold);margin-bottom:4px}
-#invite{display:none;position:absolute;left:50%;top:18%;transform:translateX(-50%);width:min(320px,90vw);background:var(--pn);border:3px solid var(--gold);padding:12px;text-align:center;z-index:7}#invite .row{margin-top:10px}
-#log .pt{color:#b9f59a}
-.clsb.on{border-color:var(--gold);outline:2px solid var(--gold)}.touch #party{top:88px;width:150px}
-@media (orientation:portrait){.touch #chat{top:112px;left:8px;transform:none;width:min(300px,70vw)}.touch .frame{width:190px}.touch .mini{width:120px}.touch #minimap{width:108px;height:83px}.touch .menu{bottom:232px}}
-@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:104px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(4,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
-
-/* moderno */
-html,body{font-family:system-ui,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-.frame,.mini,#party,.card,.win,#invite,#bar,#tframe,#pmenu,#lootc{border-radius:12px;border:1px solid #c9a24f88!important;background:linear-gradient(180deg,#221b38e0,#120e1fe6)!important;box-shadow:0 10px 30px #0009,inset 0 1px 0 #ffffff1f!important}
-button{border-radius:8px;border-width:1px!important;transition:filter .12s,border-color .12s}button:hover{filter:brightness(1.2)}
-.bar{border-radius:6px;border:0;background:#05040acc}.bar i{border-radius:6px}.slot,.cell{border-radius:8px;border-width:1px!important}.slot{box-shadow:inset 0 1px 0 #ffffff24}
-input[type=text],input[type=password],input[type=email]{border-radius:8px;border-width:1px}
-#portrait{border-radius:8px}#minimap{border-radius:8px}#log{border-radius:10px;font-size:13px}.chatline input,.chatline button{border-radius:8px}
-.menu button{border-radius:8px;font-weight:600}#xp{background:#07050ee6}#xpt{font-family:inherit;font-weight:700}
-h1{font-weight:800;letter-spacing:4px}.shopitem canvas{width:28px;height:28px}.orb em{font-family:inherit}
-.touch #bar{background:none!important;border:0!important;box-shadow:none!important}
-/* tema */
-.rk{border-collapse:collapse;width:100%;font-size:13px}.rk th{color:var(--gold);text-align:left}.rk th,.rk td{padding:5px 6px;border-bottom:1px solid #3f3458;white-space:nowrap}
-.cell em{position:absolute;right:2px;top:0;font:700 11px/13px system-ui,sans-serif;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;pointer-events:none}
-#toast{position:absolute;left:50%;top:64px;transform:translateX(-50%);padding:7px 18px;border-radius:999px;background:#120e1fdd;border:1px solid #c9a24f88;color:#ffe08a;font-weight:700;font-size:14px;white-space:nowrap;opacity:0;pointer-events:none;z-index:6}#toast.show{animation:toast 4s ease forwards}@keyframes toast{0%{opacity:0;transform:translate(-50%,-10px)}8%{opacity:1;transform:translate(-50%,0)}85%{opacity:1}100%{opacity:0}}.touch #toast{top:150px;font-size:12px}
-#xp{height:15px!important;z-index:3}#xp i{position:absolute;left:0;top:0;bottom:0}#xpt{position:absolute;inset:0;text-align:center;font:700 10px/14px ui-monospace,monospace;color:#fff;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;pointer-events:none}
-#hud #bar{margin-bottom:6px}.touch #stick{margin-bottom:6px}
-#tframe{display:none;position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(280px,60vw);background:linear-gradient(180deg,#2a1420ee,#150c14ee);border:2px solid #8a6a32;padding:5px 9px;text-align:center;font-size:12px;font-weight:700;color:#ffd9c9;box-shadow:0 0 0 1px #0a0814}.touch #tframe{top:calc(100px + env(safe-area-inset-top));width:220px}
-.slot.lock{opacity:.4;filter:grayscale(1)}.cell u{position:absolute;left:2px;top:0;font-size:10px;font-weight:700;text-decoration:none;text-shadow:1px 1px 0 #000}.cell.jsel{outline:2px solid #ffe08a}
-@media (orientation:landscape){.touch #bar{grid-template-columns:repeat(4,60px)}}
-#lootc{display:none;position:absolute;left:50%;bottom:112px;transform:translateX(-50%);background:#2a1f08dd;border:2px solid var(--gold);color:#ffe08a;padding:3px 12px;font-weight:700;font-size:13px;white-space:nowrap}.touch #lootc{bottom:auto;top:calc(8px + 70px)}
-.tcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tcols small{color:var(--gold)}.tgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin-top:6px}#w-trade{width:min(520px,calc(100vw - 16px));z-index:8}
-.sethead{display:flex;gap:10px;align-items:center;margin-top:10px;padding:5px;background:#0f0b1c88;border:1px solid #5b4e7c}.sethead canvas{width:40px;height:56px;image-rendering:pixelated;flex:none}.sethead small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
-.shoph{margin:12px 0 2px;color:var(--gold);font-size:13px}#shopl{max-height:62dvh;overflow:auto}
-body{background:#0a0814}
-.screen{background:linear-gradient(180deg,#120c28cc,#0a0814d9)}
-h1{font-size:44px;letter-spacing:5px;background:linear-gradient(180deg,#fff2c0,#e9c46a 48%,#a8671e);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(3px 3px 0 #2a1508) drop-shadow(0 0 16px #e9a63a66)}
-.card,.win,#invite{background:linear-gradient(180deg,#2a2342,#191428);border:2px solid #8a6a32;box-shadow:0 0 0 2px #0a0814,inset 0 0 0 2px #3f3458,0 18px 50px #000a}
-.win h3{border-bottom:1px solid #8a6a32;padding-bottom:7px}
-button{background:linear-gradient(180deg,#352c52,#241d3a);border-color:#5b4e7c}
-button.main{background:linear-gradient(180deg,#c28f35,#80591b);border-color:#f0d27a;text-shadow:1px 1px 0 #4a2d08}
-.frame,.mini,#party{background:linear-gradient(180deg,#221b38ee,#151024ee);border:2px solid #8a6a32;box-shadow:0 0 0 1px #0a0814,inset 0 0 0 1px #3f3458}
-.bar{border:1px solid #5b4e7c;height:12px}.hp i{background:linear-gradient(180deg,#ff7a85,#d7384f 45%,#8e1c33)}.mp i{background:linear-gradient(180deg,#8cc0ff,#3f7fe8 45%,#1f4aa8)}
-#xp{height:7px;background:#0a0814;border-top:1px solid #8a6a32}#xp i{background:linear-gradient(180deg,#ffe9a0,#d9a93a)}
-.menu button{background:linear-gradient(180deg,#352c52ee,#1e1830ee);border-color:#8a6a32;font-size:11px}
-#log{background:linear-gradient(0deg,#0f0b1c99,#0f0b1c33);border-radius:0}
-.chatline input{background:#0f0b1cbb;border-color:#5b4e7c}
-#bar{bottom:16px;align-items:flex-end;background:linear-gradient(180deg,#2a2342ee,#151024f2);border:2px solid #8a6a32;padding:6px 8px;box-shadow:0 0 0 1px #0a0814}
-.slot{background:radial-gradient(circle at 50% 35%,#352c52,#14101f);border-color:#5b4e7c}
-.slot u{z-index:2;text-shadow:1px 1px 0 #000;font-size:10px}.slot s{z-index:2;font-size:11px}
-.slot b{padding:0;display:block;line-height:0}.slot b canvas,.slot .pi{width:44px;height:44px;image-rendering:pixelated;display:block}
-.slot .pi{width:36px;height:36px}
-.orb{display:none;position:relative;width:74px;height:74px;border-radius:50%;background:#0a0814;border:3px solid #b98f42;box-shadow:0 0 0 2px #0a0814,inset 0 0 12px #000;overflow:hidden;margin:0 2px}
-body:not(.touch) .orb{display:block}
-.orb i{position:absolute;left:0;right:0;bottom:0;height:100%;transition:height .15s}.orb.hp i{background:radial-gradient(circle at 35% 25%,#ff8d97,#c92742 55%,#6e1026)}.orb.mp i{background:radial-gradient(circle at 35% 25%,#99ccff,#2f6fdd 55%,#143a8c)}
-.orb::after{content:"";position:absolute;left:14px;top:7px;width:26px;height:14px;border-radius:50%;background:#ffffff4d}
-.orb em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 13px ui-monospace,monospace;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;z-index:2}
-body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;align-items:center}body:not(.touch) #party{top:82px}
-.touch #bar{background:none;border:0;box-shadow:none;padding:0}
-.cell{background:radial-gradient(circle at 50% 35%,#272038,#120e1e);border-color:#40365a}
-</style>
-</head>
-<body>
-<canvas id="game"></canvas>
-<div id="hud">
-  <div class="frame p"><canvas id="portrait" width="80" height="96"></canvas><div class="col"><div class="nm" id="nm"></div><div class="bar hp"><i id="hpb"></i><em id="hpt"></em></div><div class="bar mp"><i id="mpb"></i><em id="mpt"></em></div></div></div>
-  <div id="tframe"><div id="tfn"></div><div class="bar hp"><i id="tfb"></i></div></div>
-  <div id="toast"></div>
-  <div id="party" class="p"></div>
-  <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
-  <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
-  <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
-  <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button data-w="rank">Rank</button><button id="auto">Auto</button><button id="gfx">Gráf: Auto</button><button id="exit">Sair</button></div>
-  <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
-  <div id="stick" class="p"><i></i></div>
-  <div id="bar" class="p">
-    <div class="orb hp" id="orbh"><i></i><em></em></div>
-    <button class="slot" id="atk"></button>
-    <button class="slot" data-sk="1"><u>1</u><b></b><div class="cd"></div></button>
-    <button class="slot" data-sk="2"><u>2</u><b></b><div class="cd"></div></button>
-    <button class="slot" data-sk="3"><u>3</u><b></b><div class="cd"></div></button>
-    <button class="slot" data-sk="4"><u>4</u><b></b><div class="cd"></div></button>
-    <button class="slot" data-pot="pot_hp"><u>Q</u>Vida<s></s></button>
-    <button class="slot" data-pot="pot_mp"><u>E</u>Mana<s></s></button>
-    <div class="orb mp" id="orbm"><i></i><em></em></div>
-  </div>
-  <div class="win p" id="w-inv"><h3>Inventário <button data-close>×</button></h3><div class="gear" id="gear"></div><div class="grid" id="grid"></div><div class="info" id="invinfo">Moedas: 0</div></div>
-  <div class="win p" id="w-char"><h3>Personagem <button data-close>×</button></h3><div id="charp"></div></div>
-  <div class="win p" id="w-map"><h3 id="mapt">Mapa <button data-close>×</button></h3><canvas id="bigmap" style="width:100%;image-rendering:pixelated;display:block"></canvas></div>
-  <div id="lootc" class="p"></div>
-  <div class="win p" id="w-trade"><h3>Troca com <span id="tname"></span></h3>
-    <div class="tcols"><div><b>Sua oferta</b> <small id="tstm"></small><div class="tgrid" id="tmine"></div><label>Moedas</label><input id="tgold" type="text" inputmode="numeric" value="0" autocomplete="off"></div>
-    <div><b>Oferta dele</b> <small id="tstt"></small><div class="tgrid" id="ttheirs"></div><div id="ttg" class="info"></div></div></div>
-    <div class="info">Sua bolsa (toque para oferecer):</div><div class="grid" id="tbag"></div>
-    <div class="row" style="margin-top:10px"><button id="tcancel">Cancelar</button><button class="main" id="tok">Travar oferta</button></div></div>
-  <div class="win p" id="w-rank"><h3>Ranking <button data-close>×</button></h3><div style="overflow:auto;max-height:70dvh"><table class="rk"><thead><tr><th>#</th><th>Nome</th><th>Classe</th><th>Resets</th><th>Master</th><th>Nível</th></tr></thead><tbody id="rankb"></tbody></table></div></div>
-  <div class="win p" id="w-shop"><h3><span id="shopt"></span> <button data-close>×</button></h3><div id="shopl"></div></div>
+:root{--g:#e9c46a;--g2:#a8671e;--tx:#ece4d4;--d:#a89cb0;--p:#191018;--ln:#6d4a2a}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#0b0710 radial-gradient(circle at 50% 0,#2a1020,#0b0710 62%) no-repeat;color:var(--tx);font:15px/1.55 system-ui,'Segoe UI',Roboto,sans-serif}
+header.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#1c0f18f5,#120a12f0);border-bottom:1px solid var(--ln);box-shadow:0 4px 18px #000a}
+nav{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:6px;padding:9px 16px;flex-wrap:wrap}
+.logo{font:800 22px Georgia,'Times New Roman',serif;letter-spacing:3px;background:linear-gradient(180deg,#fff2c0,#e9c46a 50%,#a8671e);-webkit-background-clip:text;background-clip:text;color:transparent;margin-right:auto;text-decoration:none}
+nav a.n,nav button.n{font:600 13.5px system-ui,sans-serif;letter-spacing:1px;text-transform:uppercase;color:var(--tx);background:none;border:0;text-decoration:none;padding:8px 13px;border-radius:6px;cursor:pointer}nav a.n:hover,nav button.n:hover,nav a.on{color:var(--g);background:#ffffff0d}
+.play{font:800 13.5px system-ui;letter-spacing:1px;text-transform:uppercase;color:#2a1508;background:linear-gradient(180deg,#ffe29a,#c9892e);padding:9px 20px;border-radius:6px;text-decoration:none;box-shadow:0 0 16px #e9a63a55}
+.heroWrap{position:relative;height:clamp(300px,50vw,520px);border-bottom:2px solid var(--ln);overflow:hidden}#hero{position:absolute;inset:0;width:100%;height:100%;display:block}
+.heroT{position:absolute;left:0;right:0;top:clamp(14px,4vw,40px);text-align:center;pointer-events:none;padding:0 12px}.heroT h1{margin:0;font:800 clamp(38px,8vw,84px)/1 Georgia,'Times New Roman',serif;letter-spacing:.09em;background:linear-gradient(180deg,#fff6d0,#f0c868 46%,#a2601c);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 #2a1208) drop-shadow(0 0 22px #ff9a3c66)}.heroT p{margin:6px 0 0;color:#ffe8c8;letter-spacing:3px;text-transform:uppercase;font-size:clamp(11px,1.4vw,14px);text-shadow:0 2px 6px #000}
+main{max-width:1180px;margin:0 auto;padding:22px 16px 56px;display:grid;grid-template-columns:270px minmax(0,1fr);gap:18px;align-items:start}
+.pn{position:relative;background:linear-gradient(180deg,#22141e,#160d15);border:1px solid var(--ln);border-radius:4px;padding:15px;margin-bottom:16px;box-shadow:inset 0 0 0 1px #00000055,0 8px 20px #0007}
+.pn::before,.pn::after{content:"";position:absolute;width:13px;height:13px;border:2px solid var(--g);top:-1px}.pn::before{left:-1px;border-right:0;border-bottom:0}.pn::after{right:-1px;border-left:0;border-bottom:0}
+h2{font:700 21px Georgia,serif;color:var(--g);margin:0 0 12px;letter-spacing:1px;border-bottom:1px solid var(--ln);padding-bottom:8px;text-transform:uppercase}h3{font:700 16px Georgia,serif;color:var(--g);margin:0 0 8px;letter-spacing:.5px}
+input,select{font:inherit;color:inherit;background:#0d070e;border:1px solid var(--ln);border-radius:4px;padding:8px 9px;width:100%;margin-bottom:8px}input:focus,select:focus{outline:0;border-color:var(--g)}
+button,.gold{font:inherit}.gold{display:block;text-align:center;text-decoration:none;width:100%;border:1px solid #f0d27a;border-radius:4px;background:linear-gradient(180deg,#c28f35,#7c541a);color:#fff5d8;font-weight:700;padding:9px;cursor:pointer}.gold:disabled{opacity:.42;cursor:default}.gold:hover:not(:disabled){filter:brightness(1.15)}.lnk{display:block;width:100%;margin-top:9px;text-align:center;background:none;border:0;color:var(--g);text-decoration:underline;cursor:pointer;font:inherit}.chk{display:flex;gap:7px;align-items:center;font-size:13px;color:var(--d);margin-bottom:8px}.chk input{width:auto;margin:0}.err{color:#ff9b8e;min-height:18px;font-size:13px;margin:2px 0 6px}.dim{color:var(--d)}
+.st{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #ffffff10}.st b{color:var(--g)}ul.rk{list-style:none;margin:0;padding:0}ul.rk li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #ffffff10;font-size:14px}ul.rk span{color:var(--d);font-size:12.5px;white-space:nowrap}
+.news article{padding:12px 0;border-bottom:1px solid #ffffff12}.news article:last-child{border:0}.news b{color:var(--g)}.news small{color:var(--d);margin-left:8px}.news p{margin:4px 0 0;color:#d6cdc8}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px}.feat div{background:#0f090f;border:1px solid #3f2c26;border-radius:4px;padding:12px}.feat b{color:var(--g);display:block;margin-bottom:3px}.feat p{margin:0;color:#c9c0bc;font-size:13.5px}
+.char{display:grid;grid-template-columns:200px 1fr;gap:14px;padding:13px;background:#0f090f;border:1px solid #3f2c26;border-radius:4px;margin-bottom:12px}.char canvas{width:200px;height:230px;image-rendering:pixelated;background:radial-gradient(circle at 50% 62%,#5a2a2a,#120a12 72%);border:1px solid #3f2c26}.info2 p{margin:0 0 3px}.pts{color:var(--g);font-weight:700;margin:9px 0 6px}.stat{display:grid;grid-template-columns:82px 62px 1fr auto auto auto;gap:5px;align-items:center;margin-bottom:5px}.stat b{color:var(--g)}.stat input{margin:0;padding:5px 6px;min-width:0}.mini{background:#2a1a22;border:1px solid var(--ln);border-radius:4px;color:var(--tx);padding:5px 8px;font-size:12.5px;cursor:pointer;white-space:nowrap}.mini:hover{border-color:var(--g)}.foot{margin-top:8px;max-width:210px}
+.cls{display:grid;grid-template-columns:240px 1fr;gap:15px;align-items:center;padding:12px;background:#0f090f;border:1px solid #3f2c26;border-radius:4px;margin-bottom:12px}.cls canvas{width:240px;height:240px;image-rendering:pixelated;background:radial-gradient(circle at 50% 60%,#4a1f2e,#120a12 72%)}.cls p{margin:0 0 7px;color:#d6cdc8}.cls ul{margin:0 0 7px;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:5px}.cls li{background:#2a1a22;border-radius:4px;padding:2px 8px;font-size:13px}.cls small{color:var(--d)}
+.wrapt{overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:8px;border-bottom:1px solid #ffffff14;white-space:nowrap}th{color:var(--g);font-size:13px;text-transform:uppercase}tr.top td{color:#ffe29a;font-weight:700}
+.help h3{margin-top:14px}.help ol,.help ul{margin:0 0 10px;padding-left:20px}.help li{margin-bottom:4px}.help a:not(.gold),.news a{color:var(--g)}.alert{background:#4a2410;border:1px solid var(--g2);border-radius:4px;padding:10px 12px;margin-bottom:6px;color:#ffe8c8}.alert b{color:#ffe29a}.warn{color:#ffb6a0;margin:0 0 12px}kbd{background:#2a1a22;border:1px solid var(--ln);border-radius:3px;padding:0 5px;font:12.5px ui-monospace,monospace}
+footer{border-top:1px solid var(--ln);text-align:center;color:var(--d);padding:18px;font-size:13px}
+@media(max-width:860px){main{grid-template-columns:1fr}aside{order:2}nav a.n,nav button.n{padding:6px 8px;font-size:12px}}
+@media(max-width:560px){.char,.cls{grid-template-columns:1fr}.char canvas,.cls canvas{margin:0 auto}.stat{grid-template-columns:repeat(3,1fr)}}
+</style></head><body>
+<header class="top"><nav><a class="logo" href="#inicio">ETERNAL MU</a><a class="n" href="#inicio">Início</a><a class="n" href="#conta">Minha conta</a><a class="n" href="#ajuda">Como jogar</a><a class="n" href="#ranking">Ranking</a><a class="n" href="#classes">Classes</a><a class="n" href="/guia">Guia</a><button class="n" id="nav-out" style="display:none">Sair</button><a class="play" href="/jogar">Jogar</a></nav></header>
+<div class="heroWrap"><canvas id="hero"></canvas><div class="heroT"><h1>ETERNAL MU</h1><p>Lendas renascem em cada batalha</p></div></div>
+<main>
+<aside>
+<section class="pn"><div id="auth"></div></section>
+<section class="pn"><h3>Servidor</h3><div class="st"><span>Online agora</span><b id="online">…</b></div><div class="st"><span>Contas</span><b id="accs">…</b></div><div class="st"><span>Personagens</span><b id="chars">…</b></div><div class="st"><span>XP</span><b id="rx">…</b></div><div class="st"><span>Drop</span><b id="rd">…</b></div><div class="st"><span>Moedas</span><b id="rg">…</b></div><div class="st"><span>Reset no nível</span><b id="rr">…</b></div></section>
+<section class="pn"><h3>Top 5</h3><ul class="rk" id="ranks"></ul></section>
+</aside>
+<div>
+<section id="p-inicio"><div class="pn news"><h2>Notícias</h2><article><b>Novo por aqui? Leia o Como jogar</b><small>Importante</small><p>Controles, pontos e regras em um só lugar. O Reset é liberado a partir do nível <span class="v-rl">400</span>. <a href="#ajuda">Abrir o guia</a></p></article><article><b>O servidor está no ar</b><small>Abertura</small><p>Crie sua conta, escolha uma das cinco classes e comece sua jornada em Valoria.</p></article><article><b>Seis mundos para explorar</b><small>Mundo</small><p>Do gelo de Frostvale às alturas de Celestial Ruins, com chefes e recompensas lendárias.</p></article><article><b>Sets, asas e joias</b><small>Equipamentos</small><p>30 sets exclusivos por classe, asas forjadas com relíquias e melhorias até +15.</p></article></div>
+<div class="pn"><h2>Por que jogar</h2><div class="feat"><div><b>5 classes</b><p>Cada uma com habilidades, armas e sets próprios.</p></div><div><b>Reset e Master Level</b><p>Renasça mais forte e dispute o topo do ranking.</p></div><div><b>Grupos e trocas</b><p>Cace em grupo e negocie itens com segurança.</p></div><div><b>Jogue em qualquer lugar</b><p>Direto no navegador do computador ou do celular.</p></div></div></div></section>
+<section id="p-ajuda" style="display:none"><div class="pn help"><h2>Como jogar</h2>
+<div class="alert"><b>Reset só a partir do nível <span class="v-rl">400</span>.</b> Antes disso, o Mestre Ancião não libera o Reset.</div>
+<h3>Primeiros passos</h3><ol><li>Clique em <b>Criar conta</b>, na coluna ao lado, e preencha seus dados.</li><li>Clique em <b>Jogar</b> e crie seu personagem: classe, nome e aparência.</li><li>Clique no personagem para entrar em Valoria, a cidade inicial.</li><li>Compre poções com a <b>Odila</b> e siga pelo portal até <b>Frostvale</b>, sua primeira área de caça.</li><li>A cada nível você ganha <b>5 pontos</b>. Distribua aqui em <a href="#conta">Minha conta</a> ou no jogo, na tecla <kbd>C</kbd>.</li></ol>
+<h3>Controles</h3><div class="wrapt"><table><thead><tr><th>Ação</th><th>Computador</th><th>Celular</th></tr></thead><tbody><tr><td>Andar e atacar</td><td>Botão esquerdo do mouse</td><td>Joystick e botão de ataque</td></tr><tr><td>Usar habilidade</td><td>Botão direito; <kbd>1</kbd> a <kbd>4</kbd> escolhem</td><td>Botões 1 a 4</td></tr><tr><td>Poções</td><td><kbd>Q</kbd> vida, <kbd>E</kbd> mana</td><td>Botões Q e E</td></tr><tr><td>Bolsa, perfil, mapa</td><td><kbd>I</kbd>, <kbd>C</kbd>, <kbd>M</kbd></td><td>Menu lateral</td></tr><tr><td>Grupo e troca</td><td><kbd>D</kbd> com o cursor no jogador</td><td>Toque no jogador</td></tr><tr><td>Chat</td><td><kbd>Enter</kbd></td><td>Campo de chat</td></tr></tbody></table></div>
+<h3>Distribuir pontos pelo site</h3><ol><li>Entre com sua conta e abra <a href="#conta">Minha conta</a>.</li><li>Digite o valor ou use <b>+10</b>, <b>+100</b> e <b>Máx</b> em cada atributo.</li><li>Clique em <b>Aplicar pontos</b>. Vale na hora, mesmo com o personagem dentro do jogo.</li></ol><p class="warn">Pontos aplicados não voltam. A única forma de redistribuir é fazendo um Reset.</p>
+<div class="feat"><div><b>Força</b><p>Principal fonte de ataque de guerreiros e cavaleiros.</p></div><div><b>Agilidade</b><p>Defesa, velocidade de ataque, crítico e esquiva.</p></div><div><b>Vitalidade</b><p>Aumenta sua vida máxima.</p></div><div><b>Energia</b><p>Aumenta a mana e o poder das classes mágicas.</p></div></div>
+<h3 style="margin-top:16px">Reset e Master Level</h3><ul><li><b>Requisito:</b> estar no nível <span class="v-rl">400</span> e falar com o <b>Mestre Ancião</b>, em Valoria.</li><li><b>Custo:</b> <span class="v-rg">1.000.000</span> moedas multiplicadas pelo número do Reset (o 2º custa o dobro, o 3º o triplo).</li><li><b>O que acontece:</b> você volta ao nível 1 e os atributos voltam ao valor inicial da classe.</li><li><b>Recompensa:</b> <span class="v-rp">500</span> pontos livres por Reset já feito, para distribuir de novo. Com 2 Resets, você recebe o dobro.</li><li><b>Você mantém</b> seus itens, moedas restantes e o Master Level.</li><li><b>Master Level:</b> depois do primeiro Reset, ao chegar de novo ao nível 400, a XP passa a contar para o Master, com bônus permanentes de ataque, defesa, vida e crítico.</li></ul>
+<h3>Em Valoria</h3><div class="feat"><div><b>Odila</b><p>Poções de vida e mana.</p></div><div><b>Brunna</b><p>Armas da sua classe e joias.</p></div><div><b>Isaura</b><p>Sets exclusivos da sua classe.</p></div><div><b>Alaric</b><p>Cria asas com recompensas de monstros e chefes.</p></div><div><b>Prensa de Joias</b><p>Junta 10 joias iguais em um pacote, ou desmonta.</p></div><div><b>Baú</b><p>Guarda até 40 itens com segurança.</p></div></div>
+<h3 style="margin-top:16px">Dicas</h3><ul><li>Cada classe só usa os próprios sets e armas.</li><li>Passe sobre os itens caídos: a Sequência de Coleta dá até +50% de XP e moedas.</li><li>Na Bolsa, ▲ indica item melhor que o equipado e ▼ indica pior.</li><li>Complete 2, 3 e 4 peças do mesmo set para ganhar bônus.</li><li>Para usar uma joia, clique nela na Bolsa e depois no item.</li><li>O botão <b>Auto</b> luta sozinho, usa poções e recolhe o que cair.</li></ul>
+<a class="gold" style="max-width:320px" href="/guia">Ver onde cada item cai</a></div></section>
+<section id="p-conta" style="display:none"><div class="pn"><h2>Minha conta</h2><p class="dim" style="margin-top:0">Distribua seus pontos antes de entrar no jogo. Funciona mesmo com o personagem online.</p><div id="acc"></div></div></section>
+<section id="p-ranking" style="display:none"><div class="pn"><h2>Ranking</h2><select id="rankf" style="max-width:260px"><option value="">Todas as classes</option></select><div class="wrapt"><table><thead><tr><th>#</th><th>Nome</th><th>Classe</th><th>Resets</th><th>Master</th><th>Nível</th></tr></thead><tbody id="rankb"></tbody></table></div></div></section>
+<section id="p-classes" style="display:none"><div class="pn"><h2>Classes</h2><div id="classlist"></div></div></section>
 </div>
-<div id="xp"><i></i><span id="xpt"></span></div>
-<div id="root"></div>
-<div id="over"></div>
-<script src="game.js"></script>
-</body>
-</html>
+</main>
+<footer>Eternal MU · Projeto independente de fãs de MMORPG clássico.</footer>
+<script src="site.js"></script></body></html>

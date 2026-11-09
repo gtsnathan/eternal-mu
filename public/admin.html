@@ -34,6 +34,6 @@ function render(){const S=C.settings,tabs={rates:'Taxas',mobs:'Monstros',jew:'Jo
  const lg=el('div',{class:'scroll'});P.log=el('div',{class:'panel'},lg);const loadLog=async()=>{const{log}=await api('admin/log');lg.replaceChildren(el('table',{},el('tbody',{},...log.map(x=>el('tr',{},el('td',{text:new Date(x.at).toLocaleString('pt-BR')}),el('td',{text:x.username}),el('td',{text:x.action}),el('td',{text:(x.detail||'').slice(0,90)}))))))};
  const bs={};const show=k=>{for(const x in P){P[x].classList.toggle('on',x===k);bs[x].classList.toggle('on',x===k)}if(k==='play')search();if(k==='log')loadLog()};
  const tabBar=el('div',{class:'tabs'});for(const k in tabs){bs[k]=el('button',{text:tabs[k],onclick:()=>show(k)});tabBar.append(bs[k])}
- app.replaceChildren(el('div',{class:'top'},el('h1',{text:'Eternal MU · Admin'}),el('a',{href:'/',style:'color:#e9c46a',text:'Voltar ao jogo'})),tabBar,...Object.values(P));show('rates')}
+ app.replaceChildren(el('div',{class:'top'},el('h1',{text:'Eternal MU · Admin'}),el('a',{href:'/jogar',style:'color:#e9c46a',text:'Voltar ao jogo'})),tabBar,...Object.values(P));show('rates')}
 boot();
 </script></body></html>

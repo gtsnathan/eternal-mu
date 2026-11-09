@@ -30,7 +30,7 @@ function showAuth(register = false, msg = '') {
 async function showChars(msg = '') {
   let me: any; try { me = await api('me'); } catch (e: any) { return e.status === 401 ? showAuth(false, msg) : showAuth(false, 'Sem conexão com o servidor.'); }
   root.innerHTML = `<div class="screen"><div class="card wide"><h1>ETERNAL MU</h1><div class="sub">Conta: ${esc(me.username)}</div><div class="err">${esc(msg)}</div><div class="chars"></div>
-  <div class="row">${me.characters.length < 5 ? '<button class="main" id="new">Novo personagem</button>' : ''}<button id="guia">Guia</button><button id="out">Sair</button><button id="outall">Sair de todos os dispositivos</button>${me.admin ? '<button id="adm">Painel Admin</button>' : ''}</div></div></div>`;
+  <div class="row">${me.characters.length < 5 ? '<button class="main" id="new">Novo personagem</button>' : ''}<button id="site">Site</button><button id="guia">Guia</button><button id="out">Sair</button><button id="outall">Sair de todos os dispositivos</button>${me.admin ? '<button id="adm">Painel Admin</button>' : ''}</div></div></div>`;
   const list = $('.chars');
   if (!me.characters.length) list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:16px">Crie seu primeiro herói.</div>';
   for (const c of me.characters) {
@@ -45,6 +45,7 @@ async function showChars(msg = '') {
   const adm = root.querySelector('#adm') as HTMLElement | null; if (adm) adm.onclick = () => { location.href = '/admin'; };
   const nw = root.querySelector('#new') as HTMLElement | null; if (nw) nw.onclick = () => showCreate();
   $('#guia').onclick = () => { location.href = '/guia'; };
+  $('#site').onclick = () => { location.href = '/'; };
   $('#out').onclick = async () => { await api('logout', {}); showAuth(); };
   $('#outall').onclick = async () => { await api('logout-all', {}); showAuth(); };
 }

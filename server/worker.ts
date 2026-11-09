@@ -48,6 +48,7 @@ async function listChars(env: Env, acc: number) {
   const { results } = await env.DB.prepare('SELECT id,name,class,hair_color,hair_style,level,map FROM characters WHERE account_id=? ORDER BY id').bind(acc).all();
   return results;
 }
+const statusCache = { at: 0, n: 0 };
 const toRooms = (env: Env, path: string, body: unknown) => Promise.all(MAP_IDS.map(id => env.MAP_ROOM.get(env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room' + path, { method: 'POST', body: JSON.stringify(body) })).then(r => r.json() as Promise<any>).catch(() => ({}))));
 async function admin(req: Request, env: Env, path: string, b: any, adminId: number): Promise<Response> {
   const db = env.DB, audit = (action: string, detail: unknown) => db.prepare('INSERT INTO admin_log(admin_id,action,detail,at) VALUES(?,?,?,?)').bind(adminId, action, JSON.stringify(detail).slice(0, 2000), Date.now()).run();
@@ -114,6 +115,11 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
     if (a.banned) return err('Esta conta foi suspensa.', 403);
     return startSession(req, env, a.id, a.username);
   }
+  if (path === '/api/status' && req.method === 'GET') {
+    if (Date.now() - statusCache.at > 30000) { const r = await toRooms(env, '/count', {}); statusCache.at = Date.now(); statusCache.n = r.reduce((a, x) => a + (x.n ?? 0), 0); }
+    const [a, c, st] = await Promise.all([db.prepare('SELECT COUNT(*) n FROM accounts').first<{ n: number }>(), db.prepare('SELECT COUNT(*) n FROM characters').first<{ n: number }>(), db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>()]), cfg = st ? cleanSettings(JSON.parse(st.value)) : DEFAULT_SETTINGS;
+    return json({ online: statusCache.n, accounts: a!.n, characters: c!.n, xp: cfg.xp, drop: cfg.drop, gold: cfg.gold, resetLevel: cfg.resetLevel, resetGold: cfg.resetGold, resetPoints: cfg.resetPoints });
+  }
   if (path === '/api/ranking' && req.method === 'GET') {
     const { results } = await db.prepare('SELECT c.name,c.class,c.level,c.resets,c.master_level AS ml FROM characters c JOIN accounts a ON a.id=c.account_id WHERE a.banned=0 ORDER BY c.resets DESC, c.master_level DESC, c.level DESC, c.xp DESC LIMIT 50').all();
     return json({ ranking: results });
@@ -127,6 +133,21 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   const clear = { 'set-cookie': `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` };
   if (path === '/api/logout' && req.method === 'POST') { await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await sha(readCookie(req)!)).run(); return json({ ok: 1 }, 200, clear); }
   if (path === '/api/logout-all' && req.method === 'POST') { await db.prepare('DELETE FROM sessions WHERE account_id=?').bind(me.id).run(); return json({ ok: 1 }, 200, clear); }
+  if (path === '/api/site/characters') {
+    const { results } = await db.prepare('SELECT id,name,class,hair_color,hair_style,level,xp,points,str,agi,vit,ene,gold,map,resets,master_level,master_points FROM characters WHERE account_id=? ORDER BY id').bind(me.id).all();
+    const gear = results.length ? (await db.prepare(`SELECT char_id,item_key,equip,plus FROM items WHERE equip IS NOT NULL AND char_id IN (${results.map(() => '?').join(',')})`).bind(...results.map(r => r.id)).all()).results : [];
+    return json({ username: me.username, admin: me.is_admin === 1, characters: results.map(r => ({ ...r, gear: Object.fromEntries(gear.filter(g => g.char_id === r.id).map(g => [g.equip, g.item_key])) })) });
+  }
+  const pts = path.match(/^\/api\/characters\/(\d+)\/points$/);
+  if (pts && req.method === 'POST') {
+    const add = ['str', 'agi', 'vit', 'ene'].map(k => body[k] ?? 0); if (add.some(v => !Number.isInteger(v) || v < 0 || v > 1e6)) return err('Valores inválidos.');
+    const total = add.reduce((a, b) => a + b, 0); if (!total) return err('Escolha ao menos 1 ponto.');
+    const c = await db.prepare('SELECT id,map,points FROM characters WHERE id=? AND account_id=?').bind(+pts[1], me.id).first<{ id: number; map: string; points: number }>(); if (!c) return err('Personagem não encontrado.', 404);
+    const live = await env.MAP_ROOM.get(env.MAP_ROOM.idFromName(c.map + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/addstats', { method: 'POST', body: JSON.stringify({ char: c.id, add }) })).then(r => r.json() as Promise<any>).catch(() => ({}));
+    if (live.handled) { if (live.error) return err(live.error); return json({ ok: 1 }); }
+    const u = await db.prepare('UPDATE characters SET str=str+?,agi=agi+?,vit=vit+?,ene=ene+?,points=points-? WHERE id=? AND account_id=? AND points>=?').bind(...add, total, c.id, me.id, total).run();
+    if (!u.meta.changes) return err('Pontos insuficientes.'); return json({ ok: 1 });
+  }
   if (path.startsWith('/api/admin/')) return me.is_admin === 1 ? admin(req, env, path, body, me.id) : err('Acesso restrito a administradores.', 403);
   if (path === '/api/me') return json({ admin: me.is_admin === 1, username: me.username, characters: await listChars(env, me.id) });
   if (path === '/api/characters' && req.method === 'POST') {

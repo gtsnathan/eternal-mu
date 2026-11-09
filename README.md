@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.22
+# Eternal MU · versão 0.23
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-Abra `http://localhost:8787`. Para testar com dois jogadores, use uma janela normal e uma anônima.
+Abra `http://localhost:8787` para o site e `/jogar` para o jogo. Para testar com dois jogadores, use uma janela normal e uma anônima.
 
 ## Controles
 
