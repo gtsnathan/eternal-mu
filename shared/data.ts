@@ -1,13 +1,13 @@
 // Regras e conteúdo do jogo. Todos os números de balanceamento ficam aqui.
 export const CONFIG = {
-  tickMs: 100, aoiRadius: 22, pointsPerLevel: 5, maxLevel: 400, playerSpeed: 5,
+  tickMs: 50, testCommands: true, aoiRadius: 22, pointsPerLevel: 5, maxLevel: 400, playerSpeed: 5,
   attackRange: 1.7, invSize: 40, startGold: 100, saveEveryMs: 10000, dropOwnMs: 15000, dropLifeMs: 60000,
 };
 export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots';
 export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots'];
 export const SLOT_NAMES: Record<Slot, string> = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', pants: 'Calças', boots: 'Botas' };
 export interface ItemDef {
-  key: string; name: string; kind: Slot | 'potion' | 'material'; lvl: number; price: number;
+  key: string; name: string; kind: Slot | 'potion' | 'material' | 'jewel'; lvl: number; price: number;
   dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: 'sword' | 'axe' | 'staff' | 'bow'; set?: string;
 }
 // Sets: cada peça equipada do mesmo set soma bônus (2 peças: defesa, 3: vida, 4: ataque %)
@@ -43,6 +43,9 @@ const setDrops = (s: string, ch: number) => SET_PIECES.map(p => [`${s}_${p}`, ch
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'pot_hp', name: 'Poção de Vida', kind: 'potion', lvl: 1, price: 20, heal: 80 },
   { key: 'pot_mp', name: 'Poção de Mana', kind: 'potion', lvl: 1, price: 20, mana: 50 },
+  { key: 'jewel_aurora', name: 'Joia da Aurora', kind: 'jewel', lvl: 1, price: 6000, blade: '#ffe08a' },
+  { key: 'jewel_destiny', name: 'Joia do Destino', kind: 'jewel', lvl: 1, price: 30000, blade: '#6fd6ff' },
+  { key: 'jewel_eclipse', name: 'Joia do Eclipse', kind: 'jewel', lvl: 1, price: 120000, blade: '#d86bff' },
   { key: 'shard', name: 'Estilhaço Gélido', kind: 'material', lvl: 1, price: 15 },
   { key: 'short_sword', name: 'Espada Curta', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#cfd8e3', wtype: 'sword' },
   { key: 'app_staff', name: 'Cajado do Aprendiz', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#b58cff', wtype: 'staff' },
@@ -66,13 +69,17 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'rime_pants', name: 'Grevas de Escarcha', kind: 'pants', lvl: 12, price: 1700, def: 14, hp: 50, tint: '#477fb0' },
   { key: 'rime_boots', name: 'Botas de Escarcha', kind: 'boots', lvl: 12, price: 1300, def: 8, hp: 30, tint: '#3c6c98' },
 ] as ItemDef[]).concat(SET_ITEMS).map(i => [i.key, i]));
+// Joias: faixa de melhoria, chance e quantos + perde ao falhar
+export const JEWELS: Record<string, { min: number; max: number; chance: number; fail: number }> = { jewel_aurora: { min: 0, max: 6, chance: 1, fail: 0 }, jewel_destiny: { min: 6, max: 9, chance: .6, fail: 1 }, jewel_eclipse: { min: 9, max: 15, chance: .4, fail: 2 } };
+export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material' || d.kind === 'jewel';
+export const glowTier = (p: number) => p >= 13 ? '#ff6ad5' : p >= 11 ? '#ffd76a' : p >= 9 ? '#7dffb0' : p >= 7 ? '#9fc8ff' : null;
 export const RARITY = [
   { name: 'Comum', mult: 1, color: '#e8e6df' }, { name: 'Incomum', mult: 1.25, color: '#6fdc7e' }, { name: 'Raro', mult: 1.6, color: '#68b6ff' },
 ];
 export const SHOPS: Record<string, string[]> = {
   alquimista: ['pot_hp', 'pot_mp'],
   armeira: SET_ITEMS.map(i => i.key),
-  ferreira: ['short_sword', 'app_staff', 'oak_bow', 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
+  ferreira: ['jewel_aurora', 'short_sword', 'app_staff', 'oak_bow', 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
 };
 export interface MobDef {
   key: string; name: string; level: number; hp: number; dmg: number; def: number; speed: number; detect: number; leash: number;
@@ -82,26 +89,26 @@ const EMBER: [string, number][] = [['ember_blade', 1], ['ember_axe', 1], ['ember
 const ember = (ch: number) => EMBER.map(([k]) => [k, ch] as [string, number]);
 export const MOBS: Record<string, MobDef> = {
   imp: { key: 'imp', name: 'Diabrete Cinzento', level: 22, hp: 900, dmg: 70, def: 34, speed: 2.8, detect: 7, leash: 12, attackMs: 1500, xp: 380, respawnMs: 12000, gold: [50, 110], reach: 4.5, bolt: '#ff9d3c',
-    drops: [['pot_hp', .3], ['pot_mp', .25], ['shard', .3], ...setDrops('griffin', .012)] },
+    drops: [['pot_hp', .3], ['pot_mp', .25], ['shard', .3], ['jewel_aurora', .03], ['jewel_destiny', .004], ...setDrops('griffin', .012)] },
   hound: { key: 'hound', name: 'Cão de Enxofre', level: 29, hp: 1900, dmg: 110, def: 50, speed: 4, detect: 8, leash: 14, attackMs: 1100, xp: 850, respawnMs: 15000, gold: [90, 190],
-    drops: [['pot_hp', .35], ['pot_mp', .25], ...setDrops('griffin', .02), ...setDrops('lion', .01), ...setDrops('owl', .012)] },
+    drops: [['pot_hp', .35], ['pot_mp', .25], ...setDrops('griffin', .02), ...setDrops('lion', .01), ...setDrops('owl', .012), ['jewel_aurora', .05], ['jewel_destiny', .01]] },
   magma: { key: 'magma', name: 'Colosso de Magma', level: 37, hp: 5200, dmg: 190, def: 85, speed: 2, detect: 6.5, leash: 12, attackMs: 1800, xp: 2400, respawnMs: 22000, gold: [220, 420],
-    drops: [['pot_hp', .4], ...setDrops('lion', .02), ...setDrops('serpent', .01), ...setDrops('tiger', .012), ...setDrops('manticore', .012), ...ember(.012)] },
+    drops: [['pot_hp', .4], ...setDrops('lion', .02), ...setDrops('serpent', .01), ...setDrops('tiger', .012), ...setDrops('manticore', .012), ['jewel_destiny', .03], ['jewel_eclipse', .004], ...ember(.012)] },
   wyrm: { key: 'wyrm', name: 'Serpe Carbonizada', level: 45, hp: 9500, dmg: 260, def: 120, speed: 3, detect: 8, leash: 14, attackMs: 1700, xp: 6000, respawnMs: 30000, gold: [500, 900], reach: 5.5, bolt: '#ff5a2c',
-    drops: [['pot_hp', .5], ...setDrops('serpent', .025), ...setDrops('phoenix', .012), ...setDrops('kraken', .012), ...setDrops('pegasus', .01), ...ember(.03)] },
+    drops: [['pot_hp', .5], ...setDrops('serpent', .025), ...setDrops('phoenix', .012), ...setDrops('kraken', .012), ...setDrops('pegasus', .01), ['jewel_destiny', .05], ['jewel_eclipse', .012], ...ember(.03)] },
   ignarok: { key: 'ignarok', name: 'Ignarok, o Dragão Ancestral', level: 60, hp: 120000, dmg: 420, def: 170, speed: 3, detect: 12, leash: 20, attackMs: 1500, xp: 150000, respawnMs: 1800000, gold: [15000, 30000], boss: true, reach: 3.2, nova: '#ff7a2b',
-    drops: [['pot_hp', 1], ['pot_mp', 1], ...ember(.4), ...setDrops('phoenix', .3), ...setDrops('dragon', .15), ...setDrops('kraken', .2), ...setDrops('demon', .05), ...setDrops('pegasus', .1), ...setDrops('hydra', .08), ...setDrops('chimera', .08)] },
+    drops: [['pot_hp', 1], ['pot_mp', 1], ...ember(.4), ...setDrops('phoenix', .3), ...setDrops('dragon', .15), ...setDrops('kraken', .2), ...setDrops('demon', .05), ['jewel_destiny', 1], ['jewel_eclipse', .6], ...setDrops('pegasus', .1), ...setDrops('hydra', .08), ...setDrops('chimera', .08)] },
   slime: { key: 'slime', name: 'Gelatina Gélida', level: 2, hp: 45, dmg: 9, def: 1, speed: 1.6, detect: 4.5, leash: 10, attackMs: 1500, xp: 20, respawnMs: 8000, gold: [3, 9],
     drops: [['pot_hp', .12], ['shard', .2], ['leather_boots', .03], ['leather_helm', .03]] },
   wolf: { key: 'wolf', name: 'Lobo Geladiço', level: 7, hp: 150, dmg: 22, def: 7, speed: 3.4, detect: 7, leash: 13, attackMs: 1200, xp: 70, respawnMs: 12000, gold: [10, 25],
-    drops: [['pot_hp', .15], ['pot_mp', .1], ['shard', .25], ['leather_armor', .04], ['leather_pants', .04], ['iron_axe', .02], ['rune_staff', .02], ['long_bow', .02]] },
+    drops: [['pot_hp', .15], ['pot_mp', .1], ['shard', .25], ['leather_armor', .04], ['leather_pants', .04], ['iron_axe', .02], ['rune_staff', .02], ['long_bow', .02], ['jewel_aurora', .01]] },
   golem: { key: 'golem', name: 'Colosso de Granizo', level: 14, hp: 520, dmg: 44, def: 20, speed: 1.9, detect: 6, leash: 12, attackMs: 1800, xp: 240, respawnMs: 20000, gold: [35, 80],
-    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rune_staff', .05], ['long_bow', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02], ...setDrops('griffin', .012), ...setDrops('axolotl', .02), ...setDrops('salamander', .015), ...setDrops('bat', .015), ...setDrops('wolf', .015)] },
+    drops: [['pot_hp', .25], ['shard', .4], ['iron_axe', .05], ['rune_staff', .05], ['long_bow', .05], ['rime_helm', .03], ['rime_boots', .03], ['rime_pants', .025], ['rime_armor', .02], ...setDrops('griffin', .012), ['jewel_aurora', .03], ...setDrops('axolotl', .02), ...setDrops('salamander', .015), ...setDrops('bat', .015), ...setDrops('wolf', .015)] },
   boss: { key: 'boss', name: 'Hrímara, a Soberana', level: 24, hp: 6500, dmg: 70, def: 32, speed: 2.7, detect: 9, leash: 16, attackMs: 1400, xp: 4000, respawnMs: 600000, gold: [800, 1500], boss: true,
-    drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ...setDrops('scorpion', .1), ...setDrops('spider', .1), ...setDrops('bear', .25), ...setDrops('owl', .1), ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
+    drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ['jewel_aurora', 1], ['jewel_destiny', .5], ...setDrops('scorpion', .1), ...setDrops('spider', .1), ...setDrops('bear', .25), ...setDrops('owl', .1), ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
 };
-export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse';
-export interface Skill { n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number }
+export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse' | 'buff' | 'heal' | 'drain';
+export interface Skill { lvl?: number; slow?: number; buff?: 'atk' | 'def'; heal?: number; curse?: number; n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number }
 export interface ClassDef {
   key: string; name: string; desc: string; base: { str: number; agi: number; vit: number; ene: number }; range: number; magic: boolean;
   atk: [number, number, number]; color: string; pants: string; weapon: string; weapons: string[]; bolt: string | null; skills: Skill[];
@@ -109,15 +116,20 @@ export interface ClassDef {
 // atk = pesos de Força, Agilidade e Energia no ataque
 export const CLASSES: Record<string, ClassDef> = {
   dark_warrior: { key: 'dark_warrior', name: 'Dark Warrior', desc: 'Corpo a corpo, muita resistência.', base: { str: 28, agi: 20, vit: 25, ene: 10 }, range: 1.7, magic: false, atk: [.333, 0, 0], color: '#4d5873', pants: '#373b52', weapon: 'short_sword', weapons: ['sword', 'axe'], bolt: null, skills: [
-    { n: 1, name: 'Golpe Circular', kind: 'spin', mana: 12, cd: 4000, mult: 1.3, radius: 2.4 }, { n: 2, name: 'Investida', kind: 'dash', mana: 18, cd: 7000, mult: 2, range: 7 }] },
+    { n: 1, name: 'Golpe Circular', kind: 'spin', mana: 12, cd: 4000, mult: 1.3, radius: 2.4 }, { n: 2, name: 'Investida', kind: 'dash', mana: 18, cd: 7000, mult: 2, range: 7 },
+    { n: 3, lvl: 10, name: 'Grito de Guerra', kind: 'buff', buff: 'atk', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#ff8a5c' }, { n: 4, lvl: 25, name: 'Terremoto', kind: 'spin', mana: 40, cd: 12000, mult: 2.4, radius: 3.8 }] },
   arcane_wizard: { key: 'arcane_wizard', name: 'Arcane Wizard', desc: 'Magia à distância, dano alto, pouca defesa.', base: { str: 18, agi: 18, vit: 15, ene: 32 }, range: 7, magic: true, atk: [0, 0, .4], color: '#3f4fa8', pants: '#2d3778', weapon: 'app_staff', weapons: ['staff'], bolt: '#8fd0ff', skills: [
-    { n: 1, name: 'Bola de Fogo', kind: 'splash', mana: 10, cd: 3000, mult: 1.5, radius: 2, range: 8, color: '#ff8a3c' }, { n: 2, name: 'Tempestade de Raios', kind: 'multi', mana: 20, cd: 8000, mult: 1.4, radius: 4, count: 5, range: 8, color: '#f6f07a' }] },
+    { n: 1, name: 'Bola de Fogo', kind: 'splash', mana: 10, cd: 3000, mult: 1.5, radius: 2, range: 8, color: '#ff8a3c' }, { n: 2, name: 'Tempestade de Raios', kind: 'multi', mana: 20, cd: 8000, mult: 1.4, radius: 4, count: 5, range: 8, color: '#f6f07a' },
+    { n: 3, lvl: 10, name: 'Nova Gélida', kind: 'spin', mana: 22, cd: 9000, mult: 1.2, radius: 3.6, slow: 5000, color: '#7fe3ff' }, { n: 4, lvl: 25, name: 'Meteoro', kind: 'splash', mana: 45, cd: 12000, mult: 3.2, radius: 3.2, range: 9, color: '#ff5a2c' }] },
   mystic_archer: { key: 'mystic_archer', name: 'Mystic Archer', desc: 'Arqueira veloz com um espírito auxiliar.', base: { str: 20, agi: 34, vit: 18, ene: 12 }, range: 8, magic: false, atk: [0, .34, 0], color: '#4f7a45', pants: '#3a5a33', weapon: 'oak_bow', weapons: ['bow'], bolt: '#f1e3b8', skills: [
-    { n: 1, name: 'Flecha Tripla', kind: 'multi', mana: 10, cd: 4000, mult: 1.2, radius: 3.5, count: 3, range: 9, color: '#f1e3b8' }, { n: 2, name: 'Espírito da Mata', kind: 'summon', mana: 22, cd: 12000, mult: .7, pet: 'wisp', ms: 30000 }] },
+    { n: 1, name: 'Flecha Tripla', kind: 'multi', mana: 10, cd: 4000, mult: 1.2, radius: 3.5, count: 3, range: 9, color: '#f1e3b8' }, { n: 2, name: 'Espírito da Mata', kind: 'summon', mana: 22, cd: 12000, mult: .7, pet: 'wisp', ms: 30000 },
+    { n: 3, lvl: 10, name: 'Cura da Mata', kind: 'heal', heal: .35, mana: 28, cd: 14000, mult: 0, color: '#7dffa1' }, { n: 4, lvl: 25, name: 'Chuva de Flechas', kind: 'splash', mana: 38, cd: 11000, mult: 2.4, radius: 3.6, range: 10, color: '#f1e3b8' }] },
   spell_knight: { key: 'spell_knight', name: 'Spell Knight', desc: 'Híbrido de força e energia.', base: { str: 26, agi: 24, vit: 20, ene: 22 }, range: 1.7, magic: false, atk: [.2, 0, .18], color: '#7a3f5e', pants: '#552c43', weapon: 'short_sword', weapons: ['sword', 'axe'], bolt: null, skills: [
-    { n: 1, name: 'Lâmina Arcana', kind: 'splash', mana: 12, cd: 3500, mult: 1.6, radius: 2, range: 2.6, color: '#d58cff' }, { n: 2, name: 'Explosão Rúnica', kind: 'spin', mana: 20, cd: 7000, mult: 1.7, radius: 3 }] },
+    { n: 1, name: 'Lâmina Arcana', kind: 'splash', mana: 12, cd: 3500, mult: 1.6, radius: 2, range: 2.6, color: '#d58cff' }, { n: 2, name: 'Explosão Rúnica', kind: 'spin', mana: 20, cd: 7000, mult: 1.7, radius: 3 },
+    { n: 3, lvl: 10, name: 'Escudo Rúnico', kind: 'buff', buff: 'def', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#c9a4ff' }, { n: 4, lvl: 25, name: 'Corte Dimensional', kind: 'dash', mana: 40, cd: 11000, mult: 3.2, range: 8 }] },
   shadow_summoner: { key: 'shadow_summoner', name: 'Shadow Summoner', desc: 'Invoca sombras e amaldiçoa inimigos.', base: { str: 16, agi: 20, vit: 18, ene: 34 }, range: 6.5, magic: true, atk: [0, 0, .34], color: '#4a2f6b', pants: '#33214a', weapon: 'app_staff', weapons: ['staff'], bolt: '#b06bff', skills: [
-    { n: 1, name: 'Invocar Sombra', kind: 'summon', mana: 22, cd: 10000, mult: 1, pet: 'shade', ms: 35000 }, { n: 2, name: 'Maldição', kind: 'curse', mana: 14, cd: 6000, mult: .8, range: 8, ms: 8000, color: '#b06bff' }] },
+    { n: 1, name: 'Invocar Sombra', kind: 'summon', mana: 22, cd: 10000, mult: 1, pet: 'shade', ms: 35000 }, { n: 2, name: 'Maldição', kind: 'curse', mana: 14, cd: 6000, mult: .8, range: 8, ms: 8000, color: '#b06bff' },
+    { n: 3, lvl: 10, name: 'Dreno Vital', kind: 'drain', heal: .5, mana: 18, cd: 7000, mult: 1.6, range: 8, color: '#ff5a7a' }, { n: 4, lvl: 25, name: 'Praga Sombria', kind: 'multi', curse: 8000, mana: 42, cd: 13000, mult: 2.2, radius: 4.5, count: 6, range: 9, color: '#9dff6b' }] },
 };
 export const classOf = (name?: string): ClassDef => Object.values(CLASSES).find(c => c.name === name) ?? CLASSES.dark_warrior;
 export const canWield = (c: ClassDef, d: ItemDef) => d.set ? SETS[d.set].cls === c.key : d.kind !== 'weapon' || c.weapons.includes(d.wtype!);
@@ -126,9 +138,9 @@ export const HAIR_STYLES = ['Curto', 'Espetado', 'Longo'];
 export const xpToNext = (lv: number) => Math.floor(50 * Math.pow(lv, 1.9) + 40);
 
 export interface Base { cls?: string; level: number; str: number; agi: number; vit: number; ene: number }
-export interface ItemInst { id: string; key: string; qty: number; slot: number; equip: string | null; rarity: number }
-export const sellPrice = (i: ItemInst) => Math.floor(ITEMS[i.key].price * .3 * (1 + i.rarity * .5));
-export const itemStat = (i: ItemInst, f: 'dmg' | 'def' | 'hp') => Math.round((ITEMS[i.key][f] ?? 0) * RARITY[i.rarity].mult);
+export interface ItemInst { id: string; key: string; qty: number; slot: number; equip: string | null; rarity: number; plus?: number }
+export const sellPrice = (i: ItemInst) => Math.floor(ITEMS[i.key].price * .3 * (1 + i.rarity * .5) * (1 + (i.plus ?? 0) * .3));
+export const itemStat = (i: ItemInst, f: 'dmg' | 'def' | 'hp') => Math.round((ITEMS[i.key][f] ?? 0) * RARITY[i.rarity].mult * (1 + (i.plus ?? 0) * .08));
 export function setCounts(items: ItemInst[]) { const m: Record<string, number> = {}; for (const i of items) { const s = i.equip && ITEMS[i.key].set; if (s) m[s] = (m[s] ?? 0) + 1; } return m; }
 export const fullSetOf = (keys: (string | null | undefined)[]) => { const s = keys.map(k => k ? ITEMS[k]?.set : undefined); return s.length === 4 && s[0] && s.every(x => x === s[0]) ? s[0] : null; };
 export function derive(b: Base, items: ItemInst[]) {

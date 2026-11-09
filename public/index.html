@@ -85,9 +85,11 @@ label{display:block;margin:10px 0 4px;color:var(--dim);font-size:13px}
 #log .pt{color:#b9f59a}
 .clsb.on{border-color:var(--gold);outline:2px solid var(--gold)}.touch #party{top:88px;width:150px}
 @media (orientation:portrait){.touch #chat{top:112px;left:8px;transform:none;width:min(300px,70vw)}.touch .frame{width:190px}.touch .mini{width:120px}.touch #minimap{width:108px;height:83px}.touch .menu{bottom:232px}}
-@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:124px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(3,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
+@media (max-height:460px){.win{width:min(660px,calc(100vw - 16px))}.grid{grid-template-columns:repeat(14,minmax(0,1fr))}.gear{margin-bottom:6px}.touch .mini{width:112px}.touch #minimap{width:100px;height:60px}.touch .menu{bottom:auto;top:124px;flex-direction:column;right:8px;gap:2px}.touch .menu button{padding:3px 6px}.touch #minimap{height:50px}.touch #bar{grid-template-columns:repeat(4,52px)}.touch .slot{width:52px;height:52px}.touch #bar{right:62px;bottom:12px}}
 
 /* tema */
+.slot.lock{opacity:.4;filter:grayscale(1)}.cell u{position:absolute;left:2px;top:0;font-size:10px;font-weight:700;text-decoration:none;text-shadow:1px 1px 0 #000}.cell.jsel{outline:2px solid #ffe08a}
+@media (orientation:landscape){.touch #bar{grid-template-columns:repeat(4,60px)}}
 #lootc{display:none;position:absolute;left:50%;bottom:112px;transform:translateX(-50%);background:#2a1f08dd;border:2px solid var(--gold);color:#ffe08a;padding:3px 12px;font-weight:700;font-size:13px;white-space:nowrap}.touch #lootc{bottom:auto;top:calc(8px + 70px)}
 .tcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tcols small{color:var(--gold)}.tgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin-top:6px}#w-trade{width:min(520px,calc(100vw - 16px));z-index:8}
 .sethead{display:flex;gap:10px;align-items:center;margin-top:10px;padding:5px;background:#0f0b1c88;border:1px solid #5b4e7c}.sethead canvas{width:40px;height:56px;image-rendering:pixelated;flex:none}.sethead small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
@@ -136,6 +138,8 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
     <button class="slot" id="atk"></button>
     <button class="slot" data-sk="1"><u>1</u><b></b><div class="cd"></div></button>
     <button class="slot" data-sk="2"><u>2</u><b></b><div class="cd"></div></button>
+    <button class="slot" data-sk="3"><u>3</u><b></b><div class="cd"></div></button>
+    <button class="slot" data-sk="4"><u>4</u><b></b><div class="cd"></div></button>
     <button class="slot" data-pot="pot_hp"><u>Q</u>Vida<s></s></button>
     <button class="slot" data-pot="pot_mp"><u>E</u>Mana<s></s></button>
     <div class="orb mp" id="orbm"><i></i><em></em></div>

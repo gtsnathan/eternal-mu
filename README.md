@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.7
+# Eternal MU · versão 0.8
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -39,6 +39,10 @@ Abra `http://localhost:8787`. Para testar com dois jogadores, use uma janela nor
 | Bolsa, personagem, mapa | I, C, M | Bolsa, Perfil, Mapa |
 | Chat | Enter | Campo de chat |
 
+## Comando de teste
+
+No chat, `/teste` dá o set mais forte da sua classe, joias e 500.000 moedas, e sobe o personagem ao nível exigido. `/teste 1` a `/teste 4` escolhem o set, do mais fraco ao mais forte. **Antes de abrir ao público, mude `testCommands` para `false` em `shared/data.ts`** e rode `npm run build`.
+
 ## Onde mexer
 
 - `shared/data.ts`: itens, monstros, drops, fórmulas de XP, atributos e dano
@@ -51,7 +55,9 @@ Abra `http://localhost:8787`. Para testar com dois jogadores, use uma janela nor
 
 Depois de alterar `client/` ou `shared/`, rode `npm run build`.
 
-## Situação da 0.7
+## Situação da 0.8
+
+Novo na 0.8: resposta imediata aos comandos (20 atualizações/s e previsão local), 4 habilidades por classe, joias e melhorias de +1 a +15 com brilho nos equipamentos.
 
 Novo na 0.7: troca entre jogadores com confirmação dupla, 20 sets exclusivos por classe e sequência de coleta (até +50% de XP e moedas).
 
@@ -73,4 +79,4 @@ Diferenças em relação à especificação:
 - Senhas com PBKDF2-SHA256 (100 mil iterações, o máximo do Workers) no lugar de Argon2id.
 - Sprites em 4 direções.
 
-Ainda faltam: verificação de e-mail e recuperação de senha (exigem serviço de e-mail), captcha, os outros 3 mapas, reset e Master Level, melhorias +0 a +15, guildas, amigos, mercado, baú, quests, eventos, ranking, painel administrativo, música e app Android (Capacitor).
+Ainda faltam: verificação de e-mail e recuperação de senha (exigem serviço de e-mail), captcha, os outros 3 mapas, reset e Master Level, guildas, amigos, mercado, baú, quests, eventos, ranking, painel administrativo, música e app Android (Capacitor).

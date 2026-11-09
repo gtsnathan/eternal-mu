@@ -1,6 +1,6 @@
-import { canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
-import { getMap, GameMap, Npc, T } from '../shared/world';
-import { archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
+import { glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
+import { findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
+import { tintFrame, archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
 
 const $ = <E extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as E;
 const root = $('#root');
@@ -66,6 +66,7 @@ interface Me { hp: number; mp: number; maxHp: number; maxMp: number; xp: number;
 const canvas = $<HTMLCanvasElement>('#game'), g = canvas.getContext('2d')!;
 let ws: WebSocket | null = null, charId = 0, running = false, you = 0, myName = '', map: GameMap | null = null, me: Me | null = null, items: ItemInst[] = [];
 let ents = new Map<number, Ent>(), target = 0, auto = false, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
+let pred: { x: number; y: number; path: { x: number; y: number }[] | null; stop: number; tx: number; ty: number; hold: number } | null = null;
 let myCls = CLASSES.dark_warrior, party: { m: { id: number; name: string }[]; leader: number; mode: number; me: number } | null = null, menuFor: Ent | null = null, bolts: { x: number; y: number; tx: number; ty: number; t: number; c: string }[] = [];
 let myLook: { hc: number; hs: number } = { hc: 0, hs: 0 }, Z = 2, camX = 0, camY = 0, pingTimer = 0, lastFrame = 0, reconnectTimer = 0;
 const cds: Record<number, { until: number; ms: number }> = {};
@@ -102,7 +103,7 @@ function setConn(ok: boolean) { const c = $('#conn'); c.textContent = ok ? `● 
 function handle(m: any) {
   switch (m.t) {
     case 'w': {
-      you = m.you; myName = m.name; myCls = classOf(m.cls); myCls.skills.forEach(s => { const b = $(`[data-sk="${s.n}"] b`), ic = skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a')); b.replaceChildren(ic); b.parentElement!.title = s.name; }); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
+      you = m.you; myName = m.name; myCls = classOf(m.cls); myCls.skills.forEach(s => { const b = $(`[data-sk="${s.n}"] b`), ic = skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a')); b.replaceChildren(ic); b.parentElement!.title = s.lvl ? `${s.name} (nível ${s.lvl})` : s.name; }); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
       if (map?.id !== m.map) { map = getMap(m.map); bakeMini(); log(`— ${map.name} —`, 'sys'); }
       camX = m.x; camY = m.y; retries = 0; over(''); clearInterval(pingTimer); pingTimer = setInterval(() => send({ t: 'ping', c: performance.now() }), 3000) as unknown as number; send({ t: 'ping', c: performance.now() });
       lastInput = ''; syncInput(); break;
@@ -130,8 +131,8 @@ function snapshot(m: any) {
   }
   for (const [id, x, y, hp] of m.e) {
     seen.add(id); const e = ents.get(id); if (!e) continue;
-    if (!e.snaps.length || Math.hypot(e.x - x, e.y - y) > 6) { e.x = x; e.y = y; e.snaps = []; }
-    e.snaps.push({ t, x, y }); if (e.snaps.length > 6) e.snaps.shift(); e.hp = hp;
+    if (!e.snaps.length || Math.hypot(e.x - x, e.y - y) > 6) { e.x = x; e.y = y; e.snaps = []; if (id === you) pred = null; }
+    e.snaps.push({ t, x, y }); if (e.snaps.length > 8) e.snaps.shift(); e.hp = hp;
   }
   for (const id of ents.keys()) if (!seen.has(id)) { ents.delete(id); if (id === target) target = 0; }
   for (const f of m.fx ?? []) effect(f);
@@ -153,6 +154,8 @@ function effect(f: any) {
     case 'dash': for (let i = 0; i < 14; i++) { const u = i / 14; parts.push({ x: f.fx + (f.x - f.fx) * u, y: f.fy + (f.y - f.fy) * u, vx: 0, vy: 0, life: 0, max: .4, c: '#ffcf6a', s: 5 }); } beep(200, 160, 'sawtooth', .04); break;
     case 'die': burst(f.x, f.y - .3, 26, '#d8f4ff', 5); beep(110, 260); break;
     case 'lvl': for (let i = 0; i < 44; i++) parts.push({ x: f.x + (Math.random() - .5), y: f.y, vx: 0, vy: -3 - Math.random() * 3, life: 0, max: .9, c: '#ffe08a', s: 3 }); break;
+    case 'buff': rings.push({ x: f.x, y: f.y, r: 1.8, t: 0, max: .5, c: f.b }); burst(f.x, f.y - .4, 24, f.b, 3); beep(440, 220, 'triangle', .05); break;
+    case 'up': if (f.ok) { for (let i = 0; i < 40; i++) parts.push({ x: f.x + (Math.random() - .5), y: f.y, vx: 0, vy: -3 - Math.random() * 3, life: 0, max: .8, c: '#ffe08a', s: 3 }); beep(780, 300, 'triangle', .06); } else { burst(f.x, f.y - .4, 20, '#8a7a9a', 3); beep(120, 300, 'sawtooth', .05); } break;
     case 'loot': { texts.push({ x: f.x, y: f.y - .4, s: `Coleta ×${f.n}`, c: '#ffe08a', t: 0, big: f.n >= 5 }); burst(f.x, f.y - .3, 8, '#ffe08a', 2); beep(520 + f.n * 60, 90, 'triangle', .05); break; }
     case 'heal': burst(f.x, f.y - .4, 10, '#7dffa1', 2); beep(520, 120, 'sine', .05); break;
     case 'nova': rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: f.d / 1000, c: f.b ?? '#7fe3ff', tele: true }); beep(90, 900, 'sawtooth', .05); setTimeout(() => { if (running) { rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: .4, c: f.b ?? '#d9f7ff' }); burst(f.x, f.y, 70, f.b ?? '#bdf0ff', 12); beep(70, 400, 'square', .07); } }, f.d); break;
@@ -161,6 +164,7 @@ function effect(f: any) {
 function updateHud() {
   if (!me) return; const pct = (a: number, b: number) => `${Math.max(0, Math.min(100, a / Math.max(1, b) * 100))}%`;
   { const c = $('#lootc'); if (me.loot) { c.style.display = 'block'; c.textContent = `Coleta ×${me.loot} · +${me.loot * 5}% XP e moedas`; lootHidden = false; } else if (!lootHidden) { c.style.display = 'none'; lootHidden = true; } }
+  myCls.skills.forEach(s => $(`[data-sk="${s.n}"]`).classList.toggle('lock', me!.level < (s.lvl ?? 1)));
   $<HTMLElement>('#orbh i').style.height = pct(me.hp, me.maxHp); $<HTMLElement>('#orbm i').style.height = pct(me.mp, me.maxMp); $('#orbh em').textContent = String(me.hp); $('#orbm em').textContent = String(me.mp);
   $('#nm').innerHTML = `${esc(myName)} <span>Nv ${me.level}</span>`; $('#hpb').style.width = pct(me.hp, me.maxHp); $('#mpb').style.width = pct(me.mp, me.maxMp); $('#hpt').textContent = `${me.hp}/${me.maxHp}`; $('#mpt').textContent = `${me.mp}/${me.maxMp}`; $('#xp i').style.width = pct(me.xp, me.xpNext);
   document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { b.querySelector('s')!.textContent = String(items.find(i => i.key === b.dataset.pot)?.qty ?? 0); });
@@ -178,17 +182,18 @@ function closeWins() { ['inv', 'char', 'map', 'shop'].forEach(closeWin); }
 const toggle = (w: string) => $('#w-' + w).style.display === 'block' ? closeWin(w) : openW(w);
 document.querySelectorAll<HTMLElement>('[data-w]').forEach(b => b.onclick = () => toggle(b.dataset.w!));
 document.querySelectorAll<HTMLElement>('[data-close]').forEach(b => b.onclick = () => closeWin(b.closest('.win')!.id.slice(2)));
-function itemText(i: ItemInst) { const d = ITEMS[i.key], parts = [`${d.name}${i.rarity ? ` (${RARITY[i.rarity].name})` : ''}`]; const a = itemStat(i, 'dmg'), b = itemStat(i, 'def'), c = itemStat(i, 'hp'); if (a) parts.push(`Dano +${a}`); if (b) parts.push(`Defesa +${b}`); if (c) parts.push(`Vida +${c}`); if (d.heal) parts.push(`Cura ${d.heal}`); if (d.mana) parts.push(`Mana ${d.mana}`); if (d.lvl > 1) parts.push(`Nível ${d.lvl}`); if (!canWield(myCls, d)) parts.push(d.set ? `Exclusivo: ${classOf(CLASSES[SETS[d.set].cls!].name).name}` : 'Outra classe'); if (d.set) parts.push(`Set ${SETS[d.set].name}`); return parts.join(' · '); }
+function itemText(i: ItemInst) { const d = ITEMS[i.key], parts = [`${d.name}${i.plus ? ` +${i.plus}` : ''}${i.rarity ? ` (${RARITY[i.rarity].name})` : ''}`]; if (JEWELS[i.key]) parts.push(`Melhora itens de +${JEWELS[i.key].min} a +${JEWELS[i.key].max - 1} · ${JEWELS[i.key].chance * 100}%`); const a = itemStat(i, 'dmg'), b = itemStat(i, 'def'), c = itemStat(i, 'hp'); if (a) parts.push(`Dano +${a}`); if (b) parts.push(`Defesa +${b}`); if (c) parts.push(`Vida +${c}`); if (d.heal) parts.push(`Cura ${d.heal}`); if (d.mana) parts.push(`Mana ${d.mana}`); if (d.lvl > 1) parts.push(`Nível ${d.lvl}`); if (!canWield(myCls, d)) parts.push(d.set ? `Exclusivo: ${classOf(CLASSES[SETS[d.set].cls!].name).name}` : 'Outra classe'); if (d.set) parts.push(`Set ${SETS[d.set].name}`); return parts.join(' · '); }
 function makeCell(i: ItemInst | undefined, click: () => void, label = '') {
   const c = document.createElement('button'); c.className = 'cell'; c.type = 'button';
-  if (i) { c.style.borderColor = i.rarity ? RARITY[i.rarity].color : ''; const ic = cv(28, 28); ic.getContext('2d')!.drawImage(icon(i.key), 0, 0); c.appendChild(ic); if (i.qty > 1) { const s = document.createElement('s'); s.textContent = String(i.qty); c.appendChild(s); } c.title = itemText(i); c.onclick = click; const info = $('#invinfo'); c.onpointerenter = () => { info.dataset.hover = '1'; info.textContent = itemText(i); }; c.onpointerleave = () => { delete info.dataset.hover; info.textContent = `Moedas: ${me?.gold ?? 0}`; }; }
+  if (i) { c.style.borderColor = i.rarity ? RARITY[i.rarity].color : ''; const ic = cv(28, 28); ic.getContext('2d')!.drawImage(icon(i.key), 0, 0); c.appendChild(ic); if (i.qty > 1) { const s = document.createElement('s'); s.textContent = String(i.qty); c.appendChild(s); } if (i.plus) { const u = document.createElement('u'); u.textContent = `+${i.plus}`; u.style.color = glowTier(i.plus) ?? '#fff'; c.appendChild(u); } c.title = itemText(i); c.onclick = click; const info = $('#invinfo'); c.onpointerenter = () => { info.dataset.hover = '1'; info.textContent = itemText(i); }; c.onpointerleave = () => { delete info.dataset.hover; info.textContent = `Moedas: ${me?.gold ?? 0}`; }; }
   else c.textContent = label;
   return c;
 }
 function renderInv() {
   const gear = $('#gear'), grid = $('#grid'); gear.replaceChildren(); grid.replaceChildren();
-  for (const s of SLOTS) { const i = items.find(x => x.equip === s); gear.appendChild(makeCell(i, () => send({ t: 'ue', eq: s }), SLOT_NAMES[s])); }
-  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); grid.appendChild(makeCell(i, () => { if (!i) return; if (ITEMS[i.key].kind === 'potion') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); })); }
+  for (const s of SLOTS) { const i = items.find(x => x.equip === s); gear.appendChild(makeCell(i, () => { if (jewelSlot >= 0 && i) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); } else send({ t: 'ue', eq: s }); }, SLOT_NAMES[s])); }
+  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i) return; if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (n === jewelSlot) cel.classList.add('jsel'); grid.appendChild(cel); }
+  if (jewelSlot >= 0 && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Joia selecionada: clique no item que quer melhorar.';
 }
 function renderChar() {
   if (!me) return; const P = $('#charp'), m = me, st = (k: 'str' | 'agi' | 'vit' | 'ene', n: string) => `<div class="stat"><span>${n}</span><span>${m[k]}${m.points ? `<button data-s="${k}">+1</button>` : ''}</span></div>`;
@@ -219,10 +224,11 @@ function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap
 
 // ---------- entrada ----------
 let joy = { x: 0, y: 0 }, lastInput = '';
-function syncInput() { let x = joy.x, y = joy.y; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } x = Math.round(x * 10) / 10; y = Math.round(y * 10) / 10; const s = `${x},${y}`; if (s !== lastInput) { lastInput = s; send({ t: 'i', x, y }); if (x || y) { target = 0; pendingNpc = null; marker = null; } } }
+function syncInput() { let x = joy.x, y = joy.y; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } x = Math.round(x * 10) / 10; y = Math.round(y * 10) / 10; const s = `${x},${y}`; if (s !== lastInput) { lastInput = s; send({ t: 'i', x, y }); if (x || y) { target = 0; pendingNpc = null; marker = null; const a = ents.get(you); if (a && !pred) pred = { x: a.x, y: a.y, path: null, stop: 0, tx: 0, ty: 0, hold: 0 }; } } }
 function nearestMob(r: number) { const a = ents.get(you); if (!a) return null; let b: Ent | null = null, bd = r; for (const e of ents.values()) if (e.k === 'm') { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; b = e; } } return b; }
-function attack(e: Ent) { target = e.id; send({ t: 'a', id: e.id }); }
-function skill(n: number) { const sk = myCls.skills.find(s => s.n === n)!; let t = ents.get(target); if (sk.kind !== 'spin' && sk.kind !== 'summon' && (!t || t.k !== 'm')) { const nm = nearestMob(sk.range ?? 8); if (nm) { attack(nm); t = nm; } } send({ t: 'k', n, id: t?.id ?? 0 }); }
+function startPred(x: number, y: number, stop = 0) { const a = ents.get(you); if (!a || !map || me?.dead) return; const path = findPath(map, a.x, a.y, x, y); if (path) pred = { x: a.x, y: a.y, path, stop, tx: x, ty: y, hold: performance.now() + 700 }; }
+function attack(e: Ent) { target = e.id; send({ t: 'a', id: e.id }); const a = ents.get(you); if (!a) return; if (Math.hypot(a.x - e.x, a.y - e.y) <= myCls.range) { faceTo(a, e.x, e.y); a.atkUntil = performance.now() + 180; pred = null; } else startPred(e.x, e.y, myCls.range - .05); }
+function skill(n: number) { const sk = myCls.skills.find(s => s.n === n)!; let t = ents.get(target); if (sk.kind !== 'spin' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal' && (!t || t.k !== 'm')) { const nm = nearestMob(sk.range ?? 8); if (nm) { attack(nm); t = nm; } } send({ t: 'k', n, id: t?.id ?? 0 }); }
 function potion(k: string) { const i = items.find(x => x.key === k && !x.equip); if (i) send({ t: 'u', slot: i.slot }); }
 const tgtTyping = () => document.activeElement === $('#chati');
 addEventListener('keydown', e => {
@@ -231,7 +237,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Enter') { const i = $<HTMLInputElement>('#chati'); if (!tgtTyping()) { e.preventDefault(); i.focus(); } return; }
   if (e.key === 'Escape') { $('#chati').blur(); closeWins(); return; }
   if (e.repeat) return;
-  if (k === '1' || k === '2') selectSkill(+k); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
+  if (k === '1' || k === '2' || k === '3' || k === '4') selectSkill(+k); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
 let chan: 'l' | 'g' | 'p' = 'l';
@@ -294,8 +300,8 @@ canvas.addEventListener('pointerdown', e => {
   for (const en of ents.values()) if (en.k === 'p' && en.id !== you && Math.hypot(en.x - wx, en.y - .6 - wy) < .9) {
     $('#pminv').style.display = party?.m.some(m => m.name === en.info.name) ? 'none' : ''; menuFor = en; $('#pmname').textContent = en.info.name; const pm = $('#pmenu'); pm.style.display = 'block'; pm.style.left = `${Math.min(innerWidth - 170, e.clientX)}px`; pm.style.top = `${Math.min(innerHeight - 90, e.clientY)}px`; return;
   }
-  for (const n of map.npcs) if (Math.hypot(n.x - wx, n.y - .6 - wy) < 1.1) { const a = ents.get(you); pendingNpc = n; target = 0; if (a && Math.hypot(a.x - n.x, a.y - n.y) > 2.5) send({ t: 'g', x: n.x, y: n.y + 1.4 }); return; }
-  target = 0; pendingNpc = null; marker = { x: wx, y: wy, t: 0 }; closeWin('shop'); send({ t: 'g', x: wx, y: wy });
+  for (const n of map.npcs) if (Math.hypot(n.x - wx, n.y - .6 - wy) < 1.1) { const a = ents.get(you); pendingNpc = n; target = 0; if (a && Math.hypot(a.x - n.x, a.y - n.y) > 2.5) { send({ t: 'g', x: n.x, y: n.y + 1.4 }); startPred(n.x, n.y + 1.4); } return; }
+  target = 0; pendingNpc = null; marker = { x: wx, y: wy, t: 0 }; closeWin('shop'); send({ t: 'g', x: wx, y: wy }); startPred(wx, wy);
   if (e.pointerType === 'mouse') { holding = true; holdAt = performance.now() + 250; } // segurar: segue o cursor
 });
 function resize() { const dpr = 1, W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr); canvas.width = W; canvas.height = H; Z = Math.max(1, Math.round(Math.min(W / (22 * 32), H / (13 * 32)))); }
@@ -304,6 +310,7 @@ document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const c = cv
 { const c = cv(28, 28); c.getContext('2d')!.drawImage(icon('short_sword'), 0, 0); c.className = 'pi'; $('#atk').appendChild(c); [...$('#atk').childNodes].filter(n => n.nodeType === 3).forEach(n => n.remove()); }
 
 // ---------- render ----------
+let jewelSlot = -1;
 let inviteKind = 'p', trade: any = null, lootHidden = true;
 let miniAt = 0, autoAt = 0; const cdEl: Record<number, HTMLElement> = {}, cdVal: Record<number, string> = {}; let shopKey = '';
 function menuFrame(ts: number) {
@@ -318,10 +325,19 @@ function menuFrame(ts: number) {
 function frame(ts: number) {
   if (!running) return; requestAnimationFrame(frame);
   const dt = Math.min(.1, (ts - (lastFrame || ts)) / 1000); lastFrame = ts; if (!map) return;
-  const renderT = ts - 130;
+  const renderT = ts - 85;
   for (const e of ents.values()) {
     const px = e.x, py = e.y; const s = e.snaps;
-    if (e.id === you) { const l = s[s.length - 1], p0 = s[s.length - 2]; if (l) { let tx = l.x, ty = l.y; if (p0 && l.t > p0.t) { const age = Math.min(110, ts - l.t), span = l.t - p0.t; tx += (l.x - p0.x) / span * age; ty += (l.y - p0.y) / span * age; } const k = Math.min(1, dt * 22); e.x += (tx - e.x) * k; e.y += (ty - e.y) * k; } }
+    if (e.id === you && pred && s.length) {
+      const l = s[s.length - 1], sp = CONFIG.playerSpeed * dt; let active = false;
+      if (joy.x || joy.y) { step(map, pred, joy.x * sp, joy.y * sp); pred.path = null; active = true; }
+      else if (pred.path) { let left = sp; while (left > 0 && pred.path?.length) { if (pred.stop && Math.hypot(pred.x - pred.tx, pred.y - pred.ty) <= pred.stop) { pred.path = null; break; } const n = pred.path[0], d = Math.hypot(n.x - pred.x, n.y - pred.y); if (d <= left) { pred.x = n.x; pred.y = n.y; left -= d; pred.path.shift(); } else { pred.x += (n.x - pred.x) / d * left; pred.y += (n.y - pred.y) / d * left; left = 0; } } active = !!pred.path?.length; if (!active) pred.path = null; }
+      if (active) pred.hold = ts + 700;
+      const err = Math.hypot(l.x - pred.x, l.y - pred.y);
+      if (err > 4 || me?.dead || (!active && (err < .3 || ts > pred.hold))) pred = null; else { const k = Math.min(1, dt * 30); e.x += (pred.x - e.x) * k; e.y += (pred.y - e.y) * k; }
+    }
+    if (e.id === you && pred) { /* previsão local ativa */ }
+    else if (e.id === you) { const l = s[s.length - 1], p0 = s[s.length - 2]; if (l) { let tx = l.x, ty = l.y; if (p0 && l.t > p0.t) { const age = Math.min(110, ts - l.t), span = l.t - p0.t; tx += (l.x - p0.x) / span * age; ty += (l.y - p0.y) / span * age; } const k = Math.min(1, dt * 22); e.x += (tx - e.x) * k; e.y += (ty - e.y) * k; } }
     else if (s.length) { let a = s[0], b = s[s.length - 1]; for (let i = 0; i < s.length - 1; i++) if (s[i].t <= renderT && s[i + 1].t >= renderT) { a = s[i]; b = s[i + 1]; break; } const u = b.t > a.t ? Math.max(0, Math.min(1, (renderT - a.t) / (b.t - a.t))) : 1; if (renderT > s[s.length - 1].t) { e.x = b.x; e.y = b.y; } else { e.x = a.x + (b.x - a.x) * u; e.y = a.y + (b.y - a.y) * u; } }
     const dx = e.x - px, dy = e.y - py, mv = Math.hypot(dx, dy); e.moving = mv > .003;
     if (e.moving && e.k === 'p' && Math.floor(e.anim / 2) !== e.stepN) { e.stepN = Math.floor(e.anim / 2); const tt = map.tiles[Math.floor(e.y) * map.w + Math.floor(e.x)]; if (tt === T.SNOW) { prints.push({ x: e.x + (e.stepN % 2 ? .12 : -.12), y: e.y, t: 0 }); if (prints.length > 140) prints.shift(); } else if (tt !== T.WATER) parts.push({ x: e.x, y: e.y + .1, vx: (Math.random() - .5) * .8, vy: -.5, life: 0, max: .35, c: tt === T.DIRT ? '#b79a70' : '#d8d2c2', s: 2 }); }
@@ -340,7 +356,7 @@ function frame(ts: number) {
   const ox = Math.round((vw / 2 - (vw > map.w * 32 ? map.w * 16 : cx)) * Z) / Z, oy = Math.round((vh / 2 - (vh > map.h * 32 ? map.h * 16 : cy)) * Z) / Z;
   g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false; g.fillStyle = '#0a0814'; g.fillRect(0, 0, W, H); g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   viewX = ox; viewY = oy;
-  if (holding && ts > holdAt) { holdAt = ts + 200; const w = toWorld(curX, curY); target = 0; pendingNpc = null; send({ t: 'g', x: w.x, y: w.y }); }
+  if (holding && ts > holdAt) { holdAt = ts + 200; const w = toWorld(curX, curY); target = 0; pendingNpc = null; send({ t: 'g', x: w.x, y: w.y }); startPred(w.x, w.y); }
   const x0 = Math.max(0, Math.floor(-ox / 32)), y0 = Math.max(0, Math.floor(-oy / 32)), x1 = Math.min(map.w - 1, Math.ceil((-ox + vw) / 32)), y1 = Math.min(map.h - 1, Math.ceil((-oy + vh) / 32));
   const wf = Math.floor(ts / 260) % 4;
   if (chunkMap !== map.id) buildRows(map);
@@ -401,7 +417,7 @@ function frame(ts: number) {
   }
   const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : map.id === 'infernal' ? '#40080888' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   if (me?.dead) { g.fillStyle = '#50000066'; g.fillRect(0, 0, W, H); }
-  for (const n of [1, 2]) { const c = cds[n], el = cdEl[n] ??= document.querySelector(`[data-sk="${n}"] .cd`) as HTMLElement, h = c && c.until > ts ? `${Math.ceil((c.until - ts) / c.ms * 20) * 5}%` : '0'; if (cdVal[n] !== h) { cdVal[n] = h; el.style.height = h; } }
+  for (const n of [1, 2, 3, 4]) { const c = cds[n], el = cdEl[n] ??= document.querySelector(`[data-sk="${n}"] .cd`) as HTMLElement, h = c && c.until > ts ? `${Math.ceil((c.until - ts) / c.ms * 20) * 5}%` : '0'; if (cdVal[n] !== h) { cdVal[n] = h; el.style.height = h; } }
   if (ts > miniAt) { miniAt = ts + 200; renderMini(); if (party) document.querySelectorAll<HTMLElement>('.pm').forEach(r => { const e = [...ents.values()].find(x => x.k === 'p' && x.info.name === r.dataset.n), b = r.querySelector('i') as HTMLElement; b.style.width = `${e ? e.hp : 0}%`; r.style.opacity = e ? '1' : '.55'; }); }
 }
 function ell2(x: number, y: number, rx: number, ry: number) { g.beginPath(); g.ellipse(Math.round(x), Math.round(y), Math.max(.1, rx), Math.max(.1, ry), 0, 0, 6.3); g.fill(); }
@@ -451,7 +467,8 @@ function drawEnt(e: Ent, ts: number) {
     e.look ??= heroSprites(e.id === you && items.length ? myGear() : lookFromGear(e.info.cls, HAIR_COLORS[e.info.hc], e.info.hs, e.info));
     const f = e.hp <= 0 ? 5 : ts < e.atkUntil ? 4 : e.moving ? [0, 1, 0, 3][Math.floor(e.anim) % 4] : 0;
     if (e.id === target) { g.strokeStyle = '#ffd24a'; g.lineWidth = 2; g.beginPath(); g.ellipse(X, Y + 3, 14, 6, 0, 0, 6.3); g.stroke(); }
-    shadow(X, Y + 3, 15, 6); g.drawImage(e.look[e.dir][f], X - FRAME_W / 2, Y - FRAME_H + 6); if (ts < (e.flash ?? 0)) { g.globalCompositeOperation = 'lighter'; g.drawImage(e.look[e.dir][f], X - FRAME_W / 2, Y - FRAME_H + 6); g.globalCompositeOperation = 'source-over'; } return;
+    shadow(X, Y + 3, 15, 6); g.drawImage(e.look[e.dir][f], X - FRAME_W / 2, Y - FRAME_H + 6); { const tier = glowTier(e.info.plus ?? 0); if (tier) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = .11 + Math.sin(ts / 260) * .07; g.drawImage(tintFrame(e.look[e.dir][f], tier), X - FRAME_W / 2, Y - FRAME_H + 6); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; if ((e.info.plus ?? 0) >= 13 && Math.random() < .3) parts.push({ x: e.x + (Math.random() - .5) * .8, y: e.y - Math.random(), vx: 0, vy: -1, life: 0, max: .6, c: tier, s: 2 }); } }
+    if (ts < (e.flash ?? 0)) { g.globalCompositeOperation = 'lighter'; g.drawImage(e.look[e.dir][f], X - FRAME_W / 2, Y - FRAME_H + 6); g.globalCompositeOperation = 'source-over'; } return;
   }
   const sp = mobSprites(e.info.mob), sz = mobSize(e.info.mob), fr = Math.floor(ts / 280 + e.id) % 2, c = sp[fr][e.dir === 3 ? 1 : 0], lunge = ts < e.atkUntil ? 4 : 0;
   if (e.id === target) { g.strokeStyle = '#ff5a5a'; g.lineWidth = 2; g.beginPath(); g.ellipse(X, Y + 2, sz * .55, sz * .24, 0, 0, 6.3); g.stroke(); }

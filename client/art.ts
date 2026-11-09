@@ -83,7 +83,10 @@ export function archSprite(): Cv { return memo('arch', () => { const c = cv(84, 
 export function crystalSprite(v: number): Cv { return memo('cr' + v, () => { const c = cv(36, 44), g = ctx(c); for (const [x, y, w, col] of [[14, 2 + v * 2, 9, '#7fe3ff'], [5, 18, 8, '#5bb6e6'], [24, 14, 8, '#a4eeff']] as [number, number, number, string][]) { r(g, x, y + 3, w, 40 - y, col); r(g, x + 1, y, w - 2, 3, col); r(g, x + 1, y + 3, 2, 34 - y, '#e8fbff'); r(g, x + w - 2, y + 3, 2, 37 - y, shade(col, -40)); } return outline(c, [20, 50, 90, 255]); }); }
 export function skillIcon(kind: string, col: string): Cv {
   const c = cv(32, 32), g = ctx(c), a = col || '#ffd76a'; r(g, 0, 0, 32, 32, shade(a, -105));
-  if (kind === 'spin') { for (let t = 0; t < 40; t++) { const q = t / 40 * 9, R0 = 3 + t * .28; r(g, 16 + Math.cos(q) * R0, 16 + Math.sin(q) * R0, 3, 3, a); } }
+  if (kind === 'buff') { for (let i = 0; i < 3; i++) { for (let w = 0; w < 7; w++) r(g, 16 - w, 7 + i * 7 + w, w * 2, 1, i === 0 ? '#fff' : a); } }
+  else if (kind === 'heal') { r(g, 13, 5, 6, 22, a); r(g, 5, 13, 22, 6, a); r(g, 14, 6, 2, 20, '#fff'); }
+  else if (kind === 'drain') { ell(g, 10, 16, 7, 8, a); for (let i = 0; i < 4; i++) r(g, 15 + i * 3, 15 + (i % 2) * 2, 2, 2, '#fff'); ell(g, 25, 16, 4, 5, '#ffb7c5'); }
+  else if (kind === 'spin') { for (let t = 0; t < 40; t++) { const q = t / 40 * 9, R0 = 3 + t * .28; r(g, 16 + Math.cos(q) * R0, 16 + Math.sin(q) * R0, 3, 3, a); } }
   else if (kind === 'dash') { for (let i = 0; i < 3; i++) { r(g, 5 + i * 8, 13, 7, 6, i === 2 ? '#fff' : a); r(g, 11 + i * 8, 15, 3, 2, a); } r(g, 4, 8, 12, 2, shade(a, -50)); r(g, 4, 23, 12, 2, shade(a, -50)); }
   else if (kind === 'splash') { ell(g, 16, 18, 10, 10, a); ell(g, 15, 18, 6, 6, '#ffe9a8'); r(g, 12, 4, 3, 7, a); r(g, 19, 2, 3, 8, a); r(g, 7, 8, 3, 5, a); r(g, 24, 8, 3, 5, a); }
   else if (kind === 'multi') { for (let i = 0; i < 3; i++) { const x = 6 + i * 8; r(g, x + 2, 4 + i % 2 * 3, 3, 20, a); r(g, x, 21 + i % 2 * 3, 7, 3, '#fff'); r(g, x + 1, 24 + i % 2 * 3, 5, 2, a); } }
@@ -300,6 +303,8 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
 }
 function shade(hex: string, a: number) { const n = parseInt(hex.slice(1), 16), c = (v: number) => Math.max(0, Math.min(255, v + a)).toString(16).padStart(2, '0'); return '#' + c(n >> 16) + c(n >> 8 & 255) + c(n & 255); }
 const heroCache = new Map<string, Cv[][]>();
+const tintCache = new WeakMap<Cv, Map<string, Cv>>();
+export function tintFrame(f: Cv, col: string): Cv { let m = tintCache.get(f); if (!m) { m = new Map(); tintCache.set(f, m); } let c = m.get(col); if (c) return c; c = cv(f.width, f.height); const g = ctx(c); g.drawImage(f, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, f.width, f.height); m.set(col, c); return c; }
 export function heroSprites(o: Look): Cv[][] {
   const k = JSON.stringify(o); let s = heroCache.get(k); if (s) return s;
   const S = [0, 1, 2, 3, 4, 5].map(f => heroFrame(0, f, o)), N = [0, 1, 2, 3, 4, 5].map(f => heroFrame(1, f, o)), E = [0, 1, 2, 3, 4, 5].map(f => heroFrame(2, f, o));
@@ -347,6 +352,7 @@ export function icon(key: string | null): Cv {
   c = cv(28, 28); const g = ctx(c), d = key ? ITEMS[key] : null, t = d?.tint ?? '#888', l = shade(t, 40), dk = shade(t, -35);
   if (!d) { for (const [x, y] of [[6, 14], [14, 14], [10, 8]]) { ell(g, x + 4, y + 4, 5, 4, '#e0b03a'); ell(g, x + 3, y + 3, 3, 2, '#ffe28a'); } }
   else if (d.kind === 'potion') { const col = d.heal ? '#e0425a' : '#3f7fe8'; r(g, 11, 3, 6, 3, '#a87b4a'); r(g, 11, 6, 6, 4, '#cfe3ee'); ell(g, 14, 17, 8, 7, col); ell(g, 11, 14, 3, 2, '#fff'); }
+  else if (d.kind === 'jewel') { const b = d.blade!; r(g, 10, 5, 8, 3, '#fff'); r(g, 7, 8, 14, 5, b); for (let i = 0; i < 9; i++) r(g, 7 + i, 13 + i, 14 - i * 2 > 0 ? 14 - i * 2 : 1, 1, shade(b, -25 + i * 2)); r(g, 10, 9, 3, 3, '#fff'); }
   else if (d.kind === 'material') { for (const [x, y, h] of [[8, 9, 13], [13, 5, 18], [18, 11, 11]]) { r(g, x, y, 4, h, '#8fe2ff'); r(g, x, y, 1, h, '#fff'); } }
   else if (d.wtype === 'staff') { r(g, 13, 8, 3, 18, '#7a5533'); ell(g, 14, 7, 5, 5, d.blade!); r(g, 12, 5, 2, 2, '#fff'); }
   else if (d.wtype === 'bow') { for (let i = 0; i < 22; i++) r(g, 8 + Math.round(Math.sin(i / 21 * Math.PI) * 11), 3 + i, 2, 1, d.blade!); r(g, 8, 3, 1, 22, '#e8e6df'); }

@@ -115,7 +115,7 @@ export default {
       const c = await env.DB.prepare('SELECT id,map FROM characters WHERE id=? AND account_id=?').bind(Number(url.searchParams.get('char')), me.id).first<{ id: number; map: string }>();
       if (!c || !MAP_IDS.includes(c.map)) return err('Personagem inválido.', 404);
       const headers = new Headers(req.headers); headers.set('x-char', String(c.id)); headers.set('x-map', c.map);
-      return env.MAP_ROOM.get(env.MAP_ROOM.idFromName(c.map)).fetch(new Request(req.url, { headers }));
+      return env.MAP_ROOM.get(env.MAP_ROOM.idFromName(c.map + ':e'), { locationHint: 'enam' }).fetch(new Request(req.url, { headers }));
     }
     if (url.pathname.startsWith('/api/')) return api(req, env, url.pathname);
     return new Response('Not found', { status: 404 });

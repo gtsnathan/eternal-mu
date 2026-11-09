@@ -1,16 +1,16 @@
-import { canWield, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
+import { SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
 import { blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  eid: number; charId: number; ws: CfWebSocket; name: string; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  eid: number; charId: number; ws: CfWebSocket; name: string; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
   budget: number; lastChat: number; nextRegen: number; gone: boolean; lastInvFull: number;
 }
 interface Trade { peer: Player; ids: Set<string>; gold: number; st: number }
-interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; hitBy: Map<number, number> }
+interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number> }
 interface Summon extends Pt { eid: number; owner: Player; pet: string; atk: number; expires: number; nextAtk: number }
 interface Drop extends Pt { eid: number; key: string | null; gold: number; rarity: number; owner: number; party: number; ownUntil: number; expires: number }
 
@@ -23,6 +23,7 @@ export class MapRoom {
   private summons = new Map<number, Summon>(); private partyMode = new Map<number, number>(); private partyQ: Promise<unknown> = Promise.resolve();
   private byChar = new Map<number, Player>(); private saves = new Map<number, Promise<unknown>>();
   private nextId = 1; private timer: ReturnType<typeof setInterval> | null = null; private last = 0; private lastSave = 0;
+  private tickN = 0;
   private fx: (Pt & Record<string, unknown>)[] = [];
 
   constructor(_state: unknown, env: Env) { this.env = env; }
@@ -44,7 +45,7 @@ export class MapRoom {
     this.mapId = id; this.map = getMap(id);
     for (const z of this.map.zones) for (let i = 0; i < z.n; i++) {
       const p = this.randomFree(z.cx, z.cy, z.r), def = MOBS[z.mob];
-      const m: Mob = { eid: this.nextId++, def, x: p.x, y: p.y, hx: p.x, hy: p.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, curseUntil: 0, hitBy: new Map() };
+      const m: Mob = { eid: this.nextId++, def, x: p.x, y: p.y, hx: p.x, hy: p.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, curseUntil: 0, slowUntil: 0, hitBy: new Map() };
       this.mobs.set(m.eid, m);
     }
   }
@@ -67,9 +68,9 @@ export class MapRoom {
     if (!open) return;
     if (!c || c.map !== this.mapId) { ws.close(4001, 'retry'); return; } // mudou de mapa durante a troca
     if (this.byChar.has(charId)) { ws.close(4000, 'replaced'); return; }
-    const items: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity }));
+    const items: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity, plus: i.plus ?? 0 }));
     const p: Player = {
-      eid: this.nextId++, charId, ws, name: c.name, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
+      eid: this.nextId++, charId, ws, name: c.name, buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], budget: 40, lastChat: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     if (blocked(this.map, p.x, p.y)) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; }
@@ -99,7 +100,7 @@ export class MapRoom {
       // apaga antes de regravar: os índices de posição são únicos
       for (const id of p.delItems) dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId));
       const dirtyIds = [...p.dirtyItems], changed = p.items.filter(i => p.dirtyItems.has(i.id));
-      for (const i of changed) { dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId)); ins.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity) VALUES(?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity)); }
+      for (const i of changed) { dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId)); ins.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity,plus) VALUES(?,?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity, i.plus ?? 0)); }
       rest.push(db.prepare('UPDATE characters SET level=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(p.level, p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), p.charId));
       for (const l of logs) rest.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
       const delIds = [...p.delItems]; p.delItems.clear(); p.dirtyItems.clear(); p.dirty = false;
@@ -114,7 +115,8 @@ export class MapRoom {
   }
   private send(p: Player, m: unknown) { try { p.ws.send(JSON.stringify(m)); } catch { /* fechando */ } }
   private send_all(s: string) { for (const p of this.players.values()) try { p.ws.send(s); } catch { /* fechando */ } }
-  private stats(p: Player) { return derive(p, p.items); }
+  private stats(p: Player) { const s = derive(p, p.items), n = Date.now(); if (n < p.buffAtk) s.atk = Math.floor(s.atk * 1.3); if (n < p.buffDef) s.def = Math.floor(s.def * 1.4); return s; }
+  private stub(id: string) { return this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }); }
   private sendMe(p: Player) {
     const s = this.stats(p); p.meDirty = false;
     this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, gold: p.gold, dead: p.deadUntil > 0, loot: p.streak, lootMs: Math.max(0, p.streakUntil - Date.now()) });
@@ -133,7 +135,7 @@ export class MapRoom {
     if (m.t === 'c') return this.chat(p, m);
     if (p.deadUntil) return;
     const now = Date.now();
-    if (p.trade && ['b', 'se', 'u', 'e', 'ue'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
+    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
     switch (m.t) {
       case 'i': {
         if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
@@ -150,6 +152,7 @@ export class MapRoom {
       case 'st': return this.addStat(p, m.s, m.n);
       case 'b': return this.buy(p, m.npc, m.key, m.qty);
       case 'se': return this.sell(p, m.npc, m.slot);
+      case 'up': return this.upgrade(p, m.j, m.item);
       case 'ti': return this.tradeInvite(p, m.id);
       case 'ta': return this.tradeAccept(p);
       case 'td': if (p.trade) this.cancelTrade(p, `${p.name} cancelou a troca.`); p.tradeFrom = null; return;
@@ -167,17 +170,18 @@ export class MapRoom {
     const now = Date.now();
     if (typeof m.m !== 'string' || now - p.lastChat < 700) return;
     const txt = m.m.trim().slice(0, 160); if (!txt) return; p.lastChat = now;
+    if (CONFIG.testCommands && /^\/teste(\s|$)/i.test(txt)) return this.testKit(p, txt, now);
     if (m.ch === 'p') {
       if (!p.partyId) return this.sys(p, 'Você não está em um grupo.');
       const msg = JSON.stringify({ t: 'c', ch: 'p', from: p.name, m: txt });
       this.partySend(p.partyId, msg);
-      for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id)).fetch(new Request('https://room/partychat', { method: 'POST', body: JSON.stringify({ pid: p.partyId, msg }) })).catch(() => { });
+      for (const id of MAP_IDS) if (id !== this.mapId) this.stub(id).fetch(new Request('https://room/partychat', { method: 'POST', body: JSON.stringify({ pid: p.partyId, msg }) })).catch(() => { });
       return;
     }
     const msg = JSON.stringify({ t: 'c', ch: m.ch === 'g' ? 'g' : 'l', from: p.name, m: txt });
     if (m.ch === 'g') {
       this.send_all(msg);
-      for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id)).fetch(new Request('https://room/global', { method: 'POST', body: msg })).catch(() => { });
+      for (const id of MAP_IDS) if (id !== this.mapId) this.stub(id).fetch(new Request('https://room/global', { method: 'POST', body: msg })).catch(() => { });
     } else for (const o of this.players.values()) if (dist(o, p) < CONFIG.aoiRadius) try { o.ws.send(msg); } catch { /* */ }
   }
   private addStat(p: Player, s: unknown, n: unknown) {
@@ -186,10 +190,10 @@ export class MapRoom {
   }
   private freeSlot(p: Player) { const used = new Set(p.items.filter(i => !i.equip).map(i => i.slot)); for (let i = 0; i < CONFIG.invSize; i++) if (!used.has(i)) return i; return -1; }
   private give(p: Player, key: string, qty: number, rarity: number, reason: string): boolean {
-    const def = ITEMS[key]; const stackable = def.kind === 'potion' || def.kind === 'material';
+    const def = ITEMS[key]; const stackable = isStack(def);
     let it = stackable ? p.items.find(i => i.key === key && !i.equip) : undefined;
     if (it) it.qty += qty;
-    else { const slot = this.freeSlot(p); if (slot < 0) return false; it = { id: crypto.randomUUID(), key, qty, slot, equip: null, rarity }; p.items.push(it); }
+    else { const slot = this.freeSlot(p); if (slot < 0) return false; it = { id: crypto.randomUUID(), key, qty, slot, equip: null, rarity, plus: 0 }; p.items.push(it); }
     p.dirtyItems.add(it.id); p.logs.push([reason, it.id, key, qty, 0, Date.now()]); return true;
   }
   private takeOne(p: Player, it: ItemInst) {
@@ -226,7 +230,7 @@ export class MapRoom {
   private nearNpc(p: Player, id: unknown) { const n = this.map.npcs.find(x => x.id === id); return n?.shop && dist(p, n) <= 4 ? n : null; }
   private buy(p: Player, npc: unknown, key: unknown, qty: unknown) {
     const n = this.nearNpc(p, npc); if (!n || typeof key !== 'string' || !SHOPS[n.shop!].includes(key) || !Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > 50) return;
-    const d = ITEMS[key], stack = d.kind === 'potion' || d.kind === 'material', q = stack ? qty as number : 1, cost = d.price * q;
+    const d = ITEMS[key], stack = isStack(d), q = stack ? qty as number : 1, cost = d.price * q;
     if (p.gold < cost) return this.sys(p, 'Moedas insuficientes.');
     if (!this.give(p, key, q, 0, 'buy')) return this.sys(p, 'Inventário cheio.');
     p.gold -= cost; p.logs.push(['buy_pay', null, key, q, -cost, Date.now()]); p.dirty = true; p.meDirty = true; this.sendInv(p);
@@ -239,13 +243,14 @@ export class MapRoom {
 
   // ---------- combate ----------
   private skill(p: Player, n: unknown, id: unknown, now: number) {
-    const sk = classOf(p.cls).skills.find(x => x.n === n); if (!sk || this.map.safe || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
-    const s = this.stats(p), m = this.mobs.get(id as number), targeted = sk.kind !== 'spin' && sk.kind !== 'summon';
+    const sk = classOf(p.cls).skills.find(x => x.n === n); if (sk && p.level < (sk.lvl ?? 1)) return this.sys(p, `Disponível no nível ${sk.lvl}.`);
+    if (!sk || (this.map.safe && sk.kind !== 'buff' && sk.kind !== 'heal') || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
+    const s = this.stats(p), m = this.mobs.get(id as number), targeted = sk.kind !== 'spin' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal';
     if (targeted && (!m || m.hp <= 0 || dist(m, p) > sk.range!)) return;
     p.mp -= sk.mana; p.cds[sk.n] = now + sk.cd; p.nextAtk = now + s.attackMs;
     const atk = s.atk * sk.mult, around = (c: Pt, r: number) => [...this.mobs.values()].filter(x => x.hp > 0 && dist(x, c) <= r);
     switch (sk.kind) {
-      case 'spin': this.fx.push({ k: 'spin', x: p.x, y: p.y, id: p.eid, r: sk.radius }); for (const x of around(p, sk.radius!)) this.hit(p, x, atk, s.crit); break;
+      case 'spin': this.fx.push({ k: 'spin', x: p.x, y: p.y, id: p.eid, r: sk.radius }); for (const x of around(p, sk.radius!)) { if (sk.slow) x.slowUntil = now + sk.slow; this.hit(p, x, atk, s.crit); } break;
       case 'dash': {
         const from = { x: p.x, y: p.y }, d = dist(m!, p), ux = (m!.x - p.x) / (d || 1), uy = (m!.y - p.y) / (d || 1);
         for (let t = 0; t < d - 1; t += .2) step(this.map, p, ux * .2, uy * .2);
@@ -257,8 +262,11 @@ export class MapRoom {
         for (const x of around(m!, sk.radius!)) this.hit(p, x, atk, s.crit); break;
       case 'multi': {
         const list = around(m!, sk.radius!).sort((a, b) => dist(a, m!) - dist(b, m!)).slice(0, sk.count);
-        for (const x of list) { this.fx.push({ k: 'bolt', x: p.x, y: p.y, id: p.eid, tx: x.x, ty: x.y, b: sk.color }); this.hit(p, x, atk, s.crit); } break;
+        for (const x of list) { this.fx.push({ k: 'bolt', x: p.x, y: p.y, id: p.eid, tx: x.x, ty: x.y, b: sk.color }); if (sk.curse) x.curseUntil = now + sk.curse; this.hit(p, x, atk, s.crit); } break;
       }
+      case 'buff': if (sk.buff === 'atk') p.buffAtk = now + sk.ms!; else p.buffDef = now + sk.ms!; this.fx.push({ k: 'buff', x: p.x, y: p.y, id: p.eid, b: sk.color }); break;
+      case 'heal': for (const o of this.players.values()) if ((o === p || (p.partyId && o.partyId === p.partyId)) && !o.deadUntil && dist(o, p) <= 9) { o.hp = Math.min(this.stats(o).maxHp, o.hp + this.stats(o).maxHp * sk.heal!); o.dirty = true; o.meDirty = true; this.fx.push({ k: 'heal', x: o.x, y: o.y, id: o.eid }); } break;
+      case 'drain': { this.fx.push({ k: 'bolt', x: m!.x, y: m!.y, id: p.eid, tx: p.x, ty: p.y, b: sk.color }); const b4 = m!.hp; this.hit(p, m!, atk, s.crit); p.hp = Math.min(s.maxHp, p.hp + Math.max(0, b4 - m!.hp) * sk.heal!); break; }
       case 'curse': m!.curseUntil = now + sk.ms!; this.fx.push({ k: 'curse', x: m!.x, y: m!.y, id: m!.eid, b: sk.color }); this.hit(p, m!, atk, s.crit); break;
       case 'summon': {
         for (const o of this.summons.values()) if (o.owner === p) this.summons.delete(o.eid);
@@ -314,6 +322,25 @@ export class MapRoom {
     a.trade = null; b.trade = null; a.dirty = b.dirty = true; a.meDirty = b.meDirty = true; this.saveBatch([a, b]);
     for (const x of [a, b]) { this.send(x, { t: 'tr', m: null, msg: 'Troca concluída!' }); this.sendInv(x); }
   }
+  private upgrade(p: Player, slot: unknown, id: unknown) {
+    const j = this.invAt(p, slot), rule = j && JEWELS[j.key], it = p.items.find(i => i.id === id); if (!j || !rule || !it || !SLOTS.includes(ITEMS[it.key].kind as Slot)) return;
+    const cur = it.plus ?? 0; if (cur < rule.min || cur >= rule.max) return this.sys(p, `${ITEMS[j.key].name} serve para itens de +${rule.min} até +${rule.max - 1}.`);
+    this.takeOne(p, j); const win = Math.random() < rule.chance, was = cur; it.plus = win ? cur + 1 : Math.max(rule.min, cur - rule.fail); p.dirtyItems.add(it.id); p.dirty = true; p.logs.push([win ? 'upgrade_ok' : 'upgrade_fail', it.id, it.key, it.plus, 0, Date.now()]);
+    this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: win ? 1 : 0, v: it.plus }); this.sys(p, win ? `${ITEMS[it.key].name} agora é +${it.plus}!` : `A melhoria falhou: ${ITEMS[it.key].name} ${was === it.plus ? 'manteve' : 'caiu para'} +${it.plus}.`);
+    this.afterGear(p);
+  }
+  /** Comando /teste: kit para testar o jogo. Desligue com CONFIG.testCommands = false antes de abrir ao público. */
+  private testKit(p: Player, txt: string, now: number) {
+    if (p.trade || p.deadUntil) return;
+    const list = Object.values(SETS).filter(s => s.cls === classOf(p.cls).key).sort((a, b) => a.lvl - b.lvl), n = Number(txt.split(/\s+/)[1]), set = list[Number.isInteger(n) && n >= 1 && n <= list.length ? n - 1 : list.length - 1];
+    if (p.items.filter(i => !i.equip).length + 7 > CONFIG.invSize) return this.sys(p, 'Libere 7 espaços na bolsa para usar /teste.');
+    for (const piece of SET_PIECES) this.give(p, `${set.key}_${piece}`, 1, 0, 'test');
+    this.give(p, 'jewel_aurora', 6, 0, 'test'); this.give(p, 'jewel_destiny', 6, 0, 'test'); this.give(p, 'jewel_eclipse', 6, 0, 'test');
+    p.gold += 500000; p.logs.push(['test_gold', null, null, 0, 500000, now]);
+    if (p.level < set.lvl) { p.points += (set.lvl - p.level) * CONFIG.pointsPerLevel; p.level = set.lvl; p.xp = 0; const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; }
+    p.dirty = true; p.meDirty = true; this.sendInv(p); for (const o of this.players.values()) o.known.delete(p.eid);
+    this.sys(p, `Teste: Set ${set.name}, joias e 500.000 moedas. Abra a Bolsa (I) para equipar.`);
+  }
   private bumpLoot(p: Player, now: number) { p.streak = Math.min(10, (now < p.streakUntil ? p.streak : 0) + 1); p.streakUntil = now + 15000; p.meDirty = true; }
   // ---------- grupos ----------
   private enqueueParty(f: () => Promise<unknown>) { this.partyQ = this.partyQ.then(f).catch(e => console.error('party', e)); }
@@ -354,7 +381,7 @@ export class MapRoom {
   }
   private async partyChanged(pid: number) {
     await this.reloadParty(pid);
-    await Promise.all(MAP_IDS.filter(id => id !== this.mapId).map(id => this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id)).fetch(new Request('https://room/party', { method: 'POST', body: JSON.stringify({ pid }) })).catch(() => { })));
+    await Promise.all(MAP_IDS.filter(id => id !== this.mapId).map(id => this.stub(id).fetch(new Request('https://room/party', { method: 'POST', body: JSON.stringify({ pid }) })).catch(() => { })));
   }
   /** Relê o grupo no banco e atualiza quem está neste mapa; desfaz grupos com menos de 2. */
   private async reloadParty(pid: number) {
@@ -392,7 +419,7 @@ export class MapRoom {
     const [lo, hi] = m.def.gold, now = Date.now();
     const drop = (key: string | null, gold: number, rarity: number) => { const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, owner: owner.charId, party: owner.partyId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
     drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
-    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, r = k === 'potion' || k === 'material' ? 0 : Math.random() < .08 ? 2 : Math.random() < .3 ? 1 : 0; drop(key, 0, r); }
+    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, r = isStack(ITEMS[key]) ? 0 : Math.random() < .08 ? 2 : Math.random() < .3 ? 1 : 0; drop(key, 0, r); }
     if (m.def.boss) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {
@@ -434,8 +461,7 @@ export class MapRoom {
     this.separateMobs();
     this.tickSummons(now, dt);
     for (const d of this.drops.values()) if (now > d.expires) this.drops.delete(d.eid);
-    for (const p of this.players.values()) this.snapshot(p);
-    this.fx = [];
+    if (++this.tickN % (this.players.size > 30 ? 2 : 1) === 0) { for (const p of this.players.values()) this.snapshot(p); this.fx = []; }
     if (now - this.lastSave >= CONFIG.saveEveryMs) { this.lastSave = now; for (const p of this.players.values()) this.flush(p); }
   }
   private tickSummons(now: number, dt: number) {
@@ -458,7 +484,7 @@ export class MapRoom {
   }
   private tickPlayer(p: Player, dt: number, now: number) {
     p.budget = Math.min(40, p.budget + dt * 25);
-    const s = this.stats(p);
+    const s = this.stats(p); p.maxHpC = s.maxHp;
     if (p.streak && now > p.streakUntil) { p.streak = 0; p.meDirty = true; }
     if (p.trade && dist(p, p.trade.peer) > 10) this.cancelTrade(p, 'Vocês se afastaram demais.');
     if (p.deadUntil) {
@@ -516,7 +542,7 @@ export class MapRoom {
     const d = dist(m, t), reach = def.reach ?? (def.boss ? 2.2 : 1.4);
     if (d > reach) {
       if (now >= m.nextThink) { m.nextThink = now + 500; m.path = findPath(this.map, m.x, m.y, t.x, t.y, 500); }
-      this.follow(m, def.speed * dt);
+      this.follow(m, def.speed * dt * (now < m.slowUntil ? .5 : 1));
     } else if (now >= m.nextAtk) {
       m.nextAtk = now + def.attackMs; this.fx.push(def.bolt ? { k: 'bolt', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y, b: def.bolt } : { k: 'bite', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y });
       this.hurt(t, def.dmg * (m.phase === 2 ? 1.35 : 1) * (now < m.curseUntil ? .7 : 1), now);
@@ -536,8 +562,8 @@ export class MapRoom {
     const near = (o: Pt) => Math.abs(o.x - p.x) < R && Math.abs(o.y - p.y) < R;
     const note = (id: number, full: () => unknown) => { seen.add(id); if (!p.known.has(id)) { p.known.add(id); news.push(full()); } };
     for (const o of this.players.values()) if (near(o)) {
-      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
-      e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / this.stats(o).maxHp * 100)]);
+      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, plus: Math.floor(o.items.filter(i => i.equip).reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
+      e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
     for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => ({ id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }
     for (const s of this.summons.values()) if (near(s)) { note(s.eid, () => ({ id: s.eid, k: 's', mob: s.pet })); e.push([s.eid, round(s.x), round(s.y), 100]); }
