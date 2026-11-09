@@ -161,6 +161,8 @@ function enlarge(m: GameMap, k = MAP_SCALE): GameMap {
 }
 const MOBS_IS_BOSS = (k: string) => ['boss', 'ignarok', 'aracnia', 'vorgath', 'aethon'].includes(k);
 const cache: Record<string, GameMap> = {};
+/** Destinos da janela de viagem (tecla M): mesmas regras e chegadas dos portais de Valoria. */
+export function travelList() { const v = getMap('valoria'); return [{ to: 'valoria', name: v.name, lvl: 0, x: v.spawn.x, y: v.spawn.y }, ...v.portals.map(g => ({ to: g.to, name: getMap(g.to).name, lvl: g.lvl ?? 0, x: g.tx, y: g.ty }))].sort((a, b) => a.lvl - b.lvl); }
 export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial'];
 export function getMap(id: string): GameMap { return cache[id] ??= id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
 

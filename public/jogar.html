@@ -114,6 +114,7 @@ body{background:#0a0814}
 .screen{background:linear-gradient(180deg,#120c28cc,#0a0814d9)}
 h1{font-size:44px;letter-spacing:5px;background:linear-gradient(180deg,#fff2c0,#e9c46a 48%,#a8671e);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(3px 3px 0 #2a1508) drop-shadow(0 0 16px #e9a63a66)}
 .card,.win,#invite{background:linear-gradient(180deg,#2a2342,#191428);border:2px solid #8a6a32;box-shadow:0 0 0 2px #0a0814,inset 0 0 0 2px #3f3458,0 18px 50px #000a}
+#moves{display:grid;grid-template-columns:1fr 1fr;gap:6px}#moves button{padding:7px 6px;font-size:13px}#moves button:disabled{opacity:.45;cursor:default}
 .win h3{border-bottom:1px solid #8a6a32;padding-bottom:7px}
 button{background:linear-gradient(180deg,#352c52,#241d3a);border-color:#5b4e7c}
 button.main{background:linear-gradient(180deg,#c28f35,#80591b);border-color:#f0d27a;text-shadow:1px 1px 0 #4a2d08}
@@ -164,7 +165,7 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
   </div>
   <div class="win p" id="w-inv"><h3>Inventário <button data-close>×</button></h3><div class="gear" id="gear"></div><div class="grid" id="grid"></div><div class="info" id="invinfo">Moedas: 0</div></div>
   <div class="win p" id="w-char"><h3>Personagem <button data-close>×</button></h3><div id="charp"></div></div>
-  <div class="win p" id="w-map"><h3 id="mapt">Mapa <button data-close>×</button></h3><canvas id="bigmap" style="width:100%;image-rendering:pixelated;display:block"></canvas></div>
+  <div class="win p" id="w-map"><h3 id="mapt">Mapa <button data-close>×</button></h3><canvas id="bigmap" style="width:100%;image-rendering:pixelated;display:block"></canvas><h4 style="margin:10px 0 6px;color:var(--gold)">Viajar para</h4><div id="moves"></div></div>
   <div id="lootc" class="p"></div>
   <div class="win p" id="w-trade"><h3>Troca com <span id="tname"></span></h3>
     <div class="tcols"><div><b>Sua oferta</b> <small id="tstm"></small><div class="tgrid" id="tmine"></div><label>Moedas</label><input id="tgold" type="text" inputmode="numeric" value="0" autocomplete="off"></div>

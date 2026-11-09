@@ -1,5 +1,5 @@
 import { masterNext, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
-import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step } from '../shared/world';
+import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
@@ -7,7 +7,7 @@ interface Player extends Pt {
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
-  budget: number; lastChat: number; nextTrap: number; nextRegen: number; gone: boolean; lastInvFull: number;
+  nextMove?: number; budget: number; lastChat: number; nextTrap: number; nextRegen: number; gone: boolean; lastInvFull: number;
 }
 interface Trade { peer: Player; ids: Set<string>; gold: number; st: number }
 interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number> }
@@ -163,7 +163,7 @@ export class MapRoom {
     if (m.t === 'c') return this.chat(p, m);
     if (p.deadUntil) return;
     const now = Date.now();
-    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up', 'cw', 'dep', 'wd', 'pj', 'uj'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
+    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up', 'cw', 'dep', 'wd', 'pj', 'uj', 'mv'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
     switch (m.t) {
       case 'i': {
         if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
@@ -182,6 +182,7 @@ export class MapRoom {
       case 'se': return this.sell(p, m.npc, m.slot);
       case 'pj': return this.packJewels(p, m.key);
       case 'uj': return this.unpackJewels(p, m.slot);
+      case 'mv': return this.moveTo(p, m.to, now);
       case 'rs': return this.doReset(p);
       case 'mt': return this.spendMaster(p, m.k);
       case 'dep': return this.chestDeposit(p, m.slot);
@@ -399,6 +400,12 @@ export class MapRoom {
     const it = this.invAt(p, slot); if (!it || ITEMS[it.key].kind !== 'pack' || !this.nearNpc(p, 'prensa')) return;
     if (p.items.filter(i => !i.equip).length + 9 > CONFIG.invSize) return this.sys(p, 'Libere 9 espaços na bolsa para desmontar.');
     const key = Object.keys(JEWEL_PACKS).find(k => JEWEL_PACKS[k] === it.key)!; this.takeOne(p, it); p.logs.push(['unpack', it.id, it.key, 1, 0, Date.now()]); this.give(p, key, 10, 0, 'unpack'); p.dirty = true; this.sendInv(p); this.sys(p, `Desmontado: 10x ${ITEMS[key].name}.`);
+  }
+  private moveTo(p: Player, to: unknown, now: number) {
+    const d = travelList().find(x => x.to === to); if (!d || d.to === this.mapId) return;
+    if (p.level < d.lvl) return this.sys(p, `${d.name} exige nível ${d.lvl}.`);
+    if (now < (p.nextMove ?? 0)) return this.sys(p, 'Aguarde alguns segundos para viajar de novo.');
+    p.nextMove = now + 5000; this.travel(p, d.to, d.x, d.y);
   }
   private doReset(p: Player) {
     if (!this.nearNpc(p, 'mestre')) return;

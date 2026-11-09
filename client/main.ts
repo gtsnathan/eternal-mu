@@ -1,5 +1,5 @@
 import { MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
-import { trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
+import { travelList, trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
 import { pressSprite, chestSprite, WING_ROOT, wingSprites, gfx, hdCtx, hdOf, noHd, tintFrame, archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
 
 const $ = <E extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as E;
@@ -257,7 +257,7 @@ function paintMap(c: HTMLCanvasElement, sx: number, sy: number, wv: number, hv: 
   for (const e of ents.values()) if (e.k !== 'd') dot(e.x, e.y, e.id === you ? '#fff' : e.k === 'p' ? '#6fdc7e' : '#ff5a5a');
 }
 function renderMini() { const e = ents.get(you); if (!e || !map) return; const w = Math.min(map.w, 42), h = w * 112 / 146, sx = Math.max(0, Math.min(map.w - w, e.x - w / 2)), sy = Math.max(0, Math.min(map.h - h, e.y - h / 2)); paintMap($<HTMLCanvasElement>('#minimap'), sx, sy, w, h); $('#where').textContent = `${map.name} ${e.x | 0},${e.y | 0}`; }
-function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap'); c.width = map.w * 4; c.height = map.h * 4; $('#mapt').firstChild!.textContent = `${map.name} `; paintMap(c, 0, 0, map.w, map.h); }
+function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap'); c.width = map.w * 4; c.height = map.h * 4; $('#mapt').firstChild!.textContent = `${map.name} `; paintMap(c, 0, 0, map.w, map.h); const L = $('#moves'); L.replaceChildren(); for (const d of travelList()) { const b = document.createElement('button'), here = d.to === map.id, low = (me?.level ?? 1) < d.lvl; b.textContent = here ? `${d.name} · você está aqui` : d.lvl ? `${d.name} · Nv ${d.lvl}` : d.name; b.disabled = here || low; if (!b.disabled) b.onclick = () => { send({ t: 'mv', to: d.to }); closeWins(); }; L.append(b); } }
 
 // ---------- entrada ----------
 let joy = { x: 0, y: 0 }, lastInput = '';
