@@ -6,7 +6,25 @@ export type Cv = HTMLCanvasElement;
 // ---------- alta resolução: cada sprite ganha o dobro de pixels, com bordas suavizadas ----------
 const hdCache = new WeakMap<Cv, Cv>();
 export const noHd = new WeakSet<Cv>();
-export const gfx = { hd: true };
+export const gfx = { hd: true, n: 2 as 2 | 3 };
+const hd3Cache = new WeakMap<Cv, Cv>();
+/** Versão 3× (AdvMAME3x): usada quando cada pixel da arte vira 3 pixels da tela, para ficar nítido sem distorcer. */
+export function hd3Of(c: Cv): Cv {
+  let h = hd3Cache.get(c); if (h) return h;
+  const W = c.width, H = c.height, W3 = W * 3; h = document.createElement('canvas'); h.width = W3; h.height = H * 3;
+  const s = new Uint32Array(c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, W, H).data.buffer), gh = h.getContext('2d')!, img = gh.createImageData(W3, H * 3), d = new Uint32Array(img.data.buffer);
+  const at = (x: number, y: number) => s[Math.min(H - 1, Math.max(0, y)) * W + Math.min(W - 1, Math.max(0, x))];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const A = at(x - 1, y - 1), B = at(x, y - 1), C = at(x + 1, y - 1), D = at(x - 1, y), E = s[y * W + x], F = at(x + 1, y), G = at(x - 1, y + 1), Hh = at(x, y + 1), I = at(x + 1, y + 1);
+    const o = y * 3 * W3 + x * 3, r1 = o + W3, r2 = r1 + W3;
+    if (B !== Hh && D !== F) {
+      d[o] = D === B ? D : E; d[o + 1] = (D === B && E !== C) || (B === F && E !== A) ? B : E; d[o + 2] = B === F ? F : E;
+      d[r1] = (D === B && E !== G) || (D === Hh && E !== A) ? D : E; d[r1 + 1] = E; d[r1 + 2] = (B === F && E !== I) || (Hh === F && E !== C) ? F : E;
+      d[r2] = D === Hh ? D : E; d[r2 + 1] = (D === Hh && E !== I) || (Hh === F && E !== G) ? Hh : E; d[r2 + 2] = Hh === F ? F : E;
+    } else { d[o] = d[o + 1] = d[o + 2] = d[r1] = d[r1 + 1] = d[r1 + 2] = d[r2] = d[r2 + 1] = d[r2 + 2] = E; }
+  }
+  gh.putImageData(img, 0, 0); hd3Cache.set(c, h); noHd.add(h); return h;
+}
 export function hdOf(c: Cv): Cv {
   let h = hdCache.get(c); if (h) return h;
   const W = c.width, H = c.height; h = document.createElement('canvas'); h.width = W * 2; h.height = H * 2;
@@ -22,8 +40,8 @@ export function hdCtx(x: CanvasRenderingContext2D) {
   const o = x.drawImage.bind(x) as (...a: any[]) => void;
   (x as any).drawImage = (im: any, ...a: number[]) => {
     if (!gfx.hd || !(im instanceof HTMLCanvasElement) || noHd.has(im) || im.width > 700) return o(im, ...a);
-    const h = hdOf(im);
-    if (a.length === 2) o(h, a[0], a[1], im.width, im.height); else if (a.length === 4) o(h, ...a); else o(h, a[0] * 2, a[1] * 2, a[2] * 2, a[3] * 2, a[4], a[5], a[6], a[7]);
+    const n = gfx.n, h = n === 3 ? hd3Of(im) : hdOf(im);
+    if (a.length === 2) o(h, a[0], a[1], im.width, im.height); else if (a.length === 4) o(h, ...a); else o(h, a[0] * n, a[1] * n, a[2] * n, a[3] * n, a[4], a[5], a[6], a[7]);
   };
 }
 const glowCache = new Map<string, Cv>();
@@ -135,6 +153,10 @@ export function skillIcon(kind: string, col: string): Cv {
   else if (kind === 'dash') { for (let i = 0; i < 3; i++) { r(g, 5 + i * 8, 13, 7, 6, i === 2 ? '#fff' : a); r(g, 11 + i * 8, 15, 3, 2, a); } r(g, 4, 8, 12, 2, shade(a, -50)); r(g, 4, 23, 12, 2, shade(a, -50)); }
   else if (kind === 'splash') { ell(g, 16, 18, 10, 10, a); ell(g, 15, 18, 6, 6, '#ffe9a8'); r(g, 12, 4, 3, 7, a); r(g, 19, 2, 3, 8, a); r(g, 7, 8, 3, 5, a); r(g, 24, 8, 3, 5, a); }
   else if (kind === 'multi') { for (let i = 0; i < 3; i++) { const x = 6 + i * 8; r(g, x + 2, 4 + i % 2 * 3, 3, 20, a); r(g, x, 21 + i % 2 * 3, 7, 3, '#fff'); r(g, x + 1, 24 + i % 2 * 3, 5, 2, a); } }
+  else if (kind === 'spirits') { for (let i = 0; i < 3; i++) { const an = i * 2.094 + .5, x = 16 + Math.cos(an) * 8, y = 15 + Math.sin(an) * 7; ell(g, x, y, 4, 5, i ? a : '#eefaff'); r(g, x - 4, y + 3, 8, 3, i ? a : '#eefaff'); r(g, x - 2, y - 1, 1, 2, '#10162a'); r(g, x + 1, y - 1, 1, 2, '#10162a'); } }
+  else if (kind === 'cone') { for (let t = 0; t < 26; t++) { const q = -1.9 + t / 26 * 2.3, R0 = 12 - Math.abs(t - 13) * .25; r(g, 8 + Math.cos(q) * R0, 24 + Math.sin(q) * R0, 3, 3, t > 8 && t < 18 ? '#fff' : a); } r(g, 5, 22, 4, 4, shade(a, -40)); }
+  else if (kind === 'chain') { for (let i = 0; i < 5; i++) { const x = 4 + i * 5, y = 24 - i * 5; r(g, x, y, 6, 4, i % 2 ? '#2a1838' : a); r(g, x + 1, y + 1, 4, 2, i % 2 ? a : shade(a, -70)); } }
+  else if (kind === 'wave') { for (let i = 0; i < 18; i++) r(g, 5 + i, 25 - i, 3, 3, i > 13 ? '#fff' : a); r(g, 4, 22, 6, 6, shade(a, -40)); for (let i = 0; i < 3; i++) r(g, 12 + i * 5, 23 - i * 5 - 6, 2, 2, '#ffe9a8'); }
   else if (kind === 'summon') { ell(g, 16, 16, 12, 12, shade(a, -60)); ell(g, 16, 14, 7, 7, a); r(g, 12, 12, 3, 3, '#14102a'); r(g, 18, 12, 3, 3, '#14102a'); r(g, 9, 23, 14, 3, a); }
   else { ell(g, 16, 16, 11, 11, a); ell(g, 16, 16, 7, 7, '#1d1030'); r(g, 13, 12, 2, 8, a); r(g, 18, 12, 2, 8, a); }
   return c;

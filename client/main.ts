@@ -92,7 +92,7 @@ function connect(first = false) { if (!gfxInit) { gfxInit = true; applyGfx(); }
   sock.onmessage = e => { const m = JSON.parse(e.data); if (m.t === 'portal') portal = true; else handle(m); };
   sock.onclose = async e => {
     if (ws !== sock || manualClose) return;
-    if (e.code === 4000) return leave(e.reason === 'banned' ? 'Sua conta foi suspensa.' : 'Este personagem entrou em outro dispositivo.');
+    if (e.code === 4000) return leave(e.reason === 'banned' ? 'Sua conta foi suspensa.' : e.reason === 'deleted' ? 'Este personagem foi excluído.' : 'Este personagem entrou em outro dispositivo.');
     if (portal) { over('Atravessando o portal…'); connect(); return; }
     setConn(false); retries++;
     if (retries > 12) return leave('Conexão perdida.');
@@ -161,6 +161,19 @@ function effect(f: any) {
     case 'dash': for (let i = 0; i < 14; i++) { const u = i / 14; parts.push({ x: f.fx + (f.x - f.fx) * u, y: f.fy + (f.y - f.fy) * u, vx: 0, vy: 0, life: 0, max: .4, c: '#ffcf6a', s: 5 }); } beep(200, 160, 'sawtooth', .04); break;
     case 'die': if (e?.k === 'm') ghosts.push({ c: mobSprites(e.info.mob)[0][e.dir === 3 ? 1 : 0], x: f.x, y: f.y, t: 0 }); burst(f.x, f.y - .3, 26, '#d8f4ff', 5); beep(110, 260); break;
     case 'lvl': for (let i = 0; i < 44; i++) parts.push({ x: f.x + (Math.random() - .5), y: f.y, vx: 0, vy: -3 - Math.random() * 3, life: 0, max: .9, c: '#ffe08a', s: 3 }); break;
+    case 'spirits': { if (e) e.atkUntil = now + 300; rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: f.d / 1000, c: f.b }); beep(140, 700, 'triangle', .05);
+      const N = Math.round(f.d / 45); for (let k = 0; k < N; k++) setTimeout(() => { if (!running) return; const c = ents.get(f.id) ?? f, u = k / N;
+        for (let i = 0; i < 5; i++) { const an = u * 14 + i * 1.2566, R = f.r * (.3 + .7 * Math.abs(Math.sin(u * 6.28 + i))); parts.push({ x: c.x + Math.cos(an) * R, y: c.y + Math.sin(an) * R * .75, vx: -Math.sin(an) * 2.5, vy: Math.cos(an) * 1.8 - .8, life: 0, max: .4, c: i % 2 ? f.b : '#eefaff', s: i % 2 ? 4 : 3 }); } }, k * 45); break; }
+    case 'cone': { if (e) { faceTo(e, f.x + Math.cos(f.a), f.y + Math.sin(f.a)); e.atkUntil = now + 300; } for (const o of [-.45, 0, .45]) slashes.push({ x: f.x, y: f.y, a: f.a + o, t: 0 });
+      for (let i = 0; i <= 22; i++) { const an = f.a - f.w + i / 22 * f.w * 2, R = f.r * (.45 + Math.random() * .55); parts.push({ x: f.x + Math.cos(an) * R, y: f.y + Math.sin(an) * R, vx: Math.cos(an) * 3.5, vy: Math.sin(an) * 3.5, life: 0, max: .35, c: i % 3 ? f.b : '#ffffff', s: 3 }); } beep(260, 160, 'sawtooth', .05); break; }
+    case 'wave': { if (e) { faceTo(e, f.tx, f.ty); e.atkUntil = now + 260; } beep(380, 220, 'square', .035);
+      for (let k = 0; k <= 12; k++) setTimeout(() => { if (!running) return; const u = k / 12, x = f.x + (f.tx - f.x) * u, y = f.y + (f.ty - f.y) * u;
+        for (let i = 0; i < 5; i++) parts.push({ x: x + (Math.random() - .5) * .5, y: y + (Math.random() - .5) * .5, vx: (Math.random() - .5), vy: -.6 - Math.random(), life: 0, max: .45, c: i ? f.b : '#ffffff', s: i ? 3 : 5 });
+        if (k === 12) burst(x, y, 14, f.b, 4); }, k * 22); break; }
+    case 'chain': { if (e && f.pts.length > 1) { faceTo(e, f.pts[1][0], f.pts[1][1]); e.atkUntil = now + 260; } beep(120, 380, 'sawtooth', .05);
+      for (let i = 0; i + 1 < f.pts.length; i++) setTimeout(() => { if (!running) return; const [ax, ay] = f.pts[i], [bx, by] = f.pts[i + 1], n = Math.max(4, Math.round(Math.hypot(bx - ax, by - ay) * 5));
+        for (let j = 0; j <= n; j++) { const u = j / n; parts.push({ x: ax + (bx - ax) * u, y: ay + (by - ay) * u, vx: 0, vy: 0, life: 0, max: .55, c: j % 2 ? f.b : '#2a1838', s: j % 2 ? 4 : 3 }); }
+        rings.push({ x: bx, y: by, r: .9, t: 0, max: .5, c: f.b }); burst(bx, by - .3, 8, f.b, 2); }, i * 90); break; }
     case 'buff': rings.push({ x: f.x, y: f.y, r: 1.8, t: 0, max: .5, c: f.b }); burst(f.x, f.y - .4, 24, f.b, 3); beep(440, 220, 'triangle', .05); break;
     case 'up': if (f.ok) { for (let i = 0; i < 40; i++) parts.push({ x: f.x + (Math.random() - .5), y: f.y, vx: 0, vy: -3 - Math.random() * 3, life: 0, max: .8, c: '#ffe08a', s: 3 }); beep(780, 300, 'triangle', .06); } else { burst(f.x, f.y - .4, 20, '#8a7a9a', 3); beep(120, 300, 'sawtooth', .05); } break;
     case 'loot': { texts.push({ x: f.x, y: f.y - .4, s: `Coleta ×${f.n}`, c: '#ffe08a', t: 0, big: false }); burst(f.x, f.y - .3, 8, '#ffe08a', 2); beep(520 + f.n * 60, 90, 'triangle', .05); break; }
@@ -272,7 +285,7 @@ function skill(n: number, quiet = false) {
   if (me.level < (sk.lvl ?? 1)) { if (!quiet) warn(`Nível ${sk.lvl}`); return; }
   if ((cds[n]?.until ?? 0) > now) return;
   if (me.mp < sk.mana) { warn('Sem mana'); return; }
-  const needs = sk.kind !== 'spin' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal'; let t = ents.get(target);
+  const needs = sk.kind !== 'spin' && sk.kind !== 'spirits' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal'; let t = ents.get(target);
   if (needs && (!t || t.k !== 'm')) { const nm = nearestMob(Math.max(sk.range ?? 8, 8)); if (!nm) { if (!quiet) warn('Sem alvo'); return; } attack(nm); t = nm; }
   if (needs && t && Math.hypot(t.x - a.x, t.y - a.y) > (sk.range ?? 8)) { queued = { n, until: now + 4000 }; attack(t); return; }
   send({ t: 'k', n, id: t?.id ?? 0 });
@@ -285,7 +298,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Enter') { const i = $<HTMLInputElement>('#chati'); if (!tgtTyping()) { e.preventDefault(); i.focus(); } return; }
   if (e.key === 'Escape') { $('#chati').blur(); closeWins(); return; }
   if (e.repeat) return;
-  if (k >= '1' && k <= '6' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
+  if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
 let chan: 'l' | 'g' | 'p' = 'l';
@@ -359,7 +372,15 @@ canvas.addEventListener('pointerdown', e => {
 let quality = 2, gfxAuto = true, gfxHold = 0, frameAcc = 0, frameN = 0;
 try { const v = localStorage.getItem('em_gfx'); if (v !== null && v !== 'auto') { quality = +v; gfxAuto = false; } } catch { /* sem armazenamento */ }
 gfx.hd = quality > 0;
-function resize() { const rs = quality === 2 && devicePixelRatio >= 1.5 ? 2 : 1, cssW = innerWidth, cssH = innerHeight; canvas.width = Math.round(cssW * rs); canvas.height = Math.round(cssH * rs); Z = Math.max(1, Math.round(Math.min(cssW / (22 * 32), cssH / (13 * 32)))) * rs; }
+function resize() {
+  // Desenha na resolução real da tela (antes ficava em 1× ou 2×, e o navegador esticava a imagem).
+  const cssW = innerWidth, cssH = innerHeight, dpr = devicePixelRatio || 1, cap = [1, 2, 3][quality];
+  let rs = Math.max(1, Math.min(dpr, cap)); const maxPx = quality === 2 ? 4.2e6 : 2.6e6; if (cssW * cssH * rs * rs > maxPx) rs = Math.max(1, Math.sqrt(maxPx / (cssW * cssH)));
+  canvas.width = Math.round(cssW * rs); canvas.height = Math.round(cssH * rs);
+  const base = Math.max(1, Math.round(Math.min(cssW / (22 * 32), cssH / (13 * 32)))); // mesmo campo de visão de antes
+  Z = Math.max(1, Math.round(base * rs)); // zoom inteiro: cada pixel da arte ocupa um número exato de pixels da tela
+  gfx.n = Z % 3 === 0 ? 3 : 2; // o chão é refeito sozinho quando isso muda (ver chunk())
+}
 function applyGfx() { gfx.hd = quality > 0; resize(); chunks.clear(); labels.clear(); $('#gfx').textContent = gfxAuto ? 'Gráf: Auto' : `Gráf: ${['Baixo', 'Médio', 'Alto'][quality]}`; }
 $('#gfx').onclick = () => { if (gfxAuto) { gfxAuto = false; quality = 2; } else if (quality > 0) quality--; else { gfxAuto = true; quality = 2; } try { localStorage.setItem('em_gfx', gfxAuto ? 'auto' : String(quality)); } catch { /* */ } gfxHold = performance.now() + 4000; applyGfx(); };
 addEventListener('resize', resize); resize(); requestAnimationFrame(menuFrame);
@@ -512,7 +533,7 @@ function label(x: number, y: number, s: string, c: string) {
   if (!l) { const m = g.font; g.font = 'bold 10px system-ui,Segoe UI,Roboto,sans-serif'; const w = Math.ceil(g.measureText(s).width) + 8; g.font = m; l = cv(w * Z, 16 * Z); noHd.add(l); const b = l.getContext('2d')!; b.scale(Z, Z); b.font = 'bold 10px system-ui,Segoe UI,Roboto,sans-serif'; b.textAlign = 'center'; b.lineJoin = 'round'; b.lineWidth = 3; b.strokeStyle = '#0a0814cc'; b.strokeText(s, w / 2, 12); b.fillStyle = c; b.fillText(s, w / 2, 12); if (labels.size > 400) labels.clear(); labels.set(k, l); }
   g.drawImage(l, Math.round(x - l.width / Z / 2), Math.round(y - 12), l.width / Z, l.height / Z);
 }
-const CH = 12, chunks = new Map<string, { c: Cv; anim: number[] }>(); let chunkMap = '', objRows: GameMap['objs'][] = [];
+const CH = 12, chunks = new Map<string, { c: Cv; anim: number[] }>(); let chunkN = 0; let chunkMap = '', objRows: GameMap['objs'][] = [];
 function buildRows(m: GameMap) { chunks.clear(); chunkMap = m.id; objRows = Array.from({ length: m.h }, () => []); for (const o of m.objs) objRows[o.y].push(o); }
 /** Detalhes espalhados no chão, sempre iguais para o mesmo lugar do mapa. */
 function decal(x: CanvasRenderingContext2D, t: number, i: number, j: number) {
@@ -548,8 +569,9 @@ function objShadow(x: CanvasRenderingContext2D, o: GameMap['objs'][number]) {
 }
 /** Bloco 12×12 do chão já desenhado: tiles, bordas e sombras saem prontos de uma vez. */
 function chunk(m: GameMap, cx: number, cy: number) {
+  if (chunkN !== gfx.n) { chunkN = gfx.n; chunks.clear(); }
   const k = `${cx},${cy}`; let ch = chunks.get(k); if (ch) { chunks.delete(k); chunks.set(k, ch); return ch; }
-  const S = gfx.hd ? 2 : 1, c = cv(CH * 32 * S, CH * 32 * S), x = c.getContext('2d')!, anim: number[] = [], x0 = cx * CH, y0 = cy * CH; noHd.add(c); hdCtx(x); x.imageSmoothingEnabled = false; x.scale(S, S); x.translate(-x0 * 32, -y0 * 32);
+  const S = gfx.hd ? gfx.n : 1, c = cv(CH * 32 * S, CH * 32 * S), x = c.getContext('2d')!, anim: number[] = [], x0 = cx * CH, y0 = cy * CH; noHd.add(c); hdCtx(x); x.imageSmoothingEnabled = false; x.scale(S, S); x.translate(-x0 * 32, -y0 * 32);
   for (let j = y0; j < Math.min(m.h, y0 + CH); j++) for (let i = x0; i < Math.min(m.w, x0 + CH); i++) {
     const t = m.tiles[j * m.w + i], v = (i * 7 + j * 13) % 4;
     if (t === T.WATER || t === T.LAVA || t === T.CLOUD) anim.push(i, j); else x.drawImage(tile(t, t === T.DWALL && j + 1 < m.h && m.tiles[(j + 1) * m.w + i] !== T.DWALL ? 7 : v, 0), i * 32, j * 32);
@@ -561,7 +583,7 @@ function chunk(m: GameMap, cx: number, cy: number) {
   }
   x.imageSmoothingEnabled = true; x.globalAlpha = .55;
   for (let r = Math.max(0, y0 - 4); r < Math.min(m.h, y0 + CH + 2); r++) for (const o of objRows[r]) if (o.x + o.w >= x0 - 2 && o.x <= x0 + CH + 2) objShadow(x, o);
-  ch = { c, anim }; chunks.set(k, ch); if (chunks.size > 20) chunks.delete(chunks.keys().next().value!); return ch;
+  ch = { c, anim }; chunks.set(k, ch); if (chunks.size > (S === 3 ? 14 : 20)) chunks.delete(chunks.keys().next().value!); return ch;
 }
 function sandDecal(x: CanvasRenderingContext2D, i: number, j: number) {
   const h = ((i * 73856093) ^ (j * 19349663)) >>> 0, X = i * 32, Y = j * 32, q = h % 23;
@@ -627,7 +649,7 @@ function autoPlay(a: Ent, ts: number) {
     if (!ready(s)) continue;
     if (s.kind === 'buff' || s.kind === 'summon') { if (dist < 9) return cast(s, 0); continue; }
     if (s.kind === 'heal') continue;
-    if (s.kind === 'spin' ? dist <= s.radius! - .2 : dist <= (s.range ?? 8) - .2) return cast(s, t.id);
+    if (s.kind === 'spin' || s.kind === 'spirits' ? dist <= s.radius! - .2 : dist <= (s.range ?? 8) - .2) return cast(s, t.id);
   }
 }
 function drawNpc(n: Npc) { if (n.id === 'prensa') { shadow(n.x * 32, n.y * 32 + 4, 28, 9); g.drawImage(pressSprite(), Math.round(n.x * 32) - 26, Math.round(n.y * 32) - 56); return; } if (n.id === 'bau') { shadow(n.x * 32, n.y * 32 + 4, 24, 8); g.drawImage(chestSprite(), Math.round(n.x * 32) - 22, Math.round(n.y * 32) - 34); return; } if (n.id === 'artifice') { const w = wingSprites('arcane_wizard', 1)[Math.floor(performance.now() / 135) % 6], fw = w.width / 2; g.imageSmoothingEnabled = true; g.drawImage(w, Math.round(n.x * 32 - fw / 2), Math.round(n.y * 32) - 27 - WING_ROOT, fw, w.height / 2); g.imageSmoothingEnabled = false; } shadow(n.x * 32, n.y * 32 + 2, 15, 6); g.drawImage(heroSprites(npcLooks[n.look])[0][0], Math.round(n.x * 32 - FRAME_W / 2), Math.round(n.y * 32 - FRAME_H + 6)); }

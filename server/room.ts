@@ -40,6 +40,9 @@ export class MapRoom {
   private cfg: Settings = DEFAULT_SETTINGS; private cfgReady: Promise<void> | null = null; private defs: Record<string, MobDef> = structuredClone(MOBS); private jewelRules = structuredClone(JEWELS);
   private tickN = 0; private announced = new Map<number, number>();
   private fx: (Pt & Record<string, unknown>)[] = [];
+  private timed: { at: number; run: () => void }[] = []; private saveWarnAt = 0;
+  /** Agenda algo para alguns ticks depois (golpes em sequência das habilidades). */
+  private later(at: number, run: () => void) { this.timed.push({ at, run }); }
 
   constructor(_state: unknown, env: Env) { this.env = env; }
 
@@ -49,6 +52,11 @@ export class MapRoom {
     if (route === '/news') { const b: any = await req.json(); this.send_all(JSON.stringify({ t: 'news', m: b.m })); return new Response('{}'); }
     if (route === '/kick') { const b: any = await req.json(); for (const p of [...this.players.values()]) if (p.accountId === b.account) { this.send(p, { t: 'kick', m: 'Conta suspensa.' }); try { p.ws.close(4000, 'banned'); } catch { /* */ } this.leave(p); } return new Response('{}'); }
     if (route === '/player') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); if (b.level > p.level) p.points += (b.level - p.level) * CONFIG.pointsPerLevel; p.level = b.level; p.xp = 0; p.gold = b.gold; p.dirty = true; p.meDirty = true; for (const o of this.players.values()) o.known.delete(p.eid); await this.flush(p); return new Response('{"handled":true}'); }
+    if (route === '/dropchar') { // personagem sendo excluído: tira do mapa e espera a última gravação terminar
+      const b: any = await req.json(), p = this.byChar.get(b.char);
+      if (p) { p.dirtyItems.clear(); p.delItems.clear(); p.qtyItems.clear(); p.logs = []; [p.savedRow, p.savedRank] = this.rowOf(p); this.send(p, { t: 'kick', m: 'Este personagem foi excluído.' }); try { p.ws.close(4000, 'deleted'); } catch { /* */ } this.leave(p); }
+      await this.saves.get(b.char); return new Response('{}');
+    }
     if (route === '/count') return new Response(JSON.stringify({ n: this.players.size }));
     if (route === '/addstats') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); const t = b.add.reduce((x: number, y: number) => x + y, 0); if (t > p.points) return new Response('{"handled":true,"error":"Pontos insuficientes."}'); p.str += b.add[0]; p.agi += b.add[1]; p.vit += b.add[2]; p.ene += b.add[3]; p.points -= t; p.dirty = true; p.meDirty = true; await this.flush(p); return new Response('{"handled":true}'); }
     if (route === '/global') { this.send_all(await req.text()); return new Response('ok'); }
@@ -162,10 +170,12 @@ export class MapRoom {
     if (!undo.length) return prev;
     const st = [...dels, ...ins, ...rest];
     if (!st.length) return prev; // nada mudou de verdade: não grava
-    const run: Promise<unknown> = prev.then(() => db.batch(st)).catch(e => { console.error('save', e); if (ps.some(p => p.gone)) return db.batch(st).catch(e2 => { console.error('save retry', e2); undo.forEach(u => u()); }); undo.forEach(u => u()); });
+    const run: Promise<unknown> = prev.then(() => db.batch(st)).catch(e => { console.error('save', e); if (ps.some(p => p.gone)) return db.batch(st).catch(e2 => { console.error('save retry', e2); undo.forEach(u => u()); this.saveFailed(); }); undo.forEach(u => u()); this.saveFailed(); });
     for (const p of ps) { this.saves.set(p.charId, run); run.finally(() => { if (this.saves.get(p.charId) === run) this.saves.delete(p.charId); }); }
     return run;
   }
+  /** O banco recusou a gravação (ex.: limite diário do D1): avisa quem está no mapa, no máximo a cada 5 minutos. */
+  private saveFailed() { const n = Date.now(); if (n - this.saveWarnAt < 300000) return; this.saveWarnAt = n; for (const p of this.players.values()) this.sys(p, '⚠ O servidor não conseguiu salvar agora. Seu progresso continua guardado e será salvo assim que possível; evite sair do jogo por alguns minutos.'); }
   private send(p: Player, m: unknown) { try { p.ws.send(JSON.stringify(m)); } catch { /* fechando */ } }
   private send_all(s: string) { for (const p of this.players.values()) try { p.ws.send(s); } catch { /* fechando */ } }
   private stats(p: Player) { const s = derive(p, p.items), n = Date.now(); if (n < p.buffAtk) s.atk = Math.floor(s.atk * 1.3); if (n < p.buffDef) s.def = Math.floor(s.def * 1.4); return s; }
@@ -311,7 +321,7 @@ export class MapRoom {
   private skill(p: Player, n: unknown, id: unknown, now: number) {
     const sk = classOf(p.cls).skills.find(x => x.n === n); if (sk && p.level < (sk.lvl ?? 1)) return this.sys(p, `Disponível no nível ${sk.lvl}.`);
     if (!sk || (this.map.safe && sk.kind !== 'buff' && sk.kind !== 'heal') || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
-    const s = this.stats(p), m = this.mobs.get(id as number), targeted = sk.kind !== 'spin' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal';
+    const s = this.stats(p), m = this.mobs.get(id as number), targeted = sk.kind !== 'spin' && sk.kind !== 'spirits' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal';
     if (targeted && (!m || m.hp <= 0 || dist(m, p) > sk.range!)) return;
     p.mp -= sk.mana; p.cds[sk.n] = now + sk.cd; p.nextAtk = now + s.attackMs;
     const atk = s.atk * sk.mult, around = (c: Pt, r: number) => [...this.mobs.values()].filter(x => x.hp > 0 && dist(x, c) <= r);
@@ -329,6 +339,35 @@ export class MapRoom {
       case 'multi': {
         const list = around(m!, sk.radius!).sort((a, b) => dist(a, m!) - dist(b, m!)).slice(0, sk.count);
         for (const x of list) { this.fx.push({ k: 'bolt', x: p.x, y: p.y, id: p.eid, tx: x.x, ty: x.y, b: sk.color }); if (sk.curse) x.curseUntil = now + sk.curse; this.hit(p, x, atk, s.crit); } break;
+      }
+      case 'spirits': { // espíritos giram em volta do mago e atingem tudo ao redor várias vezes
+        this.fx.push({ k: 'spirits', x: p.x, y: p.y, id: p.eid, r: sk.radius, b: sk.color, d: sk.count! * 300 });
+        for (let i = 0; i < sk.count!; i++) this.later(now + i * 300, () => { if (p.gone || p.deadUntil) return; for (const x of around(p, sk.radius!)) this.hit(p, x, atk, s.crit); });
+        break;
+      }
+      case 'cone': { // corte em leque à frente do personagem
+        const a0 = Math.atan2(m!.y - p.y, m!.x - p.x), half = (sk.arc ?? 120) / 360 * Math.PI;
+        this.fx.push({ k: 'cone', x: p.x, y: p.y, id: p.eid, a: round(a0), r: sk.radius, w: half, b: sk.color });
+        for (const x of around(p, sk.radius!)) { let da = Math.abs(Math.atan2(x.y - p.y, x.x - p.x) - a0); if (da > Math.PI) da = 2 * Math.PI - da; if (da <= half || dist(x, p) < .8) this.hit(p, x, atk, s.crit); }
+        break;
+      }
+      case 'wave': { // lâmina/flecha que atravessa todos em linha reta
+        const d = dist(m!, p) || 1, ux = (m!.x - p.x) / d, uy = (m!.y - p.y) / d, L = sk.range!, w = sk.radius ?? 1;
+        this.fx.push({ k: 'wave', x: p.x, y: p.y, id: p.eid, tx: round(p.x + ux * L), ty: round(p.y + uy * L), b: sk.color });
+        for (const x of this.mobs.values()) { if (x.hp <= 0) continue; const rx = x.x - p.x, ry = x.y - p.y, along = rx * ux + ry * uy, side = Math.abs(rx * uy - ry * ux); if (along >= -.3 && along <= L && side <= w) this.hit(p, x, atk, s.crit); }
+        break;
+      }
+      case 'chain': { // corrente que pula de monstro em monstro, prende (deixa lento) e perde força a cada pulo
+        const done = new Set<number>(), pts: number[][] = [[round(p.x), round(p.y)]]; let cur = m!, k = 1;
+        for (let i = 0; i < sk.count!; i++) {
+          done.add(cur.eid); pts.push([round(cur.x), round(cur.y)]);
+          const tg = cur, mul = k; this.later(now + i * 90, () => { if (p.gone || tg.hp <= 0) return; if (sk.slow) tg.slowUntil = Date.now() + sk.slow; this.hit(p, tg, atk * mul, s.crit); });
+          k *= .85; let nx: Mob | undefined, bd = sk.radius!;
+          for (const x of this.mobs.values()) if (x.hp > 0 && !done.has(x.eid) && x.state !== 'back') { const dd = dist(x, cur); if (dd < bd) { bd = dd; nx = x; } }
+          if (!nx) break; cur = nx;
+        }
+        this.fx.push({ k: 'chain', x: p.x, y: p.y, id: p.eid, pts, b: sk.color });
+        break;
       }
       case 'buff': if (sk.buff === 'atk') p.buffAtk = now + sk.ms!; else p.buffDef = now + sk.ms!; this.fx.push({ k: 'buff', x: p.x, y: p.y, id: p.eid, b: sk.color }); break;
       case 'heal': for (const o of this.players.values()) if ((o === p || (p.partyId && o.partyId === p.partyId)) && !o.deadUntil && dist(o, p) <= 9) { o.hp = Math.min(this.stats(o).maxHp, o.hp + this.stats(o).maxHp * sk.heal!); o.dirty = true; o.meDirty = true; this.fx.push({ k: 'heal', x: o.x, y: o.y, id: o.eid }); } break;
@@ -584,6 +623,7 @@ export class MapRoom {
     const now = Date.now(), dt = Math.min(.25, (now - this.last) / 1000); this.last = now;
     for (const p of this.players.values()) this.tickPlayer(p, dt, now);
     for (const m of this.mobs.values()) this.tickMob(m, dt, now);
+    if (this.timed.length) { const due = this.timed.filter(t => t.at <= now); if (due.length) { this.timed = this.timed.filter(t => t.at > now); for (const t of due) t.run(); } }
     this.separateMobs();
     this.tickSummons(now, dt);
     for (const d of this.drops.values()) if (now > d.expires) this.drops.delete(d.eid);

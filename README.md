@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.24
+# Eternal MU · versão 0.25
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
@@ -34,7 +34,7 @@ Abra `http://localhost:8787` para o site e `/jogar` para o jogo. Para testar com
 |---|---|---|
 | Mover | Botão esquerdo (segure para seguir o cursor) | Joystick |
 | Atacar | Botão esquerdo no monstro, ou Espaço | Atacar |
-| Habilidades | Botão direito usa a selecionada; 1 e 2 selecionam | Botões 1 e 2 |
+| Habilidades | Botão direito usa a selecionada; 1 a 7 selecionam | Botões 1 a 7 |
 | Poções | Q e E | Vida e Mana |
 | Bolsa, personagem, mapa | I, C, M | Bolsa, Perfil, Mapa |
 | Chat | Enter | Campo de chat |

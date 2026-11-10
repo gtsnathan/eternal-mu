@@ -188,6 +188,9 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   }
   const del = path.match(/^\/api\/characters\/(\d+)\/delete$/);
   if (del && req.method === 'POST') {
+    // se o personagem estiver no jogo, tira do mapa antes (senão a próxima gravação dele falharia sem fim)
+    const dc = await db.prepare('SELECT id,map FROM characters WHERE id=? AND account_id=?').bind(+del[1], me.id).first<{ id: number; map: string }>();
+    if (dc && MAP_IDS.includes(dc.map)) await env.MAP_ROOM.get(env.MAP_ROOM.idFromName(dc.map + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/dropchar', { method: 'POST', body: JSON.stringify({ char: dc.id }) })).catch(() => null);
     await db.batch([db.prepare('DELETE FROM items WHERE char_id=(SELECT id FROM characters WHERE id=? AND account_id=?)').bind(+del[1], me.id), db.prepare('DELETE FROM characters WHERE id=? AND account_id=?').bind(+del[1], me.id)]);
     return json({ characters: await listChars(env, me.id) });
   }
