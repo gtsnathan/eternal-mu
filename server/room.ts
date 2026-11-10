@@ -7,6 +7,8 @@ interface Player extends Pt {
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
+  /** itens que só mudaram de quantidade (poção, pilha): gravados com UPDATE simples */
+  qtyItems: Set<string>; savedRow: string; savedRank: string;
   nextMove?: number; budget: number; lastChat: number; nextTrap: number; nextRegen: number; gone: boolean; lastInvFull: number;
 }
 interface Trade { peer: Player; ids: Set<string>; gold: number; st: number }
@@ -16,6 +18,18 @@ interface Drop extends Pt { eid: number; key: string | null; gold: number; rarit
 
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 const round = (n: number) => Math.round(n * 100) / 100;
+/** Junta registros repetidos de coleta (ouro e itens empilháveis) em uma linha por gravação. */
+const MERGE_LOG = new Set(['loot_gold', 'loot']);
+function mergeLogs(logs: unknown[][]): unknown[][] {
+  const out: unknown[][] = [], by = new Map<string, unknown[]>();
+  for (const l of logs) {
+    if (!MERGE_LOG.has(l[0] as string)) { out.push(l); continue; }
+    const k = `${l[0]}|${l[1]}|${l[2]}`, m = by.get(k);
+    if (m) { m[3] = (m[3] as number) + (l[3] as number); m[4] = (m[4] as number) + (l[4] as number); m[5] = l[5]; }
+    else { const c = [...l]; by.set(k, c); out.push(c); }
+  }
+  return out;
+}
 
 export class MapRoom {
   private env: Env; private map!: GameMap; private mapId = '';
@@ -93,9 +107,10 @@ export class MapRoom {
     const items = all.filter(i => i.equip || i.slot < 1000), chest = all.filter(i => !i.equip && i.slot >= 1000);
     const p: Player = {
       accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
-      x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
+      x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], qtyItems: new Set(), savedRow: '', savedRank: '', budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     for (const it of [...p.items]) while (ITEMS[it.key]?.kind === 'jewel' && !it.equip && it.qty > 1) { const s = this.freeSlot(p); if (s < 0) break; it.qty--; p.dirtyItems.add(it.id); const n: ItemInst = { id: crypto.randomUUID(), key: it.key, qty: 1, slot: s, equip: null, rarity: 0, plus: 0, opts: [] }; p.items.push(n); p.dirtyItems.add(n.id); p.dirty = true; }
+    { const [r, k] = this.rowOf(p); p.savedRow = r; p.savedRank = k; } // estado igual ao do banco
     if (blocked(this.map, p.x, p.y)) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; }
     if (p.hp <= 0) p.hp = this.stats(p).maxHp;
     player = p; this.players.set(p.eid, p); this.byChar.set(charId, p);
@@ -119,24 +134,34 @@ export class MapRoom {
     if (!this.players.size && this.timer) { clearInterval(this.timer); this.timer = null; }
   }
   private flush(p: Player) { return this.saveBatch([p]); }
+  /** Colunas do personagem como texto, para comparar com o que já está no banco. */
+  private rowOf(p: Player): [string, string] {
+    return [JSON.stringify([p.mxp, p.mpts, JSON.stringify(p.mtree), p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y)]), JSON.stringify([p.resets, p.ml, p.level])];
+  }
   /** Grava um ou mais personagens em uma única transação (trocas gravam os dois juntos). */
   private saveBatch(ps: Player[]): Promise<unknown> {
     const db = this.env.DB, dels: D1PreparedStatement[] = [], ins: D1PreparedStatement[] = [], rest: D1PreparedStatement[] = [], undo: (() => void)[] = [];
     for (const p of ps) {
-      if (!p.dirty && !p.dirtyItems.size && !p.delItems.size && !p.logs.length) continue;
-      const logs = p.logs; p.logs = [];
+      if (!p.dirty && !p.dirtyItems.size && !p.delItems.size && !p.qtyItems.size && !p.logs.length) continue;
+      const logs = mergeLogs(p.logs); p.logs = [];
       // apaga antes de regravar: os índices de posição são únicos
       for (const id of p.delItems) dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId));
       const dirtyIds = [...p.dirtyItems], changed = [...p.items, ...p.chest].filter(i => p.dirtyItems.has(i.id));
       for (const i of changed) { dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId)); ins.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity,plus,opts) VALUES(?,?,?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity, i.plus ?? 0, i.opts?.length ? JSON.stringify(i.opts) : null)); }
-      rest.push(db.prepare('UPDATE characters SET resets=?,master_level=?,master_xp=?,master_points=?,master_tree=?,level=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(p.resets, p.ml, p.mxp, p.mpts, JSON.stringify(p.mtree), p.level, p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), p.charId));
+      for (const id of p.qtyItems) { if (p.dirtyItems.has(id) || p.delItems.has(id)) continue; const i = p.items.find(x => x.id === id) ?? p.chest.find(x => x.id === id); if (i) rest.push(db.prepare('UPDATE items SET qty=? WHERE id=? AND char_id=?').bind(i.qty, i.id, p.charId)); }
+      // só grava o personagem se algo mudou desde a última gravação; nível/resets à parte para não mexer no índice do ranking à toa
+      const [row, rank] = this.rowOf(p), oldRow = p.savedRow, oldRank = p.savedRank;
+      if (row !== oldRow) rest.push(db.prepare('UPDATE characters SET master_xp=?,master_points=?,master_tree=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(...JSON.parse(row), p.charId));
+      if (rank !== oldRank) rest.push(db.prepare('UPDATE characters SET resets=?,master_level=?,level=? WHERE id=?').bind(...JSON.parse(rank), p.charId));
+      p.savedRow = row; p.savedRank = rank;
       for (const l of logs) rest.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
-      const delIds = [...p.delItems]; p.delItems.clear(); p.dirtyItems.clear(); p.dirty = false;
-      undo.push(() => { p.dirty = true; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); p.logs.unshift(...logs); });
+      const delIds = [...p.delItems], qtyIds = [...p.qtyItems]; p.delItems.clear(); p.dirtyItems.clear(); p.qtyItems.clear(); p.dirty = false;
+      undo.push(() => { p.dirty = true; p.savedRow = oldRow; p.savedRank = oldRank; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); qtyIds.forEach(i => p.qtyItems.add(i)); p.logs.unshift(...logs); });
     }
     const prev = Promise.all(ps.map(p => this.saves.get(p.charId)));
     if (!undo.length) return prev;
     const st = [...dels, ...ins, ...rest];
+    if (!st.length) return prev; // nada mudou de verdade: não grava
     const run: Promise<unknown> = prev.then(() => db.batch(st)).catch(e => { console.error('save', e); if (ps.some(p => p.gone)) return db.batch(st).catch(e2 => { console.error('save retry', e2); undo.forEach(u => u()); }); undo.forEach(u => u()); });
     for (const p of ps) { this.saves.set(p.charId, run); run.finally(() => { if (this.saves.get(p.charId) === run) this.saves.delete(p.charId); }); }
     return run;
@@ -229,13 +254,17 @@ export class MapRoom {
     const def = ITEMS[key]; if (def.kind === 'jewel' && qty > 1) { for (let n = 0; n < qty; n++) if (!this.give(p, key, 1, rarity, reason)) return false; return true; }
     const stackable = isStack(def);
     let it = stackable ? p.items.find(i => i.key === key && !i.equip) : undefined;
+    const stacked = !!it;
     if (it) it.qty += qty;
     else { const slot = this.freeSlot(p); if (slot < 0) return false; it = { id: crypto.randomUUID(), key, qty, slot, equip: null, rarity, plus: 0, opts }; p.items.push(it); }
-    p.dirtyItems.add(it.id); p.logs.push([reason, it.id, key, qty, 0, Date.now()]); return true;
+    if (stacked) this.qtyChanged(p, it); else p.dirtyItems.add(it.id);
+    p.logs.push([reason, it.id, key, qty, 0, Date.now()]); return true;
   }
   private takeOne(p: Player, it: ItemInst) {
-    if (--it.qty <= 0) { p.items.splice(p.items.indexOf(it), 1); p.dirtyItems.delete(it.id); p.delItems.add(it.id); } else p.dirtyItems.add(it.id);
+    if (--it.qty <= 0) { p.items.splice(p.items.indexOf(it), 1); p.dirtyItems.delete(it.id); p.qtyItems.delete(it.id); p.delItems.add(it.id); } else this.qtyChanged(p, it);
   }
+  /** Item já gravado que só mudou a quantidade: 1 linha (UPDATE) em vez de apagar e regravar (~8 linhas com os índices). */
+  private qtyChanged(p: Player, it: ItemInst) { if (!p.dirtyItems.has(it.id)) p.qtyItems.add(it.id); }
   private invAt(p: Player, slot: unknown) { return Number.isInteger(slot) ? p.items.find(i => !i.equip && i.slot === slot) : undefined; }
   private usePotion(p: Player, slot: unknown, now: number) {
     const it = this.invAt(p, slot); if (!it || now < p.nextPotion) return;

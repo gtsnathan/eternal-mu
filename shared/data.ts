@@ -1,7 +1,7 @@
 // Regras e conteúdo do jogo. Todos os números de balanceamento ficam aqui.
 export const CONFIG = {
   tickMs: 50, testCommands: true, aoiRadius: 22, pointsPerLevel: 5, maxLevel: 400, playerSpeed: 5,
-  attackRange: 1.7, invSize: 40, startGold: 100, saveEveryMs: 10000, dropOwnMs: 15000, dropLifeMs: 60000,
+  attackRange: 1.7, invSize: 40, startGold: 100, saveEveryMs: 60000, dropOwnMs: 15000, dropLifeMs: 60000,
 };
 export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings';
 export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings'];
