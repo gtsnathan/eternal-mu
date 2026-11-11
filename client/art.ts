@@ -262,6 +262,7 @@ export function weaponSprite(key: string): Cv {
     if (t >= 1) for (let y = tip + 6; y < H - 14; y += 5) r(g, m, y, 1, 2, dk);
   }
   if (t >= 4) for (const [x, y] of [[m - 7, 6], [m + 8, 13], [m - 6, 24], [m + 7, 31]] as [number, number][]) { r(g, x, y - 1, 1, 3, lt); r(g, x - 1, y, 3, 1, lt); r(g, x, y, 1, 1, '#fff'); } // brilho das armas lendárias
+  if (d.lvl >= 200) for (const [x, y] of [[m + 9, 4], [m - 9, 15], [m + 9, 22], [m - 8, 36], [m + 6, 42]] as [number, number][]) { r(g, x, y, 2, 2, col); r(g, x, y, 1, 1, '#fff'); } // armas dos mundos mais altos: brilho extra
   weaponCache.set(key, c); return c;
 }
 function heroFrame(dir: number, f: number, o: Look): Cv {

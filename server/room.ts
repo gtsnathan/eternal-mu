@@ -325,6 +325,8 @@ export class MapRoom {
       box_prata: { gold: [10000, 40000], picks: 1, lvl: [26, 56], exc: .1, anc: .01, table: [[30, 'jewel_aurora', 2], [30, 'jewel_destiny', 1], [30, 'gear', 1], [10, 'pot_hp3', 5]] },
       box_ouro: { gold: [50000, 200000], picks: 2, lvl: [50, 90], exc: .15, anc: .03, table: [[30, 'jewel_destiny', 2], [25, 'jewel_eclipse', 1], [35, 'gear', 1], [10, 'ancient_scale', 1]] },
       box_rei: { gold: [300000, 1000000], picks: 2, lvl: [86, 110], exc: .3, anc: .1, table: [[30, 'jewel_eclipse', 2], [50, 'gear', 1], [20, 'ancient_scale', 2]] },
+      // gear do nível do jogador (até 60 abaixo), dos mundos de alto nível
+      box_mitico: { gold: [1000000, 4000000], picks: 2, lvl: [Math.max(120, p.level - 60), Math.max(120, p.level)], exc: .4, anc: .15, table: [[25, 'jewel_eclipse', 3], [55, 'gear', 1], [20, 'ancient_scale', 3]] },
     }, b = T[it.key]; if (!b) return;
     const cls = classOf(p.cls), pool = Object.values(ITEMS).filter(d => SLOTS.includes(d.kind as Slot) && d.kind !== 'wings' && d.lvl >= b.lvl[0] && d.lvl <= b.lvl[1] && canWield(cls, d));
     const prizes: { key: string; qty: number; rarity: number; opts: string[] }[] = [];
@@ -661,7 +663,7 @@ export class MapRoom {
     const [lo, hi] = m.def.gold, now = Date.now();
     const drop = (key: string | null, gold: number, rarity: number, opts: string[] = []) => { const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, opts, owner: owner.charId, party: owner.partyId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
     drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
-    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), anc = gear && k !== 'wings' && Math.random() < .003 * this.cfg.exc, exc = gear && k !== 'wings' && Math.random() < .03 * this.cfg.exc; if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 ? 2 : Math.random() < .3 ? 1 : 0; drop(key, 0, r); }
+    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), lm = (1 + Math.max(0, m.def.level - 100) / 100) * (m.def.boss ? 2 : 1), anc = gear && k !== 'wings' && Math.random() < .003 * lm * this.cfg.exc, exc = gear && k !== 'wings' && Math.random() < .03 * lm * this.cfg.exc; if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 * lm ? 2 : Math.random() < Math.min(.6, .3 * lm) ? 1 : 0; drop(key, 0, r); }
     if (m.def.boss) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {

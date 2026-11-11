@@ -56,6 +56,29 @@ export const SETS: Record<string, SetDef> = {
 };
 // Cada classe veste somente os sets dela
 for (const [c, l] of Object.entries({ dark_warrior: ['boar', 'bear', 'lion', 'tiger', 'dragon', 'minotaur', 'mammoth', 'titan'], arcane_wizard: ['salamander', 'fox', 'owl', 'phoenix', 'chimera', 'sphinx', 'djinn', 'oracle'], mystic_archer: ['axolotl', 'griffin', 'deer', 'serpent', 'pegasus', 'hummingbird', 'peacock', 'unicorn'], spell_knight: ['wolf', 'falcon', 'scorpion', 'manticore', 'hydra', 'wyvern', 'rhino', 'basilisk'], shadow_summoner: ['bat', 'spider', 'skull', 'kraken', 'demon', 'reaper', 'mummy', 'lich'] })) for (const k of l) SETS[k].cls = c;
+// Sets dos mundos de alto nível (120, 180, 240 e 300): só caem dos monstros
+Object.assign(SETS, {
+  colosso: { cls: 'dark_warrior', key: 'colosso', name: 'Colosso de Lava', of: 'do', lvl: 120, color: '#3a1a14', trim: '#ff7a2b', cape: '#1c0c08', power: 14.2, price: 5110427, bonus: { def: 135, hp: 1420, atk: 0.67 } },
+  behemoth: { cls: 'dark_warrior', key: 'behemoth', name: 'Behemoth Ancião', of: 'do', lvl: 180, color: '#4a3a2a', trim: '#ffd76a', cape: '#241a10', power: 20.8, price: 13082694, bonus: { def: 198, hp: 2080, atk: 0.88 } },
+  leviata: { cls: 'dark_warrior', key: 'leviata', name: 'Leviatã das Profundezas', of: 'do', lvl: 240, color: '#14405a', trim: '#4af0ff', cape: '#08202e', power: 27.4, price: 33491697, bonus: { def: 260, hp: 2740, atk: 1.09 } },
+  apocalipse: { cls: 'dark_warrior', key: 'apocalipse', name: 'Cavaleiro do Apocalipse', of: 'do', lvl: 300, color: '#1a1014', trim: '#ff4a6a', cape: '#0a0608', power: 34.0, price: 85738746, bonus: { def: 323, hp: 3400, atk: 1.3 } },
+  arcanjo: { cls: 'arcane_wizard', key: 'arcanjo', name: 'Arcanjo Celeste', of: 'do', lvl: 120, color: '#e8eef8', trim: '#ffd76a', cape: '#8aa0c8', power: 14.2, price: 5110427, bonus: { def: 135, hp: 1420, atk: 0.67 } },
+  eclipse: { cls: 'arcane_wizard', key: 'eclipse', name: 'Eclipse Arcano', of: 'do', lvl: 180, color: '#2a1a4a', trim: '#ffb13d', cape: '#140a28', power: 20.8, price: 13082694, bonus: { def: 198, hp: 2080, atk: 0.88 } },
+  nebulosa: { cls: 'arcane_wizard', key: 'nebulosa', name: 'Nebulosa Estelar', of: 'da', lvl: 240, color: '#3a2a8a', trim: '#ff9df0', cape: '#1a1450', power: 27.4, price: 33491697, bonus: { def: 260, hp: 2740, atk: 1.09 } },
+  infinito: { cls: 'arcane_wizard', key: 'infinito', name: 'Mago do Infinito', of: 'do', lvl: 300, color: '#0f1a3a', trim: '#7affd8', cape: '#060c1e', power: 34.0, price: 85738746, bonus: { def: 323, hp: 3400, atk: 1.3 } },
+  kitsune: { cls: 'mystic_archer', key: 'kitsune', name: 'Kitsune de Nove Caudas', of: 'da', lvl: 120, color: '#f0a050', trim: '#fff2d8', cape: '#a8501e', power: 14.2, price: 5110427, bonus: { def: 135, hp: 1420, atk: 0.67 } },
+  cervoastral: { cls: 'mystic_archer', key: 'cervoastral', name: 'Cervo Astral', of: 'do', lvl: 180, color: '#8ab0e0', trim: '#fff2b0', cape: '#3a5a8a', power: 20.8, price: 13082694, bonus: { def: 198, hp: 2080, atk: 0.88 } },
+  aguia: { cls: 'mystic_archer', key: 'aguia', name: 'Águia Imperial', of: 'da', lvl: 240, color: '#7a5a2a', trim: '#ffe27a', cape: '#3a2a10', power: 27.4, price: 33491697, bonus: { def: 260, hp: 2740, atk: 1.09 } },
+  aurora: { cls: 'mystic_archer', key: 'aurora', name: 'Aurora Boreal', of: 'da', lvl: 300, color: '#1a5a5a', trim: '#9dff6b', cape: '#0a2e2e', power: 34.0, price: 85738746, bonus: { def: 323, hp: 3400, atk: 1.3 } },
+  cerbero: { cls: 'spell_knight', key: 'cerbero', name: 'Cérbero Rúnico', of: 'do', lvl: 120, color: '#3a1a1a', trim: '#ff7a2b', cape: '#1a0a0a', power: 14.2, price: 5110427, bonus: { def: 135, hp: 1420, atk: 0.67 } },
+  grifoguerra: { cls: 'spell_knight', key: 'grifoguerra', name: 'Grifo de Guerra', of: 'do', lvl: 180, color: '#9aa6b8', trim: '#4af0ff', cape: '#4a5466', power: 20.8, price: 13082694, bonus: { def: 198, hp: 2080, atk: 0.88 } },
+  paladino: { cls: 'spell_knight', key: 'paladino', name: 'Paladino Rúnico', of: 'do', lvl: 240, color: '#d8d0b8', trim: '#7fc8ff', cape: '#7a6c48', power: 27.4, price: 33491697, bonus: { def: 260, hp: 2740, atk: 1.09 } },
+  valquiria: { cls: 'spell_knight', key: 'valquiria', name: 'Valquíria Eterna', of: 'da', lvl: 300, color: '#c0c8e0', trim: '#ffd76a', cape: '#4a5070', power: 34.0, price: 85738746, bonus: { def: 323, hp: 3400, atk: 1.3 } },
+  banshee: { cls: 'shadow_summoner', key: 'banshee', name: 'Banshee Uivante', of: 'da', lvl: 120, color: '#2a3a4a', trim: '#bdf0ff', cape: '#141e28', power: 14.2, price: 5110427, bonus: { def: 135, hp: 1420, atk: 0.67 } },
+  necromante: { cls: 'shadow_summoner', key: 'necromante', name: 'Necromante Supremo', of: 'do', lvl: 180, color: '#1a2a1a', trim: '#7dffb0', cape: '#0a140a', power: 20.8, price: 13082694, bonus: { def: 198, hp: 2080, atk: 0.88 } },
+  pesadelo: { cls: 'shadow_summoner', key: 'pesadelo', name: 'Pesadelo Vivo', of: 'do', lvl: 240, color: '#2a0a2a', trim: '#ff4af0', cape: '#140414', power: 27.4, price: 33491697, bonus: { def: 260, hp: 2740, atk: 1.09 } },
+  abismal: { cls: 'shadow_summoner', key: 'abismal', name: 'Senhor Abismal', of: 'do', lvl: 300, color: '#0a0a1a', trim: '#7a4aff', cape: '#04040c', power: 34.0, price: 85738746, bonus: { def: 323, hp: 3400, atk: 1.3 } },
+} as Record<string, SetDef>);
 export const SET_PIECES = ['helm', 'armor', 'pants', 'boots'] as const;
 const PIECE = { helm: ['Elmo', 11, 40, 1], armor: ['Couraça', 20, 90, 1.6], pants: ['Grevas', 14, 50, 1.1], boots: ['Botas', 8, 30, .9] } as const;
 // Asas: exclusivas por classe, em 3 níveis
@@ -73,7 +96,12 @@ export const EXC_TEXT: Record<string, string> = { atk: '+6% de ataque', crit: '+
 // Armas por tipo e nível
 export type WType = 'sword' | 'axe' | 'staff' | 'bow' | 'mace' | 'spear' | 'gsword' | 'scepter' | 'crossbow';
 export const WTYPE_NAME: Record<WType, string> = { sword: 'Espadas', gsword: 'Espadões', axe: 'Machados', mace: 'Maças e Martelos', spear: 'Lanças', staff: 'Cajados', scepter: 'Cetros', bow: 'Arcos', crossbow: 'Bestas' };
-const WEAPON_TIERS: [number, number, number][] = [[12, 30, 1500], [26, 62, 8000], [44, 135, 60000], [56, 200, 400000], [70, 310, 2500000], [90, 430, 9000000], [110, 580, 25000000]];
+const WEAPON_TIERS: [number, number, number][] = [[12, 30, 1500], [26, 62, 8000], [44, 135, 60000], [56, 200, 400000], [70, 310, 2500000], [90, 430, 9000000], [110, 580, 25000000],
+  [120, 650, 30000000], [150, 860, 42000000], [180, 1080, 59000000], [210, 1300, 82000000], [240, 1520, 115000000], [270, 1750, 160000000], [300, 1980, 225000000], [340, 2300, 315000000]];
+/** Níveis das armas e acessórios que só caem nos mundos de alto nível (um por mundo). */
+export const HI_TIERS = [120, 150, 180, 210, 240, 270, 300, 340];
+const HI_EPI: [string, string][] = [['da Hidra', '#9dff6b'], ['do Inverno Eterno', '#bdf0ff'], ['do Vulcão', '#ff7a2b'], ['do Lich Rei', '#7dffb0'], ['da Floresta Sombria', '#c77dff'], ['do Abismo', '#4af0ff'], ['do Caos', '#ff4a6a'], ['do Vazio Eterno', '#ff4af0']];
+const HI_NOUN: Record<string, string> = { sword: 'Espada', axe: 'Machado', staff: 'Cajado', bow: 'Arco', mace: 'Martelo', spear: 'Lança', gsword: 'Montante', scepter: 'Cetro', crossbow: 'Besta' };
 /** Multiplicador de dano de cada tipo (bestas e arcos um pouco menos porque atacam de longe). */
 const WTYPE_DMG: Record<WType, number> = { sword: 1, axe: 1.08, staff: 1, bow: .92, mace: 1.04, spear: 1.05, gsword: 1.1, scepter: 1.03, crossbow: .96 };
 const WEAPON_LINES: Record<WType, [string, string][]> = {
@@ -88,13 +116,16 @@ const WEAPON_LINES: Record<WType, [string, string][]> = {
   crossbow: [['Besta de Caça', '#9a7a4a'], ['Besta de Aço', '#cfd8e3'], ['Besta Glacial', '#9fe8ff'], ['Besta Sombria', '#8a6bd8'], ['Besta de Repetição', '#ffb13d'], ['Besta Celestial', '#ffe9a8'], ['Besta do Dragão', '#ff6a4a']],
 };
 // Acessórios: anel (ataque e vida) e amuleto (defesa e vida), para todas as classes
-export const ACC_LVLS = [10, 30, 50, 70, 90, 110];
+export const ACC_LVLS = [10, 30, 50, 70, 90, 110, 120, 150, 180, 210, 240, 270, 300, 340];
 const ACC_ITEMS: ItemDef[] = [
   ...([['Anel de Cobre', '#c98a4a', '#ff8a5c', 6, 20, 3000], ['Anel de Prata Lunar', '#d6dee8', '#8fd0ff', 16, 60, 25000], ['Anel do Fogo Eterno', '#e0b03a', '#ff5a2c', 34, 140, 150000], ['Anel do Vazio', '#6b5a8a', '#c77dff', 60, 260, 900000], ['Anel dos Céus', '#e8f4ff', '#7affd8', 95, 420, 5000000], ['Anel do Imperador', '#f0cf65', '#ff4a6a', 140, 650, 15000000]] as [string, string, string, number, number, number][])
-    .map(([name, tint, blade, dmg, hp, price], i) => ({ key: `ring_${ACC_LVLS[i]}`, name, kind: 'ring' as const, lvl: ACC_LVLS[i], price, dmg, hp, tint, blade })),
+    .concat(([[160, 720], [210, 920], [260, 1120], [310, 1320], [360, 1520], [410, 1720], [460, 1920], [530, 2200]] as [number, number][]).map(([d, h], i) => [`Anel ${HI_EPI[i][0]}`, i % 2 ? '#e8f4ff' : '#f0cf65', HI_EPI[i][1], d, h, 30000000 * 1.4 ** i] as [string, string, string, number, number, number]))
+    .map(([name, tint, blade, dmg, hp, price], i) => ({ key: `ring_${ACC_LVLS[i]}`, name, kind: 'ring' as const, lvl: ACC_LVLS[i], price: Math.round(price), dmg, hp, tint, blade })),
   ...([['Amuleto de Osso', '#e8e0c8', '#bdf0ff', 5, 40, 3000], ['Pingente de Jade', '#c9a44c', '#7dffb0', 14, 120, 25000], ['Colar de Rubi', '#e0b03a', '#ff4a6a', 30, 260, 150000], ['Talismã Abissal', '#7a8aa0', '#5ad6c8', 52, 480, 900000], ['Medalhão Solar', '#f0cf65', '#ffd76a', 80, 760, 5000000], ['Coração da Eternidade', '#e8f4ff', '#ff9df0', 120, 1100, 15000000]] as [string, string, string, number, number, number][])
-    .map(([name, tint, blade, def, hp, price], i) => ({ key: `amulet_${ACC_LVLS[i]}`, name, kind: 'amulet' as const, lvl: ACC_LVLS[i], price, def, hp, tint, blade })),
+    .concat(([[135, 1200], [175, 1500], [215, 1800], [255, 2100], [295, 2400], [335, 2700], [375, 3000], [430, 3400]] as [number, number][]).map(([d, h], i) => [`Amuleto ${HI_EPI[i][0]}`, i % 2 ? '#f0cf65' : '#e8f4ff', HI_EPI[i][1], d, h, 30000000 * 1.4 ** i] as [string, string, string, number, number, number]))
+    .map(([name, tint, blade, def, hp, price], i) => ({ key: `amulet_${ACC_LVLS[i]}`, name, kind: 'amulet' as const, lvl: ACC_LVLS[i], price: Math.round(price), def, hp, tint, blade })),
 ];
+for (const [w, l] of Object.entries(WEAPON_LINES)) l.push(...HI_EPI.map(([e, c]) => [`${HI_NOUN[w]} ${e}`, c] as [string, string]));
 const WTYPES = Object.keys(WEAPON_LINES) as WType[], WTYPE_ORDER = Object.keys(WTYPE_NAME) as WType[];
 const WEAPON_ITEMS: ItemDef[] = Object.entries(WEAPON_LINES).flatMap(([wt, l]) => l.map(([name, blade], i) => ({ key: `w_${wt}_${WEAPON_TIERS[i][0]}`, name, kind: 'weapon' as const, lvl: WEAPON_TIERS[i][0], dmg: Math.round(WEAPON_TIERS[i][1] * WTYPE_DMG[wt as WType]), price: WEAPON_TIERS[i][2], blade, wtype: wt as WType })));
 // a chance é dividida entre os tipos para não multiplicar a quantidade de armas que cai
@@ -112,6 +143,7 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'box_prata', name: 'Baú de Prata', kind: 'box', lvl: 1, price: 30000, blade: '#d6dee8' },
   { key: 'box_ouro', name: 'Baú de Ouro', kind: 'box', lvl: 1, price: 200000, blade: '#ffd76a' },
   { key: 'box_rei', name: 'Baú do Rei', kind: 'box', lvl: 1, price: 1500000, blade: '#ff6ad5' },
+  { key: 'box_mitico', name: 'Baú Mítico', kind: 'box', lvl: 1, price: 6000000, blade: '#7affd8' },
   { key: 'jewel_aurora', name: 'Joia da Aurora', kind: 'jewel', lvl: 1, price: 6000, blade: '#ffe08a' },
   { key: 'jewel_destiny', name: 'Joia do Destino', kind: 'jewel', lvl: 1, price: 30000, blade: '#6fd6ff' },
   { key: 'jewel_eclipse', name: 'Joia do Eclipse', kind: 'jewel', lvl: 1, price: 120000, blade: '#d86bff' },
@@ -157,7 +189,7 @@ export const RARITY = [
 ];
 export const SHOPS: Record<string, string[]> = {
   alquimista: ['pot_hp', 'pot_mp', 'pot_hp2', 'pot_mp2', 'pot_hp3', 'pot_mp3'],
-  armeira: SET_ITEMS.map(i => i.key),
+  armeira: SET_ITEMS.filter(i => i.lvl <= 86).map(i => i.key),
   wings: [],
   chest: [],
   reset: [],
@@ -217,8 +249,10 @@ function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?
   const b = !!o.boss, hp = Math.round(170000 * (L / 92) ** 1.5 * (b ? 6 : 1) / 1000) * 1000;
   const dmg = Math.round(lerpT(L, [[120, 1180], [150, 1240], [180, 1735], [220, 2310], [260, 2510], [300, 2820], [340, 3420], [380, 3920], [400, 4200]]) * (b ? 1.5 : 1));
   const def = Math.round(lerpT(L, [[120, 430], [150, 500], [180, 800], [220, 1050], [260, 1200], [300, 1350], [340, 1700], [380, 2100], [400, 2300]]) * (b ? 1.2 : 1));
-  const drops: [string, number][] = b ? [...wep(110, .3), ...wep(90, .5), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...TOP_SETS.flatMap(s => setDrops(s, .15))]
-    : [...wep(110, .004 + L / 40000), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...TOP_SETS.flatMap(s => setDrops(s, .006))];
+  // arma/acessório do nível do mundo (e o anterior); set do nível mais alto que o monstro alcança
+  const wt = HI_TIERS.filter(t => t <= L).pop() ?? 110, wp = HI_TIERS[HI_TIERS.indexOf(wt) - 1] ?? 110, st = [120, 180, 240, 300].filter(t => t <= L).pop(), sets = st ? Object.values(SETS).filter(s => s.lvl === st).map(s => s.key) : TOP_SETS;
+  const drops: [string, number][] = b ? [...wep(wt, .5), ...wep(wp, .6), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...sets.flatMap(s => setDrops(s, .2)), ['box_mitico', L >= 200 ? .5 : .25]]
+    : [...wep(wt, .006), ...wep(wp, .008), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...sets.flatMap(s => setDrops(s, .005)), ['box_mitico', L >= 200 ? .004 : .002]];
   return { key, name, level: L, hp, dmg, def, speed: b ? 3.2 : 3, detect: b ? 14 : 9, leash: b ? 20 : 14, attackMs: b ? 1400 : 1500, xp: Math.round(hp * (b ? 2.5 : 1.15)), respawnMs: b ? 3600000 : 42000, gold: b ? [L * 1400, L * 2400] : [L * 55, L * 95], drops, boss: b || undefined, reach: o.reach ?? (b ? 3.4 : undefined), bolt: o.bolt, nova: o.nova };
 }
 Object.assign(MOBS, Object.fromEntries([
