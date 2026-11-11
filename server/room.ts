@@ -117,7 +117,7 @@ export class MapRoom {
       accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, mr: c.master_resets ?? 0, ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], qtyItems: new Set(), savedRow: '', savedRank: '', budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
-    { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) p.dirty = true; } // junta joias, poções etc. em pilhas de até 255
+    { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) p.dirty = true; } // junta joias, poções etc. em pilhas de até 1000
     { const [r, k] = this.rowOf(p); p.savedRow = r; p.savedRank = k; } // estado igual ao do banco
     if (blocked(this.map, p.x, p.y)) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; }
     if (p.hp <= 0) p.hp = this.stats(p).maxHp;
@@ -212,7 +212,7 @@ export class MapRoom {
       case 'u': return this.usePotion(p, m.slot, now);
       case 'e': return this.equip(p, m.slot);
       case 'x': return this.discard(p, [m.slot]);
-      case 'org': { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) { p.dirty = true; this.sendInv(p); } return this.sys(p, a || b ? 'Pilhas juntadas (até 255 por espaço).' : 'Suas pilhas já estão organizadas.'); }
+      case 'org': { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) { p.dirty = true; this.sendInv(p); } return this.sys(p, a || b ? `Pilhas juntadas (até ${STACK_MAX} por espaço).` : 'Suas pilhas já estão organizadas.'); }
       case 'xa': return this.discard(p, Array.isArray(m.slots) ? m.slots.slice(0, CONFIG.invSize) : []);
       case 'ue': return this.unequip(p, m.eq);
       case 'st': return this.addStat(p, m.s, m.n);
@@ -267,7 +267,7 @@ export class MapRoom {
   private give(p: Player, key: string, qty: number, rarity: number, reason: string, opts: string[] = []): boolean {
     const def = ITEMS[key];
     let it: ItemInst | undefined;
-    if (isStack(def)) { // completa as pilhas que já existem e abre espaços novos só para o que sobrar (até 255 cada)
+    if (isStack(def)) { // completa as pilhas que já existem e abre espaços novos só para o que sobrar (até 1000 cada)
       if (this.slotsNeeded(p, key, qty) > this.freeSlots(p)) return false;
       let left = qty;
       for (const s of p.items.filter(i => i.key === key && !i.equip && i.qty < STACK_MAX).sort((a, b) => a.slot - b.slot)) { if (!left) break; const add = Math.min(left, STACK_MAX - s.qty); s.qty += add; left -= add; this.qtyChanged(p, s); it ??= s; }
@@ -284,7 +284,7 @@ export class MapRoom {
     const room = p.items.filter(i => i.key === key && !i.equip && i.qty < STACK_MAX).reduce((a, i) => a + STACK_MAX - i.qty, 0);
     return Math.max(0, Math.ceil((qty - room) / STACK_MAX));
   }
-  /** Reorganiza pilhas do mesmo item: o mínimo de espaços, cada um com até 255. Devolve true se mudou algo. */
+  /** Reorganiza pilhas do mesmo item: o mínimo de espaços, cada um com até 1000. Devolve true se mudou algo. */
   private mergeStacks(p: Player, inChest: boolean) {
     const list = inChest ? p.chest : p.items, by = new Map<string, ItemInst[]>(); let changed = false;
     for (const it of list) if (!it.equip && ITEMS[it.key] && isStack(ITEMS[it.key])) { const g = by.get(it.key); if (g) g.push(it); else by.set(it.key, [it]); }
