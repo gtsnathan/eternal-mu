@@ -138,43 +138,89 @@ body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;al
 .touch #bar{background:none;border:0;box-shadow:none;padding:0}
 .cell{background:radial-gradient(circle at 50% 35%,#272038,#120e1e);border-color:#40365a}
 
-/* ===== layout por aparelho (celular, tablet e computador) ===== */
+/* ===== layout por aparelho (computador, tablet e celular) ===== */
+.tonly{display:none}
 body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
 @media (max-width:1180px){body:not(.touch) #chat{bottom:112px;width:min(360px,44vw)}}
-/* toque: tablet e celular grande */
-.touch .frame{width:min(250px,46vw)}
-.touch #bar{display:grid;grid-template-columns:repeat(5,60px);gap:7px;left:auto;transform:none;right:calc(12px + env(safe-area-inset-right));bottom:calc(18px + env(safe-area-inset-bottom))}
-.touch .slot{width:60px;height:60px}
-.touch .menu{top:auto;bottom:calc(172px + env(safe-area-inset-bottom));right:calc(12px + env(safe-area-inset-right));flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:calc(100vw - 24px)}
-.touch .menu button{padding:5px 9px;font-size:12px}
-/* celular deitado */
-@media (orientation:landscape) and (max-height:500px){
-  .touch .frame{width:220px}.touch #portrait{width:40px;height:48px}
-  .touch .mini{width:112px}.touch #minimap{width:102px;height:54px}.touch .minfo{font-size:10px;flex-wrap:nowrap;overflow:hidden}
-  .touch .menu{top:calc(106px + env(safe-area-inset-top));bottom:auto;right:calc(8px + env(safe-area-inset-right));flex-direction:column;flex-wrap:nowrap;gap:3px;max-width:none}
-  .touch .menu button{padding:3px 6px;font-size:11px;min-width:86px}
-  .touch #bar{grid-template-columns:repeat(5,50px);gap:5px;right:calc(104px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom))}
-  .touch .slot{width:50px;height:50px}.touch .slot b canvas{width:38px;height:38px}.touch .slot .pi{width:30px;height:30px}
-  .touch #chat{top:calc(8px + env(safe-area-inset-top));left:calc(240px + env(safe-area-inset-left));transform:none;width:min(340px,calc(100vw - 384px))}
-  .touch #log{height:44px}
-  .touch #stick{width:116px;height:116px;bottom:calc(20px + env(safe-area-inset-bottom))}.touch #stick i{left:30px;top:30px}
-  .touch #party{top:calc(84px + env(safe-area-inset-top))}.touch #tframe{top:calc(92px + env(safe-area-inset-top))}
-  .touch #lootc{top:auto;bottom:140px}
+/* --- toque (celular e tablet): visual limpo --- */
+.touch .tonly{display:inline-block}
+.touch .frame{width:min(250px,calc(100vw - 150px));padding:5px}
+.touch .mini{width:124px;padding:3px}.touch #minimap{width:116px;height:72px}.touch .minfo{font-size:10px;flex-wrap:nowrap;overflow:hidden;margin-top:2px}.touch #where{overflow:hidden;text-overflow:ellipsis}
+/* menu: só Chat, Bolsa, Auto e ☰ (o resto abre no ☰) */
+.touch .menu{position:absolute;top:calc(116px + env(safe-area-inset-top));bottom:auto;right:calc(8px + env(safe-area-inset-right));left:auto;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:4px;width:auto;max-width:200px}
+.touch .menu button{padding:5px 9px;font-size:12px;min-width:0}
+.touch .menu .extra{display:none}.touch .menu.open .extra{display:block;width:100%;text-align:center}
+.touch .menu.open button{width:100%;text-align:center}.touch #bar [data-pot] u{display:none}.touch .menu.open{background:#151024ee;border:1px solid #8a6a32;border-radius:10px;padding:5px;max-width:132px}
+/* chat: só as últimas linhas, sem caixa; o campo de digitar aparece no botão 💬 */
+.touch #chat{top:calc(152px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));bottom:auto;transform:none;width:min(320px,calc(100vw - 16px));pointer-events:none}
+.touch #log{height:auto;max-height:58px;overflow:hidden;background:none;padding:0 2px;font-size:11px;line-height:1.3;-webkit-mask-image:linear-gradient(0deg,#000 70%,transparent);mask-image:linear-gradient(0deg,#000 70%,transparent)}
+.touch #log div{text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000}
+.touch .chatline{display:none;pointer-events:auto;margin-top:4px}.touch #chat.open .chatline{display:flex}.touch #chat.open #log{max-height:120px;background:#0f0b1ccc;border-radius:8px;padding:4px}
+/* barra vira uma roda em volta do botão de ataque */
+.touch #bar{display:block;position:absolute;left:auto;top:auto;transform:none;right:env(safe-area-inset-right);bottom:calc(6px + env(safe-area-inset-bottom));padding:0;background:none!important;border:0!important;box-shadow:none!important;pointer-events:none}
+.touch #bar .slot{pointer-events:auto;box-shadow:0 3px 10px #0008,inset 0 1px 0 #ffffff24}
+.touch #bar .slot u{left:50%;top:auto;bottom:-1px;transform:translateX(-50%);font-size:9px;opacity:.85}
+.touch #bar .slot s{right:50%;bottom:2px;transform:translateX(50%);font-size:10px}
+.touch #bar .slot b canvas{width:62%;height:62%;margin:auto;border-radius:6px}.touch #bar .slot b{display:flex;width:100%;height:100%;align-items:center;justify-content:center}
+.touch #bar .slot .pi{width:58%;height:58%}
+.touch #atk{display:flex;background:radial-gradient(circle at 50% 35%,#7a3a2a,#2a0f12)!important;border:2px solid #e9c46a!important}
+.touch #atk .pi{width:56%;height:56%}
+.touch #stick{width:112px;height:112px;left:calc(14px + env(safe-area-inset-left));bottom:calc(26px + env(safe-area-inset-bottom));background:#ffffff10;border-width:2px}.touch #stick i{left:29px;top:29px;width:50px;height:50px}
+.touch #lootc{top:calc(92px + env(safe-area-inset-top));bottom:auto;left:calc(8px + env(safe-area-inset-left));transform:none;font-size:11px;padding:2px 8px;border-radius:999px}
+.touch #tframe{top:calc(214px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(220px,50vw);font-size:11px}
+.touch #party{top:calc(214px + env(safe-area-inset-top));width:140px}
+.touch #toast{top:auto;bottom:calc(300px + env(safe-area-inset-bottom));font-size:12px}
+.touch #atk{position:absolute;right:8px;bottom:8px;width:74px;height:74px;border-radius:50%}
+.touch #bar [data-sk="1"]{position:absolute;right:117px;bottom:19px;width:52px;height:52px;border-radius:50%}
+.touch #bar [data-sk="2"]{position:absolute;right:104px;bottom:68px;width:52px;height:52px;border-radius:50%}
+.touch #bar [data-sk="3"]{position:absolute;right:68px;bottom:104px;width:52px;height:52px;border-radius:50%}
+.touch #bar [data-sk="4"]{position:absolute;right:19px;bottom:117px;width:52px;height:52px;border-radius:50%}
+.touch #bar [data-pot="pot_hp"]{position:absolute;right:181px;bottom:21px;width:48px;height:48px;border-radius:50%}
+.touch #bar [data-sk="5"]{position:absolute;right:169px;bottom:82px;width:48px;height:48px;border-radius:50%}
+.touch #bar [data-sk="6"]{position:absolute;right:134px;bottom:134px;width:48px;height:48px;border-radius:50%}
+.touch #bar [data-sk="7"]{position:absolute;right:82px;bottom:169px;width:48px;height:48px;border-radius:50%}
+.touch #bar [data-pot="pot_mp"]{position:absolute;right:21px;bottom:181px;width:48px;height:48px;border-radius:50%}
+.touch #bar{width:229px;height:229px}
+/* celular pequeno */
+@media (max-width:380px), (max-height:380px){
+.touch #atk{position:absolute;right:6px;bottom:6px;width:66px;height:66px;border-radius:50%}
+.touch #bar [data-sk="1"]{position:absolute;right:102px;bottom:16px;width:46px;height:46px;border-radius:50%}
+.touch #bar [data-sk="2"]{position:absolute;right:90px;bottom:59px;width:46px;height:46px;border-radius:50%}
+.touch #bar [data-sk="3"]{position:absolute;right:59px;bottom:90px;width:46px;height:46px;border-radius:50%}
+.touch #bar [data-sk="4"]{position:absolute;right:16px;bottom:102px;width:46px;height:46px;border-radius:50%}
+.touch #bar [data-pot="pot_hp"]{position:absolute;right:159px;bottom:17px;width:44px;height:44px;border-radius:50%}
+.touch #bar [data-sk="5"]{position:absolute;right:148px;bottom:71px;width:44px;height:44px;border-radius:50%}
+.touch #bar [data-sk="6"]{position:absolute;right:117px;bottom:117px;width:44px;height:44px;border-radius:50%}
+.touch #bar [data-sk="7"]{position:absolute;right:71px;bottom:148px;width:44px;height:44px;border-radius:50%}
+.touch #bar [data-pot="pot_mp"]{position:absolute;right:17px;bottom:159px;width:44px;height:44px;border-radius:50%}
+.touch #bar{width:203px;height:203px}
+.touch #stick{width:100px;height:100px}.touch #stick i{left:23px;top:23px}
 }
-/* celular em pé */
-@media (orientation:portrait) and (max-width:600px){
-  .touch .frame{width:calc(100vw - 152px)}
-  .touch .mini{width:124px}.touch #minimap{width:112px;height:70px}.touch .minfo{font-size:10px}
-  .touch .menu{top:calc(124px + env(safe-area-inset-top));bottom:auto;left:8px;right:8px;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;gap:4px;max-width:none;scrollbar-width:none}
-  .touch .menu::-webkit-scrollbar{display:none}.touch .menu button{flex:none;padding:4px 6px;font-size:11px;min-width:0}
-  .touch #chat{top:calc(162px + env(safe-area-inset-top));left:8px;transform:none;width:min(300px,72vw)}
-  .touch #log{height:52px}
-  .touch #bar{grid-template-columns:repeat(4,54px);gap:6px;right:10px;bottom:calc(16px + env(safe-area-inset-bottom))}
-  .touch .slot{width:54px;height:54px}.touch .slot b canvas{width:40px;height:40px}
-  .touch #stick{width:110px;height:110px;left:12px;bottom:calc(24px + env(safe-area-inset-bottom))}.touch #stick i{left:27px;top:27px}
-  .touch #party{top:calc(252px + env(safe-area-inset-top))}
-  .touch #tframe{top:calc(252px + env(safe-area-inset-top));left:auto;right:8px;transform:none;width:190px}
-  .touch #lootc{top:auto;bottom:206px}.touch #toast{top:auto;bottom:212px;font-size:12px}
+/* celular deitado: menu e chat no topo, roda menor para caber na altura */
+@media (orientation:landscape) and (max-height:500px){
+.touch .frame{width:220px}.touch #portrait{width:40px;height:48px}
+.touch .mini{width:112px}.touch #minimap{width:104px;height:54px}
+.touch .menu{top:calc(98px + env(safe-area-inset-top))}
+.touch #chat{top:calc(10px + env(safe-area-inset-top));left:calc(240px + env(safe-area-inset-left));width:min(300px,calc(100vw - 380px))}
+.touch #lootc{top:calc(84px + env(safe-area-inset-top))}.touch #tframe{top:calc(84px + env(safe-area-inset-top))}.touch #party{top:calc(112px + env(safe-area-inset-top))}
+.touch #toast{bottom:auto;top:calc(130px + env(safe-area-inset-top))}
+}
+/* tablet: tudo um pouco maior */
+@media (min-width:700px) and (min-height:700px){
+.touch #atk{position:absolute;right:14px;bottom:14px;width:88px;height:88px;border-radius:50%}
+.touch #bar [data-sk="1"]{position:absolute;right:144px;bottom:28px;width:60px;height:60px;border-radius:50%}
+.touch #bar [data-sk="2"]{position:absolute;right:128px;bottom:86px;width:60px;height:60px;border-radius:50%}
+.touch #bar [data-sk="3"]{position:absolute;right:86px;bottom:128px;width:60px;height:60px;border-radius:50%}
+.touch #bar [data-sk="4"]{position:absolute;right:28px;bottom:144px;width:60px;height:60px;border-radius:50%}
+.touch #bar [data-pot="pot_hp"]{position:absolute;right:220px;bottom:30px;width:56px;height:56px;border-radius:50%}
+.touch #bar [data-sk="5"]{position:absolute;right:206px;bottom:103px;width:56px;height:56px;border-radius:50%}
+.touch #bar [data-sk="6"]{position:absolute;right:164px;bottom:164px;width:56px;height:56px;border-radius:50%}
+.touch #bar [data-sk="7"]{position:absolute;right:103px;bottom:206px;width:56px;height:56px;border-radius:50%}
+.touch #bar [data-pot="pot_mp"]{position:absolute;right:30px;bottom:220px;width:56px;height:56px;border-radius:50%}
+.touch #bar{width:276px;height:276px}
+.touch .frame{width:280px}.touch .mini{width:160px}.touch #minimap{width:150px;height:96px}.touch .menu{top:calc(146px + env(safe-area-inset-top))}
+.touch #chat{top:calc(196px + env(safe-area-inset-top));width:380px}.touch #log{font-size:12px;max-height:72px}
+.touch #stick{width:140px;height:140px;left:28px;bottom:36px}.touch #stick i{left:42px;top:42px;width:54px;height:54px}
 }
 </style>
 </head>
@@ -188,7 +234,7 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
   <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
-  <div class="menu p"><button data-w="inv">Bolsa</button><button data-w="char">Perfil</button><button data-w="map">Mapa</button><button data-w="rank">Rank</button><button id="auto">Auto</button><button id="gfx">Gráf: Auto</button><button id="exit">Sair</button></div>
+  <div class="menu p"><button id="chatb" class="tonly" title="Chat">💬</button><button data-w="inv">Bolsa</button><button data-w="char" class="extra">Perfil</button><button data-w="map" class="extra">Mapa</button><button data-w="rank" class="extra">Rank</button><button id="auto">Auto</button><button id="gfx" class="extra">Gráf: Auto</button><button id="exit" class="extra">Sair</button><button id="more" class="tonly" title="Mais">☰</button></div>
   <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
   <div id="stick" class="p"><i></i></div>
   <div id="bar" class="p">

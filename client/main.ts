@@ -343,6 +343,11 @@ function renderParty() {
 }
 $<HTMLFormElement>('#chatf').onsubmit = e => { e.preventDefault(); const i = $<HTMLInputElement>('#chati'); if (i.value.trim()) send({ t: 'c', ch: chan, m: i.value }); i.value = ''; i.blur(); };
 $('#exit').onclick = () => leave();
+// celular/tablet: ☰ mostra o resto do menu; 💬 abre o campo do chat
+$('#more').onclick = e => { e.stopPropagation(); $('.menu').classList.toggle('open'); };
+document.querySelectorAll<HTMLElement>('.menu .extra').forEach(b => b.addEventListener('click', () => $('.menu').classList.remove('open')));
+$('#chatb').onclick = () => { const c = $('#chat'), o = !c.classList.contains('open'); c.classList.toggle('open', o); if (o) $<HTMLInputElement>('#chati').focus(); };
+$('#chati').addEventListener('blur', () => { if (touch) setTimeout(() => { if (document.activeElement !== $('#chati') && !$<HTMLInputElement>('#chati').value) $('#chat').classList.remove('open'); }, 150); });
 $('#auto').onclick = () => { auto = !auto; $('#auto').style.borderColor = auto ? 'var(--gold)' : ''; };
 $('#atk').onclick = () => { const m = nearestMob(12); if (m) attack(m); };
 document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => b.onclick = () => touch ? skill(+b.dataset.sk!) : selectSkill(+b.dataset.sk!));
