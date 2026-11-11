@@ -48,7 +48,16 @@ async function listChars(env: Env, acc: number) {
   const { results } = await env.DB.prepare('SELECT id,name,class,hair_color,hair_style,level,map FROM characters WHERE account_id=? ORDER BY id').bind(acc).all();
   return results;
 }
-const statusCache = { at: 0, n: 0 };
+const statusCache = { at: 0, n: 0, list: [] as { name: string; cls: string; level: number; resets: number; map: string }[] };
+/** Quem está online e em qual mapa. Guardado por 20 s para não acordar todos os mapas a cada visita. */
+async function onlineNow(env: Env) {
+  if (Date.now() - statusCache.at > 20000) {
+    const r = await toRooms(env, '/count', {}); statusCache.at = Date.now();
+    statusCache.list = r.flatMap((x, i) => (Array.isArray(x.list) ? x.list : []).map((p: any) => ({ name: String(p.name), cls: String(p.cls), level: +p.level || 1, resets: +p.resets || 0, map: getMap(MAP_IDS[i]).name })));
+    statusCache.n = statusCache.list.length || r.reduce((a, x) => a + (x.n ?? 0), 0);
+  }
+  return statusCache;
+}
 const toRooms = (env: Env, path: string, body: unknown) => Promise.all(MAP_IDS.map(id => env.MAP_ROOM.get(env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room' + path, { method: 'POST', body: JSON.stringify(body) })).then(r => r.json() as Promise<any>).catch(() => ({}))));
 async function admin(req: Request, env: Env, path: string, b: any, adminId: number): Promise<Response> {
   const db = env.DB, audit = (action: string, detail: unknown) => db.prepare('INSERT INTO admin_log(admin_id,action,detail,at) VALUES(?,?,?,?)').bind(adminId, action, JSON.stringify(detail).slice(0, 2000), Date.now()).run();
@@ -116,10 +125,11 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
     return startSession(req, env, a.id, a.username);
   }
   if (path === '/api/status' && req.method === 'GET') {
-    if (Date.now() - statusCache.at > 30000) { const r = await toRooms(env, '/count', {}); statusCache.at = Date.now(); statusCache.n = r.reduce((a, x) => a + (x.n ?? 0), 0); }
+    await onlineNow(env);
     const [a, c, st] = await Promise.all([db.prepare('SELECT COUNT(*) n FROM accounts').first<{ n: number }>(), db.prepare('SELECT COUNT(*) n FROM characters').first<{ n: number }>(), db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>()]), cfg = st ? cleanSettings(JSON.parse(st.value)) : DEFAULT_SETTINGS;
     return json({ online: statusCache.n, accounts: a!.n, characters: c!.n, xp: cfg.xp, drop: cfg.drop, gold: cfg.gold, resetLevel: cfg.resetLevel, resetGold: cfg.resetGold, resetPoints: cfg.resetPoints });
   }
+  if (path === '/api/online' && req.method === 'GET') { const o = await onlineNow(env); return json({ online: o.list.slice(0, 300) }); }
   if (path === '/api/ranking' && req.method === 'GET') {
     const { results } = await db.prepare('SELECT c.name,c.class,c.level,c.resets,c.master_level AS ml FROM characters c JOIN accounts a ON a.id=c.account_id WHERE a.banned=0 ORDER BY c.resets DESC, c.master_level DESC, c.level DESC, c.xp DESC LIMIT 50').all();
     return json({ ranking: results });

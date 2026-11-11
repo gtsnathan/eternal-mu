@@ -40,6 +40,15 @@ function classes() {
 }
 
 // ---------- ranking e situação ----------
+/** Lista de quem está jogando agora, agrupada por mapa/cidade. */
+function drawOnline(list: { name: string; cls: string; level: number; resets: number; map: string }[]) {
+  const u = $('#onl'); u.replaceChildren(); if (!list.length) { u.append(el('li', '', 'Ninguém online agora.')); return; }
+  const by = new Map<string, typeof list>(); for (const p of list) by.set(p.map, [...(by.get(p.map) ?? []), p]);
+  for (const [map, ps] of [...by].sort((a, b) => b[1].length - a[1].length)) {
+    const h = el('li'); h.append(el('b', '', `📍 ${map}`), el('span', '', `${ps.length} online`)); h.style.marginTop = '6px'; u.append(h);
+    for (const p of ps.sort((a, b) => b.resets - a.resets || b.level - a.level)) { const r = el('li'); r.append(el('span', '', `${p.name} · ${p.cls}`), el('span', '', `${p.resets ? `R${p.resets} · ` : ''}Nv ${p.level}`)); u.append(r); }
+  }
+}
 let ranking: any[] = [];
 function drawRank() {
   const f = $<HTMLSelectElement>('#rankf').value, list = f ? ranking.filter(r => r.class === f) : ranking, b = $('#rankb'); b.replaceChildren();
@@ -50,6 +59,7 @@ function drawRank() {
 async function loadPublic() {
   try { const s = await api('status'); $('#online').textContent = fmt(s.online); $('#accs').textContent = fmt(s.accounts); $('#chars').textContent = fmt(s.characters); $('#rx').textContent = `x${s.xp}`; $('#rd').textContent = `x${s.drop}`; $('#rg').textContent = `x${s.gold}`; $('#rr').textContent = s.resetLevel; document.querySelectorAll('.v-rl').forEach(e => e.textContent = s.resetLevel); document.querySelectorAll('.v-rg').forEach(e => e.textContent = fmt(s.resetGold)); document.querySelectorAll('.v-rp').forEach(e => e.textContent = fmt(s.resetPoints)); } catch { $('#online').textContent = '—'; }
   try { ranking = (await api('ranking')).ranking; drawRank(); } catch { /* sem conexão */ }
+  try { drawOnline((await api('online')).online); } catch { /* sem conexão */ }
 }
 
 // ---------- conta ----------
