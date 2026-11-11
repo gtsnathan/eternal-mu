@@ -137,6 +137,45 @@ body:not(.touch) .orb{display:block}
 body:not(.touch) .frame .bar{display:none}body:not(.touch) .frame{width:190px;align-items:center}body:not(.touch) #party{top:82px}
 .touch #bar{background:none;border:0;box-shadow:none;padding:0}
 .cell{background:radial-gradient(circle at 50% 35%,#272038,#120e1e);border-color:#40365a}
+
+/* ===== layout por aparelho (celular, tablet e computador) ===== */
+body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
+@media (max-width:1180px){body:not(.touch) #chat{bottom:112px;width:min(360px,44vw)}}
+/* toque: tablet e celular grande */
+.touch .frame{width:min(250px,46vw)}
+.touch #bar{display:grid;grid-template-columns:repeat(5,60px);gap:7px;left:auto;transform:none;right:calc(12px + env(safe-area-inset-right));bottom:calc(18px + env(safe-area-inset-bottom))}
+.touch .slot{width:60px;height:60px}
+.touch .menu{top:auto;bottom:calc(172px + env(safe-area-inset-bottom));right:calc(12px + env(safe-area-inset-right));flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:calc(100vw - 24px)}
+.touch .menu button{padding:5px 9px;font-size:12px}
+/* celular deitado */
+@media (orientation:landscape) and (max-height:500px){
+  .touch .frame{width:220px}.touch #portrait{width:40px;height:48px}
+  .touch .mini{width:112px}.touch #minimap{width:102px;height:54px}.touch .minfo{font-size:10px;flex-wrap:nowrap;overflow:hidden}
+  .touch .menu{top:calc(106px + env(safe-area-inset-top));bottom:auto;right:calc(8px + env(safe-area-inset-right));flex-direction:column;flex-wrap:nowrap;gap:3px;max-width:none}
+  .touch .menu button{padding:3px 6px;font-size:11px;min-width:86px}
+  .touch #bar{grid-template-columns:repeat(5,50px);gap:5px;right:calc(104px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom))}
+  .touch .slot{width:50px;height:50px}.touch .slot b canvas{width:38px;height:38px}.touch .slot .pi{width:30px;height:30px}
+  .touch #chat{top:calc(8px + env(safe-area-inset-top));left:calc(240px + env(safe-area-inset-left));transform:none;width:min(340px,calc(100vw - 384px))}
+  .touch #log{height:44px}
+  .touch #stick{width:116px;height:116px;bottom:calc(20px + env(safe-area-inset-bottom))}.touch #stick i{left:30px;top:30px}
+  .touch #party{top:calc(84px + env(safe-area-inset-top))}.touch #tframe{top:calc(92px + env(safe-area-inset-top))}
+  .touch #lootc{top:auto;bottom:140px}
+}
+/* celular em pé */
+@media (orientation:portrait) and (max-width:600px){
+  .touch .frame{width:calc(100vw - 152px)}
+  .touch .mini{width:124px}.touch #minimap{width:112px;height:70px}.touch .minfo{font-size:10px}
+  .touch .menu{top:calc(124px + env(safe-area-inset-top));bottom:auto;left:8px;right:8px;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;gap:4px;max-width:none;scrollbar-width:none}
+  .touch .menu::-webkit-scrollbar{display:none}.touch .menu button{flex:none;padding:4px 6px;font-size:11px;min-width:0}
+  .touch #chat{top:calc(162px + env(safe-area-inset-top));left:8px;transform:none;width:min(300px,72vw)}
+  .touch #log{height:52px}
+  .touch #bar{grid-template-columns:repeat(4,54px);gap:6px;right:10px;bottom:calc(16px + env(safe-area-inset-bottom))}
+  .touch .slot{width:54px;height:54px}.touch .slot b canvas{width:40px;height:40px}
+  .touch #stick{width:110px;height:110px;left:12px;bottom:calc(24px + env(safe-area-inset-bottom))}.touch #stick i{left:27px;top:27px}
+  .touch #party{top:calc(252px + env(safe-area-inset-top))}
+  .touch #tframe{top:calc(252px + env(safe-area-inset-top));left:auto;right:8px;transform:none;width:190px}
+  .touch #lootc{top:auto;bottom:206px}.touch #toast{top:auto;bottom:212px;font-size:12px}
+}
 </style>
 </head>
 <body>
