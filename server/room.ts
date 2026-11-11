@@ -217,7 +217,7 @@ export class MapRoom {
       case 'ue': return this.unequip(p, m.eq);
       case 'st': return this.addStat(p, m.s, m.n);
       case 'b': return this.buy(p, m.npc, m.key, m.qty);
-      case 'se': return this.sell(p, m.npc, m.slot);
+      case 'se': return this.sell(p, m.npc, m.slot, m.all === true);
       case 'pj': return this.packJewels(p, m.key);
       case 'uj': return this.unpackJewels(p, m.slot);
       case 'mv': return this.moveTo(p, m.to, now);
@@ -378,10 +378,12 @@ export class MapRoom {
     if (!this.give(p, key, q, 0, 'buy')) return this.sys(p, 'Inventário cheio.');
     p.gold -= cost; p.logs.push(['buy_pay', null, key, q, -cost, Date.now()]); p.dirty = true; p.meDirty = true; this.sendInv(p);
   }
-  private sell(p: Player, npc: unknown, slot: unknown) {
+  private sell(p: Player, npc: unknown, slot: unknown, all = false) {
     const it = this.invAt(p, slot); if (!this.nearNpc(p, npc) || !it) return;
-    const v = sellPrice(it);
-    this.takeOne(p, it); p.gold += v; p.logs.push(['sell', it.id, it.key, 1, v, Date.now()]); p.dirty = true; p.meDirty = true; this.sendInv(p);
+    const n = all ? it.qty : 1, v = sellPrice(it) * n;
+    if (n === it.qty) { p.items.splice(p.items.indexOf(it), 1); p.dirtyItems.delete(it.id); p.qtyItems.delete(it.id); p.delItems.add(it.id); } else this.takeOne(p, it);
+    p.gold += v; p.logs.push(['sell', it.id, it.key, n, v, Date.now()]); p.dirty = true; p.meDirty = true; this.sendInv(p);
+    if (n > 1) this.sys(p, `Vendido: ${n}x ${ITEMS[it.key].name} por ${v.toLocaleString('pt-BR')} moedas.`);
   }
 
   // ---------- combate ----------

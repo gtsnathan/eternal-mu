@@ -223,7 +223,7 @@ function makeCell(i: ItemInst | undefined, click: () => void, label = '') {
 function renderInv() {
   const gear = $('#gear'), grid = $('#grid'); gear.replaceChildren(); grid.replaceChildren();
   for (const s of SLOTS) { const i = items.find(x => x.equip === s); gear.appendChild(makeCell(i, () => { if (jewelSlot >= 0 && i) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); } else send({ t: 'ue', eq: s }); }, SLOT_NAMES[s])); }
-  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i) return; if (trashMode) { if (!valuable(i) || confirm(`Descartar ${itemText(i).split('\n')[0]}? Não dá para desfazer.`)) send({ t: 'x', slot: n }); return; } if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (n === jewelSlot) cel.classList.add('jsel'); grid.appendChild(cel); }
+  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i || dragDone) return; if (trashMode) { if (!valuable(i) || confirm(`Descartar ${itemText(i).split('\n')[0]}? Não dá para desfazer.`)) send({ t: 'x', slot: n }); return; } if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (i) cel.addEventListener('pointerdown', e => dragToSell(e, i, cel)); if (n === jewelSlot) cel.classList.add('jsel'); grid.appendChild(cel); }
   if (jewelSlot >= 0 && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Joia selecionada: clique no item que quer melhorar.';
   grid.classList.toggle('trash', trashMode); $('#trash').classList.toggle('on', trashMode); if (trashMode && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Modo descarte: clique no item que quer jogar fora.';
 }
@@ -238,6 +238,30 @@ function renderChar() {
   P.querySelectorAll<HTMLElement>('[data-mt]').forEach(b => b.onclick = () => send({ t: 'mt', k: b.dataset.mt }));
 }
 const setBonus = (k: string, n: number) => { const b = SETS[k].bonus, o: string[] = []; if (n >= 2) o.push(`+${b.def} def`); if (n >= 3) o.push(`+${b.hp} vida`); if (n >= 4) o.push(`+${Math.round(b.atk * 100)}% atq`); return o.join(' · ') || 'sem bônus'; };
+/** Lojas onde dá para vender (as que mostram "Vender da bolsa"). */
+const canSellHere = () => !!shop && !['reset', 'chest', 'press', 'wings'].includes(shop.shop!) && $('#w-shop').style.display === 'block';
+/** Vende a pilha inteira, com confirmação. */
+function sellAll(i: ItemInst) {
+  if (!canSellHere()) return log('Abra uma loja (fale com um vendedor) para vender.', 'sys');
+  const total = sellPrice(i) * i.qty, name = `${i.qty > 1 ? `${i.qty}x ` : ''}${ITEMS[i.key].name}${i.rarity ? ` (${RARITY[i.rarity].name})` : ''}`;
+  if (confirm(`Vender ${name} por ${total.toLocaleString('pt-BR')} moedas?`)) send({ t: 'se', npc: shop!.id, slot: i.slot, all: true });
+}
+/** Arrastar um item da bolsa até a janela da loja vende a pilha inteira (com confirmação). Funciona com mouse e com o dedo. */
+let dragDone = false;
+function dragToSell(e: PointerEvent, i: ItemInst, cel: HTMLElement) {
+  if (!canSellHere() || e.button > 0) return;
+  const sx = e.clientX, sy = e.clientY; let ghost: HTMLElement | null = null; dragDone = false;
+  const move = (ev: PointerEvent) => {
+    if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { ghost = cel.cloneNode(true) as HTMLElement; ghost.style.cssText = 'position:fixed;z-index:999;pointer-events:none;opacity:.85;width:48px;height:48px;transform:translate(-50%,-50%)'; document.body.appendChild(ghost); $('#w-shop').classList.add('dropok'); }
+    if (ghost) { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; ev.preventDefault(); }
+  };
+  const up = (ev: PointerEvent) => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); $('#w-shop').classList.remove('dropok');
+    if (!ghost) return; ghost.remove(); dragDone = true; setTimeout(() => { dragDone = false; }, 50);
+    if (ev.type === 'pointerup' && document.elementFromPoint(ev.clientX, ev.clientY)?.closest('#w-shop')) sellAll(i);
+  };
+  addEventListener('pointermove', move, { passive: false }); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+}
 function renderShop() {
   if (!shop || !me) return; const sk = `${you}|${shop.id}|${me.level}|${me.gold}|${JSON.stringify(items)}|${JSON.stringify(chest)}`; if (sk === shopKey) return; shopKey = sk; $('#shopt').textContent = shop.name; const L = $('#shopl'), npc = shop; L.replaceChildren();
   if (npc.shop === 'reset') {
@@ -265,7 +289,7 @@ function renderShop() {
     if (d.kind === 'weapon' && d.wtype !== lastW) { lastW = d.wtype!; const h = document.createElement('h4'); h.className = 'shoph'; h.textContent = WTYPE_NAME[d.wtype!]; L.appendChild(h); }
     const r = document.createElement('div'); r.className = 'shopitem'; const c = cv(56, 56); c.getContext('2d')!.drawImage(hdOf(icon(k)), 0, 0); c.style.imageRendering = 'pixelated'; const s = document.createElement('span'); { const cm = cmpItem({ key: k, rarity: 0 }); if (cm) { const a = document.createElement('b'); a.textContent = cm.arrow; a.style.cssText = `color:${cm.color};margin-right:2px`; a.title = cm.text; r.append(a); r.title = cm.text; } } s.textContent = d.kind === 'weapon' ? `${d.name} · Nv ${d.lvl} · Dano +${d.dmg} · ${d.price.toLocaleString('pt-BR')} moedas` : `${d.name} · ${d.price.toLocaleString('pt-BR')} moedas`; if (d.kind === 'weapon' && me.level < d.lvl) s.style.color = '#ff9b8e'; const b = document.createElement('button'); b.textContent = 'Comprar'; b.disabled = me.gold < d.price || (d.kind === 'weapon' && me.level < d.lvl); b.onclick = () => send({ t: 'b', npc: npc.id, key: k, qty: 1 }); r.append(c, s, b); L.appendChild(r); }
   const bag = items.filter(i => !i.equip).sort((a, b) => a.slot - b.slot), h = document.createElement('h4'); h.textContent = bag.length ? 'Vender da bolsa' : 'Sua bolsa está vazia'; h.className = 'shoph'; L.appendChild(h);
-  for (const i of bag) { const r = document.createElement('div'); r.className = 'shopitem'; r.dataset.sell = i.key; const c = cv(56, 56); c.getContext('2d')!.drawImage(hdOf(icon(i.key)), 0, 0); c.style.imageRendering = 'pixelated'; const s = document.createElement('span'); s.textContent = `${ITEMS[i.key].name}${i.qty > 1 ? ` ×${i.qty}` : ''} · ${sellPrice(i)} moedas`; s.style.color = RARITY[i.rarity].color; s.title = itemText(i); const b = document.createElement('button'); b.textContent = 'Vender'; b.onclick = () => { if (i.rarity && !confirm(`Vender ${ITEMS[i.key].name} (${RARITY[i.rarity].name})?`)) return; send({ t: 'se', npc: npc.id, slot: i.slot }); }; r.append(c, s, b); L.appendChild(r); }
+  for (const i of bag) { const r = document.createElement('div'); r.className = 'shopitem'; r.dataset.sell = i.key; const c = cv(56, 56); c.getContext('2d')!.drawImage(hdOf(icon(i.key)), 0, 0); c.style.imageRendering = 'pixelated'; const s = document.createElement('span'); s.textContent = `${ITEMS[i.key].name}${i.qty > 1 ? ` ×${i.qty}` : ''} · ${sellPrice(i)} moedas`; s.style.color = RARITY[i.rarity].color; s.title = itemText(i); const b = document.createElement('button'); b.textContent = 'Vender'; b.onclick = () => { if (i.rarity && !confirm(`Vender ${ITEMS[i.key].name} (${RARITY[i.rarity].name})?`)) return; send({ t: 'se', npc: npc.id, slot: i.slot }); }; r.append(c, s, b); if (i.qty > 1) { const ba = document.createElement('button'); ba.textContent = 'Vender tudo'; ba.onclick = () => sellAll(i); r.append(ba); } L.appendChild(r); }
 }
 let miniBase: Cv | null = null;
 const TILE_COL = ['#4c8a3f', '#a29a8b', '#2f74b5', '#e4edf6', '#a6d6ee', '#94734b', '#e8601c', '#3b3236', '#2a4a30', '#45404f', '#e6e2ee', '#7fa3dc', '#14121c', '#d9bc7a'];
