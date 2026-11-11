@@ -48,6 +48,14 @@ async function listChars(env: Env, acc: number) {
   const { results } = await env.DB.prepare('SELECT id,name,class,hair_color,hair_style,level,map FROM characters WHERE account_id=? ORDER BY id').bind(acc).all();
   return results;
 }
+/** Mapa reduzido pela metade para o guia: 1 caractere por bloco 2×2 (tipo do chão + 16 se for parede). */
+const gridCache = new Map<string, string>();
+function guideGrid(id: string) {
+  let s = gridCache.get(id); if (s) return s;
+  const m = getMap(id), W = Math.ceil(m.w / 2), H = Math.ceil(m.h / 2); let out = '';
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = Math.min(m.h - 1, y * 2) * m.w + Math.min(m.w - 1, x * 2); out += (m.tiles[i] + (m.solid[i] ? 16 : 0)).toString(32); }
+  gridCache.set(id, out); return out;
+}
 const statusCache = { at: 0, n: 0, list: [] as { name: string; cls: string; level: number; resets: number; map: string }[] };
 /** Quem está online e em qual mapa. Guardado por 20 s para não acordar todos os mapas a cada visita. */
 async function onlineNow(env: Env) {
@@ -136,7 +144,7 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   }
   if (path === '/api/guide' && req.method === 'GET') {
     const r = await db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>(), c = r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, v = getMap('valoria');
-    return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { name: m.name, req: travelList().find(p => p.to === id)?.lvl || 1, mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { name: d.name, level: d.level, boss: !!d.boss, drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });
+    return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { id, name: m.name, req: travelList().find(p => p.to === id)?.lvl || 1, w: m.w, h: m.h, spawn: m.spawn, grid: guideGrid(id), mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { key: k, name: d.name, level: d.level, boss: !!d.boss, hp: d.hp, areas: m.zones.filter(z => z.mob === k).map(z => ({ x: z.cx, y: z.cy, r: z.r, n: z.n })), drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });
   }
   const me = await auth(req, env);
   if (!me) return err('Sessão expirada.', 401);
