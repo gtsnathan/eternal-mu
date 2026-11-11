@@ -223,9 +223,14 @@ function makeCell(i: ItemInst | undefined, click: () => void, label = '') {
 function renderInv() {
   const gear = $('#gear'), grid = $('#grid'); gear.replaceChildren(); grid.replaceChildren();
   for (const s of SLOTS) { const i = items.find(x => x.equip === s); gear.appendChild(makeCell(i, () => { if (jewelSlot >= 0 && i) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); } else send({ t: 'ue', eq: s }); }, SLOT_NAMES[s])); }
-  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i) return; if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (n === jewelSlot) cel.classList.add('jsel'); grid.appendChild(cel); }
+  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i) return; if (trashMode) { if (!valuable(i) || confirm(`Descartar ${itemText(i).split('\n')[0]}? Não dá para desfazer.`)) send({ t: 'x', slot: n }); return; } if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (n === jewelSlot) cel.classList.add('jsel'); grid.appendChild(cel); }
   if (jewelSlot >= 0 && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Joia selecionada: clique no item que quer melhorar.';
+  grid.classList.toggle('trash', trashMode); $('#trash').classList.toggle('on', trashMode); if (trashMode && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Modo descarte: clique no item que quer jogar fora.';
 }
+/** Itens que pedem confirmação antes de descartar. */
+const valuable = (i: ItemInst) => { const d = ITEMS[i.key]; return i.rarity > 0 || (i.plus ?? 0) > 0 || !!d.set || !!i.opts?.length || ['jewel', 'pack', 'box', 'wings', 'ring', 'amulet'].includes(d.kind) || d.price >= 50000 || i.qty > 1; };
+/** Equipamento comum sem valor: sem raridade, sem +, fora de set e sem opções. */
+const junk = (i: ItemInst) => { const d = ITEMS[i.key]; return !i.equip && ['weapon', 'helm', 'armor', 'pants', 'boots'].includes(d.kind) && !i.rarity && !(i.plus ?? 0) && !d.set && !i.opts?.length; };
 function renderChar() {
   if (!me) return; const P = $('#charp'), m = me, st = (k: 'str' | 'agi' | 'vit' | 'ene', n: string) => `<div class="stat"><span>${n}</span><span>${m[k]}${m.points ? `<button data-s="${k}">+1</button>` : ''}</span></div>`;
   P.innerHTML = `<div class="stat"><b>${esc(myName)}</b><span>${myCls.name} · Nível ${m.level}</span></div><div class="stat"><span>Experiência</span><span>${m.xp} / ${m.xpNext}</span></div><div class="stat" style="color:var(--gold)"><span>Pontos livres</span><span>${m.points}</span></div>${st('str', 'Força')}${st('agi', 'Agilidade')}${st('vit', 'Vitalidade')}${st('ene', 'Energia')}<div class="stat"><span>Ataque</span><span>${m.atk}</span></div><div class="stat"><span>Defesa</span><span>${m.def}</span></div><div class="stat" style="color:var(--gold)"><span>Resets</span><span>${m.resets}</span></div><div class="stat" style="color:var(--gold)"><span>Master Level (pontos: ${m.mpts})</span><span>${m.ml}</span></div>${Object.entries(MASTER_NODES).map(([k, n]) => `<div class="stat"><span>${n}</span><span>${m.mtree[k] ?? 0}/${MASTER_NODE_MAX}${m.mpts && (m.mtree[k] ?? 0) < MASTER_NODE_MAX ? `<button data-mt="${k}">+1</button>` : ''}</span></div>`).join('')}${Object.entries(setCounts(items)).map(([k, n]) => `<div class="stat" style="color:${SETS[k].trim}"><span>${esc(SETS[k].name)} (${n}/4)</span><span>${setBonus(k, n)}</span></div>`).join('')}`;
@@ -395,7 +400,9 @@ document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const c = cv
 
 // ---------- render ----------
 let chest: ItemInst[] = [], editId = 0;
-let jewelSlot = -1, gfxInit = false;
+let jewelSlot = -1, gfxInit = false, trashMode = false;
+$('#trash').onclick = () => { trashMode = !trashMode; jewelSlot = -1; renderInv(); };
+$('#trashall').onclick = () => { const list = items.filter(junk); if (!list.length) return log('Nenhum item comum para descartar.', 'sys'); if (confirm(`Descartar ${list.length} item(ns) comum(ns)?\n\n${list.map(i => ITEMS[i.key].name).join(', ')}`)) send({ t: 'xa', slots: list.map(i => i.slot) }); };
 const bloomC = cv(16, 16), bloomX = bloomC.getContext('2d')!; noHd.add(bloomC);
 let ghosts: { c: Cv; x: number; y: number; t: number }[] = [];
 let inviteKind = 'p', trade: any = null, lootHidden = true;

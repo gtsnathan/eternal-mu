@@ -198,7 +198,7 @@ export class MapRoom {
     if (m.t === 'c') return this.chat(p, m);
     if (p.deadUntil) return;
     const now = Date.now();
-    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up', 'cw', 'dep', 'wd', 'pj', 'uj', 'mv'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
+    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up', 'cw', 'dep', 'wd', 'pj', 'uj', 'mv', 'x', 'xa'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
     switch (m.t) {
       case 'i': {
         if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
@@ -211,6 +211,8 @@ export class MapRoom {
       case 'k': return this.skill(p, m.n, m.id, now);
       case 'u': return this.usePotion(p, m.slot, now);
       case 'e': return this.equip(p, m.slot);
+      case 'x': return this.discard(p, [m.slot]);
+      case 'xa': return this.discard(p, Array.isArray(m.slots) ? m.slots.slice(0, CONFIG.invSize) : []);
       case 'ue': return this.unequip(p, m.eq);
       case 'st': return this.addStat(p, m.s, m.n);
       case 'b': return this.buy(p, m.npc, m.key, m.qty);
@@ -312,6 +314,12 @@ export class MapRoom {
     for (const x of prizes) if (this.give(p, x.key, x.qty, x.rarity, 'box', x.opts)) got.push(`${x.qty > 1 ? x.qty + 'x ' : ''}${ITEMS[x.key].name}${x.rarity ? ` (${RARITY[x.rarity].name})` : ''}`);
     p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
     this.sys(p, `${ITEMS[it.key].name} aberto: ${got.join(', ')}.`);
+  }
+  /** Joga fora itens da bolsa (some de vez; fica registrado no histórico de itens). */
+  private discard(p: Player, slots: unknown[]) {
+    const now = Date.now(); let n = 0;
+    for (const s of slots) { const it = this.invAt(p, s); if (!it) continue; p.items.splice(p.items.indexOf(it), 1); p.dirtyItems.delete(it.id); p.qtyItems.delete(it.id); p.delItems.add(it.id); p.logs.push(['discard', it.id, it.key, it.qty, 0, now]); n++; }
+    if (n) { this.sendInv(p); this.sys(p, n === 1 ? 'Item descartado.' : `${n} itens descartados.`); }
   }
   private equip(p: Player, slot: unknown) {
     const it = this.invAt(p, slot); if (!it) return; const d = ITEMS[it.key];
