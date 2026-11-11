@@ -1,4 +1,4 @@
-import { masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
@@ -117,7 +117,7 @@ export class MapRoom {
       accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, mr: c.master_resets ?? 0, ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], qtyItems: new Set(), savedRow: '', savedRank: '', budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
-    for (const it of [...p.items]) while (ITEMS[it.key]?.kind === 'jewel' && !it.equip && it.qty > 1) { const s = this.freeSlot(p); if (s < 0) break; it.qty--; p.dirtyItems.add(it.id); const n: ItemInst = { id: crypto.randomUUID(), key: it.key, qty: 1, slot: s, equip: null, rarity: 0, plus: 0, opts: [] }; p.items.push(n); p.dirtyItems.add(n.id); p.dirty = true; }
+    { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) p.dirty = true; } // junta joias, poções etc. em pilhas de até 255
     { const [r, k] = this.rowOf(p); p.savedRow = r; p.savedRank = k; } // estado igual ao do banco
     if (blocked(this.map, p.x, p.y)) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; }
     if (p.hp <= 0) p.hp = this.stats(p).maxHp;
@@ -198,7 +198,7 @@ export class MapRoom {
     if (m.t === 'c') return this.chat(p, m);
     if (p.deadUntil) return;
     const now = Date.now();
-    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up', 'cw', 'dep', 'wd', 'pj', 'uj', 'mv', 'x', 'xa'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
+    if (p.trade && ['b', 'se', 'u', 'e', 'ue', 'up', 'cw', 'dep', 'wd', 'pj', 'uj', 'mv', 'x', 'xa', 'org'].includes(m.t)) return this.sys(p, 'Termine a troca primeiro.');
     switch (m.t) {
       case 'i': {
         if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
@@ -212,6 +212,7 @@ export class MapRoom {
       case 'u': return this.usePotion(p, m.slot, now);
       case 'e': return this.equip(p, m.slot);
       case 'x': return this.discard(p, [m.slot]);
+      case 'org': { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) { p.dirty = true; this.sendInv(p); } return this.sys(p, a || b ? 'Pilhas juntadas (até 255 por espaço).' : 'Suas pilhas já estão organizadas.'); }
       case 'xa': return this.discard(p, Array.isArray(m.slots) ? m.slots.slice(0, CONFIG.invSize) : []);
       case 'ue': return this.unequip(p, m.eq);
       case 'st': return this.addStat(p, m.s, m.n);
@@ -264,16 +265,44 @@ export class MapRoom {
   }
   private freeSlot(p: Player) { const used = new Set(p.items.filter(i => !i.equip).map(i => i.slot)); for (let i = 0; i < CONFIG.invSize; i++) if (!used.has(i)) return i; return -1; }
   private give(p: Player, key: string, qty: number, rarity: number, reason: string, opts: string[] = []): boolean {
-    const def = ITEMS[key]; if (def.kind === 'jewel' && qty > 1) { for (let n = 0; n < qty; n++) if (!this.give(p, key, 1, rarity, reason)) return false; return true; }
-    const stackable = isStack(def);
-    let it = stackable ? p.items.find(i => i.key === key && !i.equip) : undefined;
-    const stacked = !!it;
-    if (it) it.qty += qty;
-    else { const slot = this.freeSlot(p); if (slot < 0) return false; it = { id: crypto.randomUUID(), key, qty, slot, equip: null, rarity, plus: 0, opts }; p.items.push(it); }
-    if (stacked) this.qtyChanged(p, it); else p.dirtyItems.add(it.id);
-    p.logs.push([reason, it.id, key, qty, 0, Date.now()]);
+    const def = ITEMS[key];
+    let it: ItemInst | undefined;
+    if (isStack(def)) { // completa as pilhas que já existem e abre espaços novos só para o que sobrar (até 255 cada)
+      if (this.slotsNeeded(p, key, qty) > this.freeSlots(p)) return false;
+      let left = qty;
+      for (const s of p.items.filter(i => i.key === key && !i.equip && i.qty < STACK_MAX).sort((a, b) => a.slot - b.slot)) { if (!left) break; const add = Math.min(left, STACK_MAX - s.qty); s.qty += add; left -= add; this.qtyChanged(p, s); it ??= s; }
+      while (left > 0) { const n = Math.min(left, STACK_MAX), s: ItemInst = { id: crypto.randomUUID(), key, qty: n, slot: this.freeSlot(p), equip: null, rarity, plus: 0, opts }; p.items.push(s); p.dirtyItems.add(s.id); left -= n; it ??= s; }
+    } else { const slot = this.freeSlot(p); if (slot < 0) return false; it = { id: crypto.randomUUID(), key, qty, slot, equip: null, rarity, plus: 0, opts }; p.items.push(it); p.dirtyItems.add(it.id); }
+    p.logs.push([reason, it!.id, key, qty, 0, Date.now()]);
     if (rarity === 4) for (const o of this.players.values()) this.sys(o, `✦ ${p.name} encontrou ${def.name} Ancestral!`);
     return true;
+  }
+  private freeSlots(p: Player) { return CONFIG.invSize - p.items.filter(i => !i.equip).length; }
+  /** Quantos espaços novos da bolsa seriam usados para receber qty unidades deste item. */
+  private slotsNeeded(p: Player, key: string, qty: number) {
+    if (!isStack(ITEMS[key])) return 1;
+    const room = p.items.filter(i => i.key === key && !i.equip && i.qty < STACK_MAX).reduce((a, i) => a + STACK_MAX - i.qty, 0);
+    return Math.max(0, Math.ceil((qty - room) / STACK_MAX));
+  }
+  /** Reorganiza pilhas do mesmo item: o mínimo de espaços, cada um com até 255. Devolve true se mudou algo. */
+  private mergeStacks(p: Player, inChest: boolean) {
+    const list = inChest ? p.chest : p.items, by = new Map<string, ItemInst[]>(); let changed = false;
+    for (const it of list) if (!it.equip && ITEMS[it.key] && isStack(ITEMS[it.key])) { const g = by.get(it.key); if (g) g.push(it); else by.set(it.key, [it]); }
+    for (const its of by.values()) {
+      const total = its.reduce((a, i) => a + i.qty, 0), need = Math.ceil(total / STACK_MAX);
+      if (its.length === need && its.every(i => i.qty <= STACK_MAX)) continue;
+      its.sort((a, b) => a.slot - b.slot); let left = total; changed = true;
+      its.forEach((it, n) => {
+        if (n < need) { const q = Math.min(STACK_MAX, left); left -= q; if (it.qty !== q) { it.qty = q; this.qtyChanged(p, it); } }
+        else { list.splice(list.indexOf(it), 1); p.dirtyItems.delete(it.id); p.qtyItems.delete(it.id); p.delItems.add(it.id); }
+      });
+      while (left > 0) { // pilha grande demais (ex.: 1000 poções): divide em espaços livres; sem espaço, o resto fica na última pilha
+        const used = new Set(list.filter(i => !i.equip).map(i => i.slot)); let s = -1; for (let i = 0; i < CONFIG.invSize; i++) if (!used.has((inChest ? 1000 : 0) + i)) { s = (inChest ? 1000 : 0) + i; break; }
+        if (s < 0) { const last = its[Math.min(need, its.length) - 1]; last.qty += left; this.qtyChanged(p, last); break; }
+        const q = Math.min(STACK_MAX, left), n: ItemInst = { id: crypto.randomUUID(), key: its[0].key, qty: q, slot: s, equip: null, rarity: 0, plus: 0, opts: [] }; list.push(n); p.dirtyItems.add(n.id); left -= q;
+      }
+    }
+    return changed;
   }
   private takeOne(p: Player, it: ItemInst) {
     if (--it.qty <= 0) { p.items.splice(p.items.indexOf(it), 1); p.dirtyItems.delete(it.id); p.qtyItems.delete(it.id); p.delItems.add(it.id); } else this.qtyChanged(p, it);
@@ -307,7 +336,7 @@ export class MapRoom {
       prizes.push({ key: d.key, qty: 1, rarity: anc ? 4 : exc ? 3 : Math.random() < .15 ? 2 : Math.random() < .35 ? 1 : 0, opts: anc ? ops.slice(0, Math.random() < .3 ? 3 : 2) : exc ? ops.slice(0, Math.random() < .3 ? 2 : 1) : [] });
     }
     // espaço na bolsa: joias ocupam 1 espaço cada; o baú libera o dele se for o último
-    const need = prizes.reduce((a, x) => a + (isStack(ITEMS[x.key]) && p.items.some(i => i.key === x.key && !i.equip) ? 0 : ITEMS[x.key].kind === 'jewel' ? x.qty : 1), 0) - (it.qty === 1 ? 1 : 0);
+    const need = prizes.reduce((a, x) => a + this.slotsNeeded(p, x.key, x.qty), 0) - (it.qty === 1 ? 1 : 0);
     const free = CONFIG.invSize - p.items.filter(i => !i.equip).length; if (free < need) return this.sys(p, `Libere ${need} espaço(s) na bolsa para abrir o ${ITEMS[it.key].name}.`);
     p.nextPotion = now + 700; this.takeOne(p, it); p.logs.push(['box_open', it.id, it.key, 1, 0, now]);
     const g = Math.floor((b.gold[0] + Math.random() * (b.gold[1] - b.gold[0])) * (this.cfg.gold || 1)); p.gold += g; p.logs.push(['box_gold', null, it.key, 0, g, now]);
@@ -504,8 +533,7 @@ export class MapRoom {
   }
   private unpackJewels(p: Player, slot: unknown) {
     const it = this.invAt(p, slot); if (!it || ITEMS[it.key].kind !== 'pack' || !this.nearNpc(p, 'prensa')) return;
-    if (p.items.filter(i => !i.equip).length + 9 > CONFIG.invSize) return this.sys(p, 'Libere 9 espaços na bolsa para desmontar.');
-    const key = Object.keys(JEWEL_PACKS).find(k => JEWEL_PACKS[k] === it.key)!; this.takeOne(p, it); p.logs.push(['unpack', it.id, it.key, 1, 0, Date.now()]); this.give(p, key, 10, 0, 'unpack'); p.dirty = true; this.sendInv(p); this.sys(p, `Desmontado: 10x ${ITEMS[key].name}.`);
+    const key = Object.keys(JEWEL_PACKS).find(k => JEWEL_PACKS[k] === it.key)!; if (this.slotsNeeded(p, key, 10) > this.freeSlots(p) + (it.qty === 1 ? 1 : 0)) return this.sys(p, 'Libere 1 espaço na bolsa para desmontar.'); this.takeOne(p, it); p.logs.push(['unpack', it.id, it.key, 1, 0, Date.now()]); this.give(p, key, 10, 0, 'unpack'); p.dirty = true; this.sendInv(p); this.sys(p, `Desmontado: 10x ${ITEMS[key].name}.`);
   }
   private moveTo(p: Player, to: unknown, now: number) {
     const d = travelList().find(x => x.to === to); if (!d || d.to === this.mapId) return;

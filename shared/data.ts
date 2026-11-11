@@ -146,7 +146,9 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
 ] as ItemDef[]).concat(SET_ITEMS, WING_ITEMS, WEAPON_ITEMS, ACC_ITEMS).map(i => [i.key, i]));
 // Joias: faixa de melhoria, chance e quantos + perde ao falhar
 export const JEWELS: Record<string, { min: number; max: number; chance: number; fail: number }> = { jewel_aurora: { min: 0, max: 6, chance: 1, fail: 0 }, jewel_destiny: { min: 6, max: 9, chance: .6, fail: 1 }, jewel_eclipse: { min: 9, max: 15, chance: .4, fail: 2 } };
-export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material' || d.kind === 'box';
+/** Itens empilháveis juntam até 255 unidades no mesmo espaço da bolsa. */
+export const STACK_MAX = 255;
+export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material' || d.kind === 'box' || d.kind === 'jewel' || d.kind === 'pack';
 export const JEWEL_PACKS: Record<string, string> = { jewel_aurora: 'pack_aurora', jewel_destiny: 'pack_destiny', jewel_eclipse: 'pack_eclipse' };
 export const glowTier = (p: number) => p >= 13 ? '#ff6ad5' : p >= 11 ? '#ffd76a' : p >= 9 ? '#7dffb0' : p >= 7 ? '#9fc8ff' : null;
 export const RARITY = [

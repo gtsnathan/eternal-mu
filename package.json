@@ -1,6 +1,6 @@
 {
   "name": "eternal-mu",
-  "version": "0.29.0",
+  "version": "0.29.1",
   "private": true,
   "scripts": {
     "build": "esbuild client/main.ts --bundle --minify --target=es2020 --outfile=public/game.js && esbuild client/site.ts --bundle --minify --target=es2020 --outfile=public/site.js",

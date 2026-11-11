@@ -408,6 +408,7 @@ document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const c = cv
 let chest: ItemInst[] = [], editId = 0;
 let jewelSlot = -1, gfxInit = false, trashMode = false;
 $('#trash').onclick = () => { trashMode = !trashMode; jewelSlot = -1; renderInv(); };
+$('#stackb').onclick = () => send({ t: 'org' });
 $('#trashall').onclick = () => { const list = items.filter(junk); if (!list.length) return log('Nenhum item comum para descartar.', 'sys'); if (confirm(`Descartar ${list.length} item(ns) comum(ns)?\n\n${list.map(i => ITEMS[i.key].name).join(', ')}`)) send({ t: 'xa', slots: list.map(i => i.slot) }); };
 const bloomC = cv(16, 16), bloomX = bloomC.getContext('2d')!; noHd.add(bloomC);
 let ghosts: { c: Cv; x: number; y: number; t: number }[] = [];
