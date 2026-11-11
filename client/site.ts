@@ -1,4 +1,4 @@
-import { CLASSES, HAIR_COLORS, ITEMS, MOBS, SETS, WING_THEME } from '../shared/data';
+import { fmtRes, CLASSES, HAIR_COLORS, ITEMS, MOBS, SETS, WING_THEME } from '../shared/data';
 import { FRAME_H, FRAME_W, hdOf, heroSprites, lookFromGear, wingSprites, WING_ROOT } from './art';
 
 const $ = <E extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as E;
@@ -41,20 +41,20 @@ function classes() {
 
 // ---------- ranking e situação ----------
 /** Lista de quem está jogando agora, agrupada por mapa/cidade. */
-function drawOnline(list: { name: string; cls: string; level: number; resets: number; map: string }[]) {
+function drawOnline(list: { name: string; cls: string; level: number; resets: number; mr: number; map: string }[]) {
   const u = $('#onl'); u.replaceChildren(); if (!list.length) { u.append(el('li', '', 'Ninguém online agora.')); return; }
   const by = new Map<string, typeof list>(); for (const p of list) by.set(p.map, [...(by.get(p.map) ?? []), p]);
   for (const [map, ps] of [...by].sort((a, b) => b[1].length - a[1].length)) {
     const h = el('li'); h.append(el('b', '', `📍 ${map}`), el('span', '', `${ps.length} online`)); h.style.marginTop = '6px'; u.append(h);
-    for (const p of ps.sort((a, b) => b.resets - a.resets || b.level - a.level)) { const r = el('li'); r.append(el('span', '', `${p.name} · ${p.cls}`), el('span', '', `${p.resets ? `R${p.resets} · ` : ''}Nv ${p.level}`)); u.append(r); }
+    for (const p of ps.sort((a, b) => (b.mr ?? 0) - (a.mr ?? 0) || b.resets - a.resets || b.level - a.level)) { const r = el('li'); r.append(el('span', '', `${p.name} · ${p.cls}`), el('span', '', `${p.resets || p.mr ? `${fmtRes(p.resets, p.mr)} · ` : ''}Nv ${p.level}`)); u.append(r); }
   }
 }
 let ranking: any[] = [];
 function drawRank() {
   const f = $<HTMLSelectElement>('#rankf').value, list = f ? ranking.filter(r => r.class === f) : ranking, b = $('#rankb'); b.replaceChildren();
-  list.forEach((r, i) => { const tr = el('tr', i < 3 ? 'top' : ''); for (const v of [i + 1, r.name, r.class, r.resets, r.ml, r.level]) tr.append(el('td', '', v)); b.append(tr); });
+  list.forEach((r, i) => { const tr = el('tr', i < 3 ? 'top' : ''); for (const v of [i + 1, r.name, r.class, fmtRes(r.resets, r.mr), r.ml, r.level]) tr.append(el('td', '', v)); b.append(tr); });
   if (!list.length) { const tr = el('tr'), td = el('td', '', 'Nenhum herói ainda. Seja o primeiro!'); td.setAttribute('colspan', '6'); tr.append(td); b.append(tr); }
-  const side = $('#ranks'); side.replaceChildren(); ranking.slice(0, 5).forEach((r, i) => { const row = el('li'); row.append(el('b', '', `${i + 1}. ${r.name}`), el('span', '', `R${r.resets} · Nv ${r.level}`)); side.append(row); }); if (!ranking.length) side.append(el('li', '', 'Sem heróis ainda.'));
+  const side = $('#ranks'); side.replaceChildren(); ranking.slice(0, 5).forEach((r, i) => { const row = el('li'); row.append(el('b', '', `${i + 1}. ${r.name}`), el('span', '', `${fmtRes(r.resets, r.mr)} · Nv ${r.level}`)); side.append(row); }); if (!ranking.length) side.append(el('li', '', 'Sem heróis ainda.'));
 }
 async function loadPublic() {
   try { const s = await api('status'); $('#online').textContent = fmt(s.online); $('#accs').textContent = fmt(s.accounts); $('#chars').textContent = fmt(s.characters); $('#rx').textContent = `x${s.xp}`; $('#rd').textContent = `x${s.drop}`; $('#rg').textContent = `x${s.gold}`; $('#rr').textContent = s.resetLevel; document.querySelectorAll('.v-rl').forEach(e => e.textContent = s.resetLevel); document.querySelectorAll('.v-rg').forEach(e => e.textContent = fmt(s.resetGold)); document.querySelectorAll('.v-rp').forEach(e => e.textContent = fmt(s.resetPoints)); } catch { $('#online').textContent = '—'; }
@@ -73,7 +73,7 @@ function authBox(msg = '') {
 function charCard(c: any, reload: () => void) {
   const card = el('article', 'char'), cv = document.createElement('canvas'); cv.width = 200; cv.height = 230; const g = cv.getContext('2d')!, s = 3, wk = c.gear.wings as string | undefined, f = heroSprites(lookFromGear(c.class, HAIR_COLORS[c.hair_color], c.hair_style, c.gear))[0][0];
   if (wk && ITEMS[wk]) { const wf = wingSprites(ITEMS[wk].cls!, ITEMS[wk].wtier!)[2]; g.imageSmoothingEnabled = true; g.drawImage(wf, 100 - wf.width / 2 * s / 2, 210 - (27 + WING_ROOT) * s, wf.width / 2 * s, wf.height / 2 * s); } g.imageSmoothingEnabled = false; g.drawImage(hdOf(f), 100 - FRAME_W * s / 2, 210 - FRAME_H * s + 6 * s, FRAME_W * s, FRAME_H * s);
-  const info = el('div', 'info2'); info.append(el('h3', '', c.name), el('p', '', `${c.class} · Nível ${c.level} · Reset ${c.resets} · Master ${c.master_level}`), el('p', 'dim', `Moedas: ${fmt(c.gold)}`));
+  const info = el('div', 'info2'); info.append(el('h3', '', c.name), el('p', '', `${c.class} · Nível ${c.level} · ${c.master_resets ? `Master Reset ${c.master_resets} · ` : ''}Reset ${c.resets} · Master Level ${c.master_level}`), el('p', 'dim', `Moedas: ${fmt(c.gold)}`));
   const left = el('div', 'pts'); const add: Record<string, number> = { str: 0, agi: 0, vit: 0, ene: 0 }, used = () => add.str + add.agi + add.vit + add.ene, sync = () => { left.textContent = `Pontos livres: ${fmt(c.points - used())}`; for (const k in add) { (rows[k].querySelector('input') as HTMLInputElement).value = String(add[k]); rows[k].querySelector('b')!.textContent = fmt(c[k] + add[k]); } (go as HTMLButtonElement).disabled = !used(); };
   const go = el('button', 'gold', 'Aplicar pontos'), rows: Record<string, HTMLElement> = {}, m = el('div', 'err'); info.append(left);
   for (const [k, n] of [['str', 'Força'], ['agi', 'Agilidade'], ['vit', 'Vitalidade'], ['ene', 'Energia']]) { const r = el('div', 'stat'); r.append(el('span', '', n), el('b', '', fmt(c[k]))); const i = document.createElement('input'); i.type = 'number'; i.min = '0'; i.value = '0'; i.setAttribute('aria-label', n); i.oninput = () => { const other = used() - add[k]; add[k] = Math.max(0, Math.min(c.points - other, Math.floor(+i.value) || 0)); sync(); }; r.append(i); for (const q of [10, 100]) { const b = el('button', 'mini', `+${q}`) as HTMLButtonElement; b.type = 'button'; b.onclick = () => { add[k] += Math.min(q, c.points - used()); sync(); }; r.append(b); } const mx = el('button', 'mini', 'Máx') as HTMLButtonElement; mx.type = 'button'; mx.onclick = () => { add[k] += c.points - used(); sync(); }; r.append(mx); rows[k] = r; info.append(r); }

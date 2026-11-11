@@ -56,12 +56,12 @@ function guideGrid(id: string) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = Math.min(m.h - 1, y * 2) * m.w + Math.min(m.w - 1, x * 2); out += (m.tiles[i] + (m.solid[i] ? 16 : 0)).toString(32); }
   gridCache.set(id, out); return out;
 }
-const statusCache = { at: 0, n: 0, list: [] as { name: string; cls: string; level: number; resets: number; map: string }[] };
+const statusCache = { at: 0, n: 0, list: [] as { name: string; cls: string; level: number; resets: number; mr: number; map: string }[] };
 /** Quem está online e em qual mapa. Guardado por 20 s para não acordar todos os mapas a cada visita. */
 async function onlineNow(env: Env) {
   if (Date.now() - statusCache.at > 20000) {
     const r = await toRooms(env, '/count', {}); statusCache.at = Date.now();
-    statusCache.list = r.flatMap((x, i) => (Array.isArray(x.list) ? x.list : []).map((p: any) => ({ name: String(p.name), cls: String(p.cls), level: +p.level || 1, resets: +p.resets || 0, map: getMap(MAP_IDS[i]).name })));
+    statusCache.list = r.flatMap((x, i) => (Array.isArray(x.list) ? x.list : []).map((p: any) => ({ name: String(p.name), cls: String(p.cls), level: +p.level || 1, resets: +p.resets || 0, mr: +p.mr || 0, map: getMap(MAP_IDS[i]).name })));
     statusCache.n = statusCache.list.length || r.reduce((a, x) => a + (x.n ?? 0), 0);
   }
   return statusCache;
@@ -139,7 +139,7 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   }
   if (path === '/api/online' && req.method === 'GET') { const o = await onlineNow(env); return json({ online: o.list.slice(0, 300) }); }
   if (path === '/api/ranking' && req.method === 'GET') {
-    const { results } = await db.prepare('SELECT c.name,c.class,c.level,c.resets,c.master_level AS ml FROM characters c JOIN accounts a ON a.id=c.account_id WHERE a.banned=0 ORDER BY c.resets DESC, c.master_level DESC, c.level DESC, c.xp DESC LIMIT 50').all();
+    const { results } = await db.prepare('SELECT c.name,c.class,c.level,c.resets,c.master_resets AS mr,c.master_level AS ml FROM characters c JOIN accounts a ON a.id=c.account_id WHERE a.banned=0 ORDER BY c.master_resets DESC, c.resets DESC, c.master_level DESC, c.level DESC, c.xp DESC LIMIT 50').all();
     return json({ ranking: results });
   }
   if (path === '/api/guide' && req.method === 'GET') {
@@ -163,7 +163,7 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
     return startSession(req, env, me.id, me.username);
   }
   if (path === '/api/site/characters') {
-    const { results } = await db.prepare('SELECT id,name,class,hair_color,hair_style,level,xp,points,str,agi,vit,ene,gold,map,resets,master_level,master_points FROM characters WHERE account_id=? ORDER BY id').bind(me.id).all();
+    const { results } = await db.prepare('SELECT id,name,class,hair_color,hair_style,level,xp,points,str,agi,vit,ene,gold,map,resets,master_resets,master_level,master_points FROM characters WHERE account_id=? ORDER BY id').bind(me.id).all();
     const gear = results.length ? (await db.prepare(`SELECT char_id,item_key,equip,plus FROM items WHERE equip IS NOT NULL AND char_id IN (${results.map(() => '?').join(',')})`).bind(...results.map(r => r.id)).all()).results : [];
     return json({ username: me.username, admin: me.is_admin === 1, characters: results.map(r => ({ ...r, gear: Object.fromEntries(gear.filter(g => g.char_id === r.id).map(g => [g.equip, g.item_key])) })) });
   }

@@ -1,9 +1,9 @@
-import { masterNext, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; ml: number; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -57,7 +57,7 @@ export class MapRoom {
       if (p) { p.dirtyItems.clear(); p.delItems.clear(); p.qtyItems.clear(); p.logs = []; [p.savedRow, p.savedRank] = this.rowOf(p); this.send(p, { t: 'kick', m: 'Este personagem foi excluído.' }); try { p.ws.close(4000, 'deleted'); } catch { /* */ } this.leave(p); }
       await this.saves.get(b.char); return new Response('{}');
     }
-    if (route === '/count') return new Response(JSON.stringify({ n: this.players.size, list: [...this.players.values()].map(p => ({ name: p.name, cls: p.cls, level: p.level, resets: p.resets })) }));
+    if (route === '/count') return new Response(JSON.stringify({ n: this.players.size, list: [...this.players.values()].map(p => ({ name: p.name, cls: p.cls, level: p.level, resets: p.resets, mr: p.mr })) }));
     if (route === '/addstats') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); const t = b.add.reduce((x: number, y: number) => x + y, 0); if (t > p.points) return new Response('{"handled":true,"error":"Pontos insuficientes."}'); p.str += b.add[0]; p.agi += b.add[1]; p.vit += b.add[2]; p.ene += b.add[3]; p.points -= t; p.dirty = true; p.meDirty = true; await this.flush(p); return new Response('{"handled":true}'); }
     if (route === '/global') { this.send_all(await req.text()); return new Response('ok'); }
     if (route === '/partychat') { const b: any = await req.json(); this.partySend(b.pid, b.msg); return new Response('ok'); }
@@ -114,7 +114,7 @@ export class MapRoom {
     const all: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity, plus: i.plus ?? 0, opts: (() => { try { return i.opts ? JSON.parse(i.opts) : []; } catch { return []; } })() }));
     const items = all.filter(i => i.equip || i.slot < 1000), chest = all.filter(i => !i.equip && i.slot >= 1000);
     const p: Player = {
-      accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
+      accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, mr: c.master_resets ?? 0, ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], qtyItems: new Set(), savedRow: '', savedRank: '', budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     for (const it of [...p.items]) while (ITEMS[it.key]?.kind === 'jewel' && !it.equip && it.qty > 1) { const s = this.freeSlot(p); if (s < 0) break; it.qty--; p.dirtyItems.add(it.id); const n: ItemInst = { id: crypto.randomUUID(), key: it.key, qty: 1, slot: s, equip: null, rarity: 0, plus: 0, opts: [] }; p.items.push(n); p.dirtyItems.add(n.id); p.dirty = true; }
@@ -144,7 +144,7 @@ export class MapRoom {
   private flush(p: Player) { return this.saveBatch([p]); }
   /** Colunas do personagem como texto, para comparar com o que já está no banco. */
   private rowOf(p: Player): [string, string] {
-    return [JSON.stringify([p.mxp, p.mpts, JSON.stringify(p.mtree), p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y)]), JSON.stringify([p.resets, p.ml, p.level])];
+    return [JSON.stringify([p.mxp, p.mpts, JSON.stringify(p.mtree), p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y)]), JSON.stringify([p.resets, p.ml, p.level, p.mr])];
   }
   /** Grava um ou mais personagens em uma única transação (trocas gravam os dois juntos). */
   private saveBatch(ps: Player[]): Promise<unknown> {
@@ -160,7 +160,7 @@ export class MapRoom {
       // só grava o personagem se algo mudou desde a última gravação; nível/resets à parte para não mexer no índice do ranking à toa
       const [row, rank] = this.rowOf(p), oldRow = p.savedRow, oldRank = p.savedRank;
       if (row !== oldRow) rest.push(db.prepare('UPDATE characters SET master_xp=?,master_points=?,master_tree=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(...JSON.parse(row), p.charId));
-      if (rank !== oldRank) rest.push(db.prepare('UPDATE characters SET resets=?,master_level=?,level=? WHERE id=?').bind(...JSON.parse(rank), p.charId));
+      if (rank !== oldRank) { const [rs, ml, lv, mr] = JSON.parse(rank), [, , , omr] = oldRank ? JSON.parse(oldRank) : []; rest.push(db.prepare('UPDATE characters SET resets=?,master_level=?,level=? WHERE id=?').bind(rs, ml, lv, p.charId)); if (mr !== (omr ?? 0)) rest.push(db.prepare('UPDATE characters SET master_resets=? WHERE id=?').bind(mr, p.charId)); }
       p.savedRow = row; p.savedRank = rank;
       for (const l of logs) rest.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
       const delIds = [...p.delItems], qtyIds = [...p.qtyItems]; p.delItems.clear(); p.dirtyItems.clear(); p.qtyItems.clear(); p.dirty = false;
@@ -182,7 +182,7 @@ export class MapRoom {
   private stub(id: string) { return this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }); }
   private sendMe(p: Player) {
     const s = this.stats(p); p.meDirty = false;
-    this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, resets: p.resets, ml: p.ml, mxp: p.mxp, mxpNext: masterNext(p.ml), mpts: p.mpts, mtree: p.mtree, gold: p.gold, dead: p.deadUntil > 0, loot: p.streak, lootMs: Math.max(0, p.streakUntil - Date.now()) });
+    this.send(p, { t: 'me', hp: Math.ceil(p.hp), mp: Math.floor(p.mp), maxHp: s.maxHp, maxMp: s.maxMp, xp: p.xp, xpNext: xpToNext(p.level), level: p.level, points: p.points, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, atk: s.atk, def: s.def, resets: p.resets, mr: p.mr, ml: p.ml, mxp: p.mxp, mxpNext: masterNext(p.ml), mpts: p.mpts, mtree: p.mtree, gold: p.gold, dead: p.deadUntil > 0, loot: p.streak, lootMs: Math.max(0, p.streakUntil - Date.now()) });
   }
   private sendInv(p: Player) { this.send(p, { t: 'inv', items: p.items, chest: p.chest }); }
   private sys(p: Player, m: string) { this.send(p, { t: 'sys', m }); }
@@ -221,6 +221,7 @@ export class MapRoom {
       case 'uj': return this.unpackJewels(p, m.slot);
       case 'mv': return this.moveTo(p, m.to, now);
       case 'rs': return this.doReset(p);
+      case 'mrs': return this.doMasterReset(p);
       case 'mt': return this.spendMaster(p, m.k);
       case 'dep': return this.chestDeposit(p, m.slot);
       case 'wd': return this.chestWithdraw(p, m.slot);
@@ -512,11 +513,22 @@ export class MapRoom {
     if (now < (p.nextMove ?? 0)) return this.sys(p, 'Aguarde alguns segundos para viajar de novo.');
     p.nextMove = now + 5000; this.travel(p, d.to, d.x, d.y);
   }
+  /** Master Reset: com 25 Resets e no nível de Reset, zera os Resets, volta ao nível 1 e ganha pontos permanentes. Master Level, itens e moedas restantes continuam. */
+  private doMasterReset(p: Player) {
+    if (!this.nearNpc(p, 'mestre')) return;
+    if (p.resets < MR_RESETS) return this.sys(p, `O Master Reset pede ${MR_RESETS} Resets (você tem ${p.resets}).`);
+    if (p.level < this.cfg.resetLevel) return this.sys(p, `É preciso alcançar o nível ${this.cfg.resetLevel}.`);
+    const cost = MR_GOLD * (p.mr + 1); if (p.gold < cost) return this.sys(p, `São necessárias ${cost.toLocaleString('pt-BR')} moedas.`);
+    const b = classOf(p.cls).base; p.gold -= cost; p.mr++; p.resets = 0; p.level = 1; p.xp = 0; p.str = b.str; p.agi = b.agi; p.vit = b.vit; p.ene = b.ene; p.points = p.mr * MR_POINTS;
+    const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; p.logs.push(['master_reset', null, null, p.mr, -cost, Date.now()]); p.dirty = true; p.meDirty = true; this.flush(p);
+    for (const o of this.players.values()) { o.known.delete(p.eid); this.sys(o, `✦ ${p.name} completou o Master Reset ${p.mr}!`); }
+    this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid });
+  }
   private doReset(p: Player) {
     if (!this.nearNpc(p, 'mestre')) return;
     if (p.level < this.cfg.resetLevel) return this.sys(p, `É preciso alcançar o nível ${this.cfg.resetLevel}.`);
     const cost = this.cfg.resetGold * (p.resets + 1); if (p.gold < cost) return this.sys(p, `São necessárias ${cost.toLocaleString('pt-BR')} moedas.`);
-    const b = classOf(p.cls).base; p.gold -= cost; p.resets++; p.level = 1; p.xp = 0; p.str = b.str; p.agi = b.agi; p.vit = b.vit; p.ene = b.ene; p.points = p.resets * this.cfg.resetPoints;
+    const b = classOf(p.cls).base; p.gold -= cost; p.resets++; p.level = 1; p.xp = 0; p.str = b.str; p.agi = b.agi; p.vit = b.vit; p.ene = b.ene; p.points = p.resets * this.cfg.resetPoints + p.mr * MR_POINTS;
     const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; p.logs.push(['reset', null, null, p.resets, -cost, Date.now()]); p.dirty = true; p.meDirty = true; this.flush(p);
     for (const o of this.players.values()) { o.known.delete(p.eid); this.sys(o, `${p.name} completou o Reset ${p.resets}!`); }
     this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid });
@@ -766,7 +778,7 @@ export class MapRoom {
     const near = (o: Pt) => Math.abs(o.x - p.x) < R && Math.abs(o.y - p.y) < R;
     const note = (id: number, full: () => unknown) => { seen.add(id); if (!p.known.has(id)) { p.known.add(id); news.push(full()); } };
     for (const o of this.players.values()) if (near(o)) {
-      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
+      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
       e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
     for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => ({ id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }
