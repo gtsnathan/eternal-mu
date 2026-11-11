@@ -204,8 +204,8 @@ export interface Look { helmSet?: string; armorSet?: string; pantsSet?: string; 
 export const FRAME_W = 40, FRAME_H = 56;
 const weaponCache = new Map<string, Cv>();
 /** Desenho de cada arma, mais ornamentado quanto maior o nível. */
-function weaponSprite(key: string): Cv {
-  let c = weaponCache.get(key); if (c) return c; c = cv(25, 52); const g = ctx(c), d = ITEMS[key], H = 52, m = 12, col = d.blade!, t = d.lvl >= 44 ? 3 : d.lvl >= 18 ? 2 : d.lvl >= 8 ? 1 : 0, lt = shade(col, 45), dk = shade(col, -55), gold = t >= 2 ? '#f0cf65' : '#b08a3c', wood = '#6b4a2b';
+export function weaponSprite(key: string): Cv {
+  let c = weaponCache.get(key); if (c) return c; c = cv(25, 52); const g = ctx(c), d = ITEMS[key], H = 52, m = 12, col = d.blade!, t = d.lvl >= 90 ? 4 : d.lvl >= 44 ? 3 : d.lvl >= 18 ? 2 : d.lvl >= 8 ? 1 : 0, lt = shade(col, 45), dk = shade(col, -55), gold = t >= 2 ? '#f0cf65' : '#b08a3c', wood = '#6b4a2b';
   if (d.wtype === 'staff') {
     const top = 14 - t; r(g, m - 1, top, 3, H - top - 1, wood); r(g, m - 1, top, 1, H - top - 1, '#8f6a42'); for (let y = top + 6; y < H - 4; y += 7) r(g, m - 1, y, 3, 1, gold);
     r(g, m - 4 - t, top - 1, 9 + t * 2, 2, gold); r(g, m - 4 - t, top - 7, 2, 7, gold); r(g, m + 3 + t, top - 7, 2, 7, gold); ell(g, m + 1, top - 7, 4 + (t >> 1), 4 + (t >> 1), col); ell(g, m, top - 8, 2, 2, lt); r(g, m - 1, top - 10, 2, 2, '#fff');
@@ -214,6 +214,44 @@ function weaponSprite(key: string): Cv {
     const len = 30 + t * 3, cy = 34, top = cy - (len >> 1); for (let i = 0; i < len; i++) { const b = Math.round(Math.sin(i / (len - 1) * Math.PI) * (7 + t)); r(g, m - 7 + b, top + i, 3, 1, i % 6 < 3 ? col : dk); r(g, m - 7 + b, top + i, 1, 1, lt); }
     r(g, m - 7, top, 1, len, '#efe9d8'); r(g, m - 1 + t, cy - 3, 4, 7, wood); r(g, m - 8, top - 2, 3, 3, gold); r(g, m - 8, top + len - 1, 3, 3, gold);
     if (t >= 2) { r(g, m + 2 + t, cy - 1, 4, 3, gold); ell(g, m + 5 + t, cy, 2, 2, lt); }
+  } else if (d.wtype === 'mace') {
+    const R0 = 4 + (t >> 1), hy = 6 + R0; // centro da cabeça
+    r(g, m - 1, hy + 2, 3, H - hy - 3, wood); r(g, m - 1, hy + 2, 1, H - hy - 3, '#8f6a42'); for (let y = H - 14; y < H - 3; y += 2) r(g, m - 1, y, 3, 1, '#3a2a1c');
+    r(g, m - 2, H - 3, 5, 3, gold); r(g, m - 2, hy + R0 + 1, 5, 2, gold); if (t >= 3) r(g, m - 2, hy + R0 + 7, 5, 1, gold);
+    if (t >= 2) for (const sx of [-1, 1]) for (let j = -R0 - 1; j <= R0 + 1; j++) { const w = Math.max(1, Math.round(R0 + 2 - Math.abs(j) * .55)); r(g, sx > 0 ? m + 1 : m - w, hy + j, w, 1, j < 0 ? lt : dk); }
+    ell(g, m, hy, R0, R0, col); ell(g, m - 1, hy - 1, Math.max(1, R0 - 2), Math.max(1, R0 - 2), lt); r(g, m - 2, hy - 2, 2, 2, '#fff');
+    const sp = t >= 1 ? 8 : 4; for (let i = 0; i < sp; i++) { const a = i / sp * 6.283 + (t >= 1 ? 0 : .785), x = m + Math.cos(a) * (R0 + 1.6), y = hy + Math.sin(a) * (R0 + 1.6); r(g, Math.round(x) - 1, Math.round(y) - 1, 2, 2, t >= 3 ? gold : dk); }
+    if (t >= 3) { r(g, m - 1, hy - R0 - 6, 2, 4, gold); r(g, m - 1, hy - R0 - 7, 2, 1, '#fff'); }
+  } else if (d.wtype === 'spear') {
+    const bl = 10 + t, by = 2, sock = by + bl;
+    r(g, m, sock, 2, H - sock - 1, wood); r(g, m, sock, 1, H - sock - 1, '#8f6a42'); for (let y = sock + 9; y < H - 3; y += 9) r(g, m - 1, y, 4, 1, gold); r(g, m - 1, H - 3, 4, 3, gold);
+    for (let y = 0; y < bl; y++) { const u = y / bl, hw = Math.round((u < .7 ? Math.sin(u / .7 * Math.PI / 2) : (1 - u) / .3) * (2 + (t >> 1))); for (let x = -hw; x <= hw + 1; x++) r(g, m + x, by + y, 1, 1, x <= 0 ? (x === -hw ? '#fff' : lt) : x === hw + 1 ? dk : col); }
+    r(g, m - 1, sock, 4, 3, gold);
+    if (t >= 1) { r(g, m - 3 - t, sock + 3, 8 + t * 2, 2, gold); r(g, m - 3 - t, sock + 1, 2, 2, gold); r(g, m + 3 + t, sock + 1, 2, 2, gold); }
+    if (t >= 2) for (let i = 0; i < 7; i++) { r(g, m - 2 - (i % 2), sock + 5 + i, 1, 1, col); r(g, m + 3 + (i % 2), sock + 5 + i, 1, 1, col); }
+    if (t >= 3) for (let j = -4; j <= 4; j++) { const w = 5 - Math.abs(j); r(g, m - 1 - w, sock + 9 + j, w, 1, j < 0 ? lt : col); }
+  } else if (d.wtype === 'gsword') {
+    const L = 28 + t * 3, tip = H - 12 - L, hw0 = 3 + (t >= 3 ? 1 : 0), gw = 6 + t;
+    r(g, m - 1, H - 4, 3, 3, gold); ell(g, m, H - 2, 2, 1, t >= 2 ? col : gold); r(g, m - 1, H - 10, 3, 6, wood); for (let y = H - 10; y < H - 4; y += 2) r(g, m - 1, y, 3, 1, '#3a2a1c');
+    for (let y = tip; y < H - 12; y++) { const u = (y - tip) / L, hw = u < .1 ? Math.round(u / .1 * hw0) : hw0 + (t >= 3 && y % 6 < 2 ? 1 : 0); for (let x = -hw; x <= hw; x++) r(g, m + x, y, 1, 1, x === 0 ? (u > .1 ? dk : '#fff') : x < 0 ? (x === -hw ? '#fff' : lt) : x === hw ? dk : col); }
+    if (t >= 2) for (let y = tip + 8; y < H - 16; y += 6) r(g, m, y, 1, 2, t >= 4 ? '#fff' : gold);
+    r(g, m - gw, H - 12, gw * 2 + 1, 2, gold); r(g, m - gw - 1, H - 15, 2, 4, gold); r(g, m + gw, H - 15, 2, 4, gold); if (t >= 1) ell(g, m, H - 11, 2, 2, t >= 2 ? col : gold); if (t >= 3) { r(g, m - gw - 2, H - 17, 2, 2, lt); r(g, m + gw + 1, H - 17, 2, 2, lt); }
+  } else if (d.wtype === 'scepter') {
+    const R0 = 3 + (t >> 1), oy = 8 + R0, shaft = t >= 2 ? '#cfc6dd' : wood;
+    r(g, m - 1, oy + 4, 3, H - oy - 5, shaft); r(g, m - 1, oy + 4, 1, H - oy - 5, shade(shaft, 35)); for (let y = oy + 10; y < H - 5; y += 6) r(g, m - 2, y, 5, 1, gold); r(g, m - 2, H - 5, 5, 4, gold); r(g, m, H - 2, 1, 1, col);
+    if (t >= 2) for (const sx of [-1, 1]) for (let i = 0; i < 5; i++) r(g, m + sx * (R0 + 3 + i) - (sx < 0 ? 1 : 0), oy + 2 - i, 2, 5 - (i >> 1), i % 2 ? lt : '#ffffff');
+    for (let j = 0; j <= 10; j++) { const a = -1 + j / 10 * 2; for (const sx of [-1, 1]) r(g, Math.round(m + sx * Math.cos(a) * (R0 + 2)) - (sx < 0 ? 1 : 0), Math.round(oy + Math.sin(a) * (R0 + 2)), 2, 2, gold); }
+    ell(g, m, oy, R0, R0, col); ell(g, m - 1, oy - 1, Math.max(1, R0 - 1), Math.max(1, R0 - 1), lt); r(g, m - 2, oy - 2, 2, 1, '#fff');
+    if (t >= 3) { r(g, m - 3, oy - R0 - 4, 1, 3, gold); r(g, m, oy - R0 - 6, 1, 5, gold); r(g, m + 3, oy - R0 - 4, 1, 3, gold); }
+  } else if (d.wtype === 'crossbow') {
+    const ly = 18 - (t >> 1), span = 9 + (t >> 1);
+    r(g, m - 1, ly - 2, 4, H - ly + 1, wood); r(g, m - 1, ly - 2, 1, H - ly + 1, '#8f6a42'); r(g, m - 2, H - 12, 6, 12, shade(wood, -15)); r(g, m + 3, H - 21, 2, 5, '#2c2632');
+    if (t >= 2) { r(g, m - 1, ly + 4, 4, 2, gold); r(g, m - 2, H - 13, 6, 1, gold); }
+    const limb = (yo: number, sp: number) => { for (const sx of [-1, 1]) for (let i = 0; i <= sp; i++) r(g, m + 1 + sx * i - (sx < 0 ? 1 : 0), ly + yo + Math.round((i / sp) ** 2 * 5), 2, 2, i % 4 < 2 ? col : dk); };
+    limb(0, span); if (t >= 3) limb(3, span - 2);
+    for (const sx of [-1, 1]) for (let i = 0; i <= 10; i++) { const u = i / 10; r(g, Math.round(m + 1 + sx * span * (1 - u)) - (sx < 0 ? 1 : 0), Math.round(ly + 5 + u * 6), 1, 1, '#efe9d8'); }
+    r(g, m, ly - 12, 2, 23, '#e8e0c8'); r(g, m - 1, ly - 13, 4, 2, col); r(g, m, ly - 15, 2, 2, lt); r(g, m - 1, ly + 8, 1, 3, col); r(g, m + 2, ly + 8, 1, 3, col);
+    if (t >= 2) { r(g, m - span - 1, ly + 4, 2, 2, gold); r(g, m + span + 1, ly + 4, 2, 2, gold); } if (t >= 4) ell(g, m + 1, ly + 1, 2, 2, lt);
   } else if (d.wtype === 'axe') {
     const top = 14 - t * 2; r(g, m - 1, top, 3, H - top - 1, wood); r(g, m - 1, top, 1, H - top - 1, '#8f6a42'); r(g, m - 2, H - 3, 5, 3, gold);
     const R0 = 8 + t, cy = top + 7, side = (sgn: number) => { for (let j = -R0; j <= R0; j++) { const w = Math.round(Math.sqrt(R0 * R0 - j * j) * .78) + 2; for (let i = 2; i < w + 2; i++) r(g, m + 1 + sgn * i, cy + j, 1, 1, i >= w ? lt : i < 4 ? dk : col); } }; side(1); if (t >= 1) side(-1);
@@ -223,6 +261,7 @@ function weaponSprite(key: string): Cv {
     for (let y = tip; y < H - 11; y++) { const u = (y - tip) / L, hw = u < .14 ? Math.max(0, Math.round(u / .14 * (2 + (t >> 1)))) : 2 + (t >> 1) - (t === 3 && (y % 7 < 2) ? 1 : 0); for (let x = -hw; x <= hw; x++) r(g, m + x, y, 1, 1, x < 0 ? lt : x > 0 ? (x === hw ? dk : col) : '#fff'); }
     if (t >= 1) for (let y = tip + 6; y < H - 14; y += 5) r(g, m, y, 1, 2, dk);
   }
+  if (t >= 4) for (const [x, y] of [[m - 7, 6], [m + 8, 13], [m - 6, 24], [m + 7, 31]] as [number, number][]) { r(g, x, y - 1, 1, 3, lt); r(g, x - 1, y, 3, 1, lt); r(g, x, y, 1, 1, '#fff'); } // brilho das armas lendárias
   weaponCache.set(key, c); return c;
 }
 function heroFrame(dir: number, f: number, o: Look): Cv {
@@ -235,8 +274,8 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
   const skin = '#e8b88f', skinD = '#c98f66', armor = o.robe ?? o.armor ?? '#4d5873', armD = shade(armor, -28), armL = shade(armor, 28), pants = o.robe ? shade(o.robe, -20) : o.pants ?? '#373b52', boots = o.boots ?? '#2c2632';
   const wd = o.weapon ? ITEMS[o.weapon] : null, blade = wd?.blade ?? '#cfd8e3', isAxe = o.weapon === 'iron_axe';
   const sword = (x: number, y: number, horiz: boolean, s = 1) => {
-    if (!wd) return; const w = weaponSprite(o.weapon!), grip = wd.wtype === 'bow' ? 34 : w.height - 8;
-    if (horiz && wd.wtype !== 'bow') { g.save(); g.translate(x, y + 4); g.rotate(s > 0 ? Math.PI / 2 : -Math.PI / 2); g.drawImage(w, -(w.width >> 1), -grip); g.restore(); }
+    if (!wd) return; const w = weaponSprite(o.weapon!), ranged = wd.wtype === 'bow' || wd.wtype === 'crossbow', grip = wd.wtype === 'bow' ? 34 : wd.wtype === 'crossbow' ? 37 : w.height - 8;
+    if (horiz && !ranged) { g.save(); g.translate(x, y + 4); g.rotate(s > 0 ? Math.PI / 2 : -Math.PI / 2); g.drawImage(w, -(w.width >> 1), -grip); g.restore(); }
     else g.drawImage(w, x + 2 - (w.width >> 1), y + 14 - grip + (horiz ? 4 : 0));
   };
   const Y = 2 - bob;
@@ -555,7 +594,10 @@ export function icon(key: string | null): Cv {
   const k = key ?? 'gold'; let c = iconCache.get(k); if (c) return c;
   c = cv(28, 28); const g = ctx(c), d = key ? ITEMS[key] : null, t = d?.tint ?? '#888', l = shade(t, 40), dk = shade(t, -35);
   if (!d) { for (const [x, y] of [[6, 14], [14, 14], [10, 8]]) { ell(g, x + 4, y + 4, 5, 4, '#e0b03a'); ell(g, x + 3, y + 3, 3, 2, '#ffe28a'); } }
-  else if (d.kind === 'potion') { const col = d.heal ? '#e0425a' : '#3f7fe8'; r(g, 11, 3, 6, 3, '#a87b4a'); r(g, 11, 6, 6, 4, '#cfe3ee'); ell(g, 14, 17, 8, 7, col); ell(g, 11, 14, 3, 2, '#fff'); }
+  else if (d.kind === 'potion') { const col = d.heal ? '#e0425a' : '#3f7fe8', tier = (d.heal ?? 0) >= 2000 || (d.mana ?? 0) >= 1000 ? 2 : (d.heal ?? 0) >= 400 || (d.mana ?? 0) >= 250 ? 1 : 0; r(g, 11, 3, 6, 3, tier ? '#e0b03a' : '#a87b4a'); r(g, 11, 6, 6, 4, '#cfe3ee'); ell(g, 14, 17, 8 + (tier ? 1 : 0), 7 + tier, col); ell(g, 14, 19, 6, 4, shade(col, -30)); ell(g, 11, 14, 3, 2, '#fff'); if (tier) r(g, 6, 15, 16, 2, '#e0b03a'); if (tier === 2) { r(g, 10, 1, 2, 3, '#ffe9a8'); r(g, 16, 1, 2, 3, '#ffe9a8'); r(g, 13, 0, 2, 3, '#fff'); } }
+  else if (d.kind === 'ring') { const b = d.blade!; ell(g, 14, 17, 9, 8, shade(t, -40)); ell(g, 14, 16, 8, 7, t); g.globalCompositeOperation = 'destination-out'; ell(g, 14, 17, 5, 4, '#000'); g.globalCompositeOperation = 'source-over'; r(g, 9, 13, 3, 1, l); ell(g, 14, 8, 5, 4, shade(t, -30)); ell(g, 14, 8, 4, 3, b); r(g, 12, 6, 2, 2, '#fff'); }
+  else if (d.kind === 'amulet') { const b = d.blade!; for (let i = 0; i <= 9; i++) { r(g, 4 + i, 2 + i, 2, 2, i % 2 ? t : dk); r(g, 22 - i, 2 + i, 2, 2, i % 2 ? t : dk); } ell(g, 14, 18, 8, 8, t); ell(g, 14, 18, 6, 6, shade(b, -40)); ell(g, 14, 18, 5, 5, b); r(g, 11, 15, 3, 2, '#fff'); r(g, 13, 9, 2, 3, t); }
+  else if (d.kind === 'box') { const b = d.blade!, w = '#6b4a2b'; r(g, 3, 11, 22, 14, w); r(g, 3, 6, 22, 6, shade(w, 20)); r(g, 3, 11, 22, 2, '#2c1f14'); r(g, 3, 6, 22, 1, shade(w, 45)); for (const x of [6, 20]) r(g, x, 6, 3, 19, b); r(g, 3, 19, 22, 2, b); r(g, 12, 12, 5, 6, '#2c2632'); r(g, 13, 13, 3, 3, b); r(g, 14, 14, 1, 2, '#fff'); r(g, 4, 7, 2, 1, '#fff'); }
   else if (d.kind === 'pack') { const b = d.blade!; r(g, 6, 11, 16, 14, '#8a6a3c'); r(g, 6, 11, 16, 2, '#b08a54'); r(g, 9, 7, 10, 5, '#6b4a2b'); r(g, 12, 5, 4, 3, '#c9a44c'); r(g, 10, 14, 8, 8, b); r(g, 12, 15, 3, 3, '#fff'); }
   else if (d.kind === 'jewel') { const b = d.blade!; r(g, 10, 5, 8, 3, '#fff'); r(g, 7, 8, 14, 5, b); for (let i = 0; i < 9; i++) r(g, 7 + i, 13 + i, 14 - i * 2 > 0 ? 14 - i * 2 : 1, 1, shade(b, -25 + i * 2)); r(g, 10, 9, 3, 3, '#fff'); }
   else if (d.kind === 'material') { for (const [x, y, h] of [[8, 9, 13], [13, 5, 18], [18, 11, 11]]) { r(g, x, y, 4, h, d.blade ?? '#8fe2ff'); r(g, x, y, 1, h, '#fff'); } }

@@ -1,4 +1,4 @@
-import { masterNext, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot } from '../shared/data';
+import { masterNext, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
@@ -268,7 +268,9 @@ export class MapRoom {
     if (it) it.qty += qty;
     else { const slot = this.freeSlot(p); if (slot < 0) return false; it = { id: crypto.randomUUID(), key, qty, slot, equip: null, rarity, plus: 0, opts }; p.items.push(it); }
     if (stacked) this.qtyChanged(p, it); else p.dirtyItems.add(it.id);
-    p.logs.push([reason, it.id, key, qty, 0, Date.now()]); return true;
+    p.logs.push([reason, it.id, key, qty, 0, Date.now()]);
+    if (rarity === 4) for (const o of this.players.values()) this.sys(o, `✦ ${p.name} encontrou ${def.name} Ancestral!`);
+    return true;
   }
   private takeOne(p: Player, it: ItemInst) {
     if (--it.qty <= 0) { p.items.splice(p.items.indexOf(it), 1); p.dirtyItems.delete(it.id); p.qtyItems.delete(it.id); p.delItems.add(it.id); } else this.qtyChanged(p, it);
@@ -278,11 +280,38 @@ export class MapRoom {
   private invAt(p: Player, slot: unknown) { return Number.isInteger(slot) ? p.items.find(i => !i.equip && i.slot === slot) : undefined; }
   private usePotion(p: Player, slot: unknown, now: number) {
     const it = this.invAt(p, slot); if (!it || now < p.nextPotion) return;
-    const d = ITEMS[it.key]; if (d.kind !== 'potion') return;
+    const d = ITEMS[it.key]; if (d.kind === 'box') return this.openBox(p, it, now); if (d.kind !== 'potion') return;
     const s = this.stats(p); p.nextPotion = now + 700;
     p.hp = Math.min(s.maxHp, p.hp + (d.heal ?? 0)); p.mp = Math.min(s.maxMp, p.mp + (d.mana ?? 0));
     this.takeOne(p, it); p.logs.push(['use', it.id, it.key, 1, 0, now]);
     p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'heal', x: p.x, y: p.y, id: p.eid });
+  }
+  /** Abre um baú: sempre dá moedas e mais 1 ou 2 prêmios sorteados (joias, poções ou equipamento que a classe usa). */
+  private openBox(p: Player, it: ItemInst, now: number) {
+    const T: Record<string, { gold: [number, number]; picks: number; lvl: [number, number]; exc: number; anc: number; table: [number, string, number][] }> = {
+      box_bronze: { gold: [2000, 8000], picks: 1, lvl: [1, 26], exc: .04, anc: 0, table: [[40, 'pot_hp2', 10], [35, 'jewel_aurora', 1], [25, 'gear', 1]] },
+      box_prata: { gold: [10000, 40000], picks: 1, lvl: [26, 56], exc: .1, anc: .01, table: [[30, 'jewel_aurora', 2], [30, 'jewel_destiny', 1], [30, 'gear', 1], [10, 'pot_hp3', 5]] },
+      box_ouro: { gold: [50000, 200000], picks: 2, lvl: [50, 90], exc: .15, anc: .03, table: [[30, 'jewel_destiny', 2], [25, 'jewel_eclipse', 1], [35, 'gear', 1], [10, 'ancient_scale', 1]] },
+      box_rei: { gold: [300000, 1000000], picks: 2, lvl: [86, 110], exc: .3, anc: .1, table: [[30, 'jewel_eclipse', 2], [50, 'gear', 1], [20, 'ancient_scale', 2]] },
+    }, b = T[it.key]; if (!b) return;
+    const cls = classOf(p.cls), pool = Object.values(ITEMS).filter(d => SLOTS.includes(d.kind as Slot) && d.kind !== 'wings' && d.lvl >= b.lvl[0] && d.lvl <= b.lvl[1] && canWield(cls, d));
+    const prizes: { key: string; qty: number; rarity: number; opts: string[] }[] = [];
+    for (let n = 0; n < b.picks; n++) {
+      let r = Math.random() * 100, row = b.table[b.table.length - 1]; for (const t of b.table) { if (r < t[0]) { row = t; break; } r -= t[0]; }
+      if (row[1] !== 'gear' || !pool.length) { prizes.push({ key: row[1] === 'gear' ? 'jewel_aurora' : row[1], qty: row[2], rarity: 0, opts: [] }); continue; }
+      const d = pool[Math.floor(Math.random() * pool.length)], q = Math.random(), anc = q < b.anc, exc = !anc && q < b.anc + b.exc;
+      const ops = [...(d.kind === 'weapon' || d.kind === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5);
+      prizes.push({ key: d.key, qty: 1, rarity: anc ? 4 : exc ? 3 : Math.random() < .15 ? 2 : Math.random() < .35 ? 1 : 0, opts: anc ? ops.slice(0, Math.random() < .3 ? 3 : 2) : exc ? ops.slice(0, Math.random() < .3 ? 2 : 1) : [] });
+    }
+    // espaço na bolsa: joias ocupam 1 espaço cada; o baú libera o dele se for o último
+    const need = prizes.reduce((a, x) => a + (isStack(ITEMS[x.key]) && p.items.some(i => i.key === x.key && !i.equip) ? 0 : ITEMS[x.key].kind === 'jewel' ? x.qty : 1), 0) - (it.qty === 1 ? 1 : 0);
+    const free = CONFIG.invSize - p.items.filter(i => !i.equip).length; if (free < need) return this.sys(p, `Libere ${need} espaço(s) na bolsa para abrir o ${ITEMS[it.key].name}.`);
+    p.nextPotion = now + 700; this.takeOne(p, it); p.logs.push(['box_open', it.id, it.key, 1, 0, now]);
+    const g = Math.floor((b.gold[0] + Math.random() * (b.gold[1] - b.gold[0])) * (this.cfg.gold || 1)); p.gold += g; p.logs.push(['box_gold', null, it.key, 0, g, now]);
+    const got = [`${g.toLocaleString('pt-BR')} moedas`];
+    for (const x of prizes) if (this.give(p, x.key, x.qty, x.rarity, 'box', x.opts)) got.push(`${x.qty > 1 ? x.qty + 'x ' : ''}${ITEMS[x.key].name}${x.rarity ? ` (${RARITY[x.rarity].name})` : ''}`);
+    p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
+    this.sys(p, `${ITEMS[it.key].name} aberto: ${got.join(', ')}.`);
   }
   private equip(p: Player, slot: unknown) {
     const it = this.invAt(p, slot); if (!it) return; const d = ITEMS[it.key];
@@ -582,7 +611,7 @@ export class MapRoom {
     const [lo, hi] = m.def.gold, now = Date.now();
     const drop = (key: string | null, gold: number, rarity: number, opts: string[] = []) => { const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, opts, owner: owner.charId, party: owner.partyId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
     drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
-    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), exc = gear && k !== 'wings' && Math.random() < .03 * this.cfg.exc; if (exc) { const pool = [...(k === 'weapon' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, 3, pool.slice(0, Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 ? 2 : Math.random() < .3 ? 1 : 0; drop(key, 0, r); }
+    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), anc = gear && k !== 'wings' && Math.random() < .003 * this.cfg.exc, exc = gear && k !== 'wings' && Math.random() < .03 * this.cfg.exc; if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 ? 2 : Math.random() < .3 ? 1 : 0; drop(key, 0, r); }
     if (m.def.boss) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {

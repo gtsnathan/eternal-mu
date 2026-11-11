@@ -3,12 +3,12 @@ export const CONFIG = {
   tickMs: 50, testCommands: true, aoiRadius: 22, pointsPerLevel: 5, maxLevel: 400, playerSpeed: 5,
   attackRange: 1.7, invSize: 40, startGold: 100, saveEveryMs: 60000, dropOwnMs: 15000, dropLifeMs: 60000,
 };
-export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings';
-export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings'];
-export const SLOT_NAMES: Record<Slot, string> = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', pants: 'Calças', boots: 'Botas', wings: 'Asas' };
+export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings' | 'ring' | 'amulet';
+export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings', 'ring', 'amulet'];
+export const SLOT_NAMES: Record<Slot, string> = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', pants: 'Calças', boots: 'Botas', wings: 'Asas', ring: 'Anel', amulet: 'Amuleto' };
 export interface ItemDef {
-  key: string; name: string; kind: Slot | 'potion' | 'material' | 'jewel' | 'pack'; lvl: number; price: number;
-  dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: 'sword' | 'axe' | 'staff' | 'bow'; set?: string; cls?: string; wtier?: number;
+  key: string; name: string; kind: Slot | 'potion' | 'material' | 'jewel' | 'pack' | 'box'; lvl: number; price: number;
+  dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: WType; set?: string; cls?: string; wtier?: number;
 }
 // Sets: cada peça equipada do mesmo set soma bônus (2 peças: defesa, 3: vida, 4: ataque %)
 export interface SetDef { cls?: string; key: string; name: string; of: string; lvl: number; color: string; trim: string; cape: string; power: number; price: number; bonus: { def: number; hp: number; atk: number } }
@@ -71,20 +71,47 @@ export const WING_RECIPES: { gold: number; mats: [string, number][] }[] = [{ gol
 export const EXC_WEAPON = ['atk', 'crit', 'speed', 'lifek', 'manak'], EXC_ARMOR = ['hp', 'mp', 'absorb', 'reflect', 'goldx', 'dodge'];
 export const EXC_TEXT: Record<string, string> = { atk: '+6% de ataque', crit: '+8% de crítico', speed: '+7% de velocidade de ataque', lifek: 'Recupera 8% da vida ao matar', manak: 'Recupera 10% da mana ao matar', hp: '+4% de vida', mp: '+4% de mana', absorb: '-4% de dano recebido', reflect: 'Reflete 5% do dano', goldx: '+30% de moedas', dodge: '+3% de esquiva' };
 // Armas por tipo e nível
-const WEAPON_TIERS: [number, number, number][] = [[12, 30, 1500], [26, 62, 8000], [44, 135, 60000], [56, 200, 400000], [70, 310, 2500000]];
-const WEAPON_LINES: Record<'sword' | 'axe' | 'staff' | 'bow', [string, string][]> = {
-  sword: [['Gládio de Aço', '#d6dee8'], ['Sabre Lunar', '#b8d8ff'], ['Espada do Crepúsculo', '#c77dff'], ['Lâmina do Apocalipse', '#ff5a4a'], ['Aurora Eterna', '#fff2b0']],
-  axe: [['Machadinha de Guerra', '#b4bfcc'], ['Machado Rúnico', '#7fc8ff'], ['Ceifador Sombrio', '#9a6bff'], ['Devastador Titânico', '#ffb13d'], ['Juízo Final', '#ffe9a8']],
-  staff: [['Bastão de Cristal', '#9fe8ff'], ['Cajado Astral', '#8f9bff'], ['Cetro do Vazio', '#d86bff'], ['Báculo Divino', '#ffe08a'], ['Cetro do Firmamento', '#b8f0ff']],
-  bow: [['Arco Composto', '#9a7a4a'], ['Arco Lunar', '#b8d8ff'], ['Arco do Vento Negro', '#6d5a9a'], ['Arco Celestial', '#ffe9a8'], ['Arco do Zênite', '#ffd9f0']],
+export type WType = 'sword' | 'axe' | 'staff' | 'bow' | 'mace' | 'spear' | 'gsword' | 'scepter' | 'crossbow';
+export const WTYPE_NAME: Record<WType, string> = { sword: 'Espadas', gsword: 'Espadões', axe: 'Machados', mace: 'Maças e Martelos', spear: 'Lanças', staff: 'Cajados', scepter: 'Cetros', bow: 'Arcos', crossbow: 'Bestas' };
+const WEAPON_TIERS: [number, number, number][] = [[12, 30, 1500], [26, 62, 8000], [44, 135, 60000], [56, 200, 400000], [70, 310, 2500000], [90, 430, 9000000], [110, 580, 25000000]];
+/** Multiplicador de dano de cada tipo (bestas e arcos um pouco menos porque atacam de longe). */
+const WTYPE_DMG: Record<WType, number> = { sword: 1, axe: 1.08, staff: 1, bow: .92, mace: 1.04, spear: 1.05, gsword: 1.1, scepter: 1.03, crossbow: .96 };
+const WEAPON_LINES: Record<WType, [string, string][]> = {
+  sword: [['Gládio de Aço', '#d6dee8'], ['Sabre Lunar', '#b8d8ff'], ['Espada do Crepúsculo', '#c77dff'], ['Lâmina do Apocalipse', '#ff5a4a'], ['Aurora Eterna', '#fff2b0'], ['Lâmina Estelar', '#9ffcff'], ['Espada do Rei Eterno', '#ffe27a']],
+  axe: [['Machadinha de Guerra', '#b4bfcc'], ['Machado Rúnico', '#7fc8ff'], ['Ceifador Sombrio', '#9a6bff'], ['Devastador Titânico', '#ffb13d'], ['Juízo Final', '#ffe9a8'], ['Machado do Cometa', '#8ff0ff'], ['Fúria dos Deuses', '#ff7ad9']],
+  staff: [['Bastão de Cristal', '#9fe8ff'], ['Cajado Astral', '#8f9bff'], ['Cetro do Vazio', '#d86bff'], ['Báculo Divino', '#ffe08a'], ['Cetro do Firmamento', '#b8f0ff'], ['Cajado das Marés Astrais', '#7affd8'], ['Báculo da Criação', '#fff2b0']],
+  bow: [['Arco Composto', '#9a7a4a'], ['Arco Lunar', '#b8d8ff'], ['Arco do Vento Negro', '#6d5a9a'], ['Arco Celestial', '#ffe9a8'], ['Arco do Zênite', '#ffd9f0'], ['Arco da Tempestade', '#9fd7ff'], ['Arco da Fênix Eterna', '#ffb07a']],
+  mace: [['Maça de Ferro', '#b4bfcc'], ['Maça Estrelada', '#ffd76a'], ['Martelo do Trovão', '#8fd0ff'], ['Maça do Abismo', '#b06bff'], ['Malho Vulcânico', '#ff7a3c'], ['Martelo Celestial', '#fff2b0'], ['Maça do Fim dos Tempos', '#ff4a6a']],
+  spear: [['Lança de Caça', '#cfd8e3'], ['Lança Glacial', '#9fe8ff'], ['Alabarda Rúnica', '#7fc8ff'], ['Tridente Abissal', '#5ad6c8'], ['Lança do Dragão', '#ff6a3c'], ['Lança Solar', '#ffe08a'], ['Lança do Eclipse', '#d86bff']],
+  gsword: [['Espadão de Guerra', '#d6dee8'], ['Espadão Sanguíneo', '#ff6a6a'], ['Montante do Trovão', '#9fd0ff'], ['Espadão das Sombras', '#a67dff'], ['Montante Infernal', '#ff7a2c'], ['Espadão Dourado', '#ffe9a8'], ['Montante do Juízo', '#fff8e0']],
+  scepter: [['Cetro de Âmbar', '#ffb54a'], ['Cetro Lunar', '#c9e0ff'], ['Orbe do Arcano', '#8f9bff'], ['Cetro das Almas', '#9dff6b'], ['Cetro do Inferno', '#ff5a4a'], ['Cetro Sagrado', '#fff2b0'], ['Cetro do Infinito', '#e07aff']],
+  crossbow: [['Besta de Caça', '#9a7a4a'], ['Besta de Aço', '#cfd8e3'], ['Besta Glacial', '#9fe8ff'], ['Besta Sombria', '#8a6bd8'], ['Besta de Repetição', '#ffb13d'], ['Besta Celestial', '#ffe9a8'], ['Besta do Dragão', '#ff6a4a']],
 };
-const WEAPON_ITEMS: ItemDef[] = Object.entries(WEAPON_LINES).flatMap(([wt, l]) => l.map(([name, blade], i) => ({ key: `w_${wt}_${WEAPON_TIERS[i][0]}`, name, kind: 'weapon' as const, lvl: WEAPON_TIERS[i][0], dmg: Math.round(WEAPON_TIERS[i][1] * (wt === 'axe' ? 1.08 : wt === 'bow' ? .92 : 1)), price: WEAPON_TIERS[i][2], blade, wtype: wt as 'sword' })));
-const wep = (lvl: number, ch: number) => (['sword', 'axe', 'staff', 'bow'] as const).map(w => [`w_${w}_${lvl}`, ch] as [string, number]);
+// Acessórios: anel (ataque e vida) e amuleto (defesa e vida), para todas as classes
+export const ACC_LVLS = [10, 30, 50, 70, 90, 110];
+const ACC_ITEMS: ItemDef[] = [
+  ...([['Anel de Cobre', '#c98a4a', '#ff8a5c', 6, 20, 3000], ['Anel de Prata Lunar', '#d6dee8', '#8fd0ff', 16, 60, 25000], ['Anel do Fogo Eterno', '#e0b03a', '#ff5a2c', 34, 140, 150000], ['Anel do Vazio', '#6b5a8a', '#c77dff', 60, 260, 900000], ['Anel dos Céus', '#e8f4ff', '#7affd8', 95, 420, 5000000], ['Anel do Imperador', '#f0cf65', '#ff4a6a', 140, 650, 15000000]] as [string, string, string, number, number, number][])
+    .map(([name, tint, blade, dmg, hp, price], i) => ({ key: `ring_${ACC_LVLS[i]}`, name, kind: 'ring' as const, lvl: ACC_LVLS[i], price, dmg, hp, tint, blade })),
+  ...([['Amuleto de Osso', '#e8e0c8', '#bdf0ff', 5, 40, 3000], ['Pingente de Jade', '#c9a44c', '#7dffb0', 14, 120, 25000], ['Colar de Rubi', '#e0b03a', '#ff4a6a', 30, 260, 150000], ['Talismã Abissal', '#7a8aa0', '#5ad6c8', 52, 480, 900000], ['Medalhão Solar', '#f0cf65', '#ffd76a', 80, 760, 5000000], ['Coração da Eternidade', '#e8f4ff', '#ff9df0', 120, 1100, 15000000]] as [string, string, string, number, number, number][])
+    .map(([name, tint, blade, def, hp, price], i) => ({ key: `amulet_${ACC_LVLS[i]}`, name, kind: 'amulet' as const, lvl: ACC_LVLS[i], price, def, hp, tint, blade })),
+];
+const WTYPES = Object.keys(WEAPON_LINES) as WType[], WTYPE_ORDER = Object.keys(WTYPE_NAME) as WType[];
+const WEAPON_ITEMS: ItemDef[] = Object.entries(WEAPON_LINES).flatMap(([wt, l]) => l.map(([name, blade], i) => ({ key: `w_${wt}_${WEAPON_TIERS[i][0]}`, name, kind: 'weapon' as const, lvl: WEAPON_TIERS[i][0], dmg: Math.round(WEAPON_TIERS[i][1] * WTYPE_DMG[wt as WType]), price: WEAPON_TIERS[i][2], blade, wtype: wt as WType })));
+// a chance é dividida entre os tipos para não multiplicar a quantidade de armas que cai
+const wep = (lvl: number, ch: number) => WTYPES.map(w => [`w_${w}_${lvl}`, ch * 4 / WTYPES.length] as [string, number]);
 const SET_ITEMS: ItemDef[] = Object.values(SETS).sort((a, b) => a.lvl - b.lvl).flatMap(s => SET_PIECES.map(p => ({ key: `${s.key}_${p}`, name: `${PIECE[p][0]} ${s.of} ${s.name}`, kind: p, lvl: s.lvl, price: Math.round(s.price * PIECE[p][3]), def: Math.round(PIECE[p][1] * s.power), hp: Math.round(PIECE[p][2] * s.power), tint: s.color, set: s.key })));
 const setDrops = (s: string, ch: number) => SET_PIECES.map(p => [`${s}_${p}`, ch] as [string, number]);
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'pot_hp', name: 'Poção de Vida', kind: 'potion', lvl: 1, price: 20, heal: 80 },
   { key: 'pot_mp', name: 'Poção de Mana', kind: 'potion', lvl: 1, price: 20, mana: 50 },
+  { key: 'pot_hp2', name: 'Grande Poção de Vida', kind: 'potion', lvl: 1, price: 150, heal: 450 },
+  { key: 'pot_mp2', name: 'Grande Poção de Mana', kind: 'potion', lvl: 1, price: 150, mana: 260 },
+  { key: 'pot_hp3', name: 'Elixir de Vida', kind: 'potion', lvl: 1, price: 900, heal: 2200 },
+  { key: 'pot_mp3', name: 'Elixir de Mana', kind: 'potion', lvl: 1, price: 900, mana: 1100 },
+  { key: 'box_bronze', name: 'Baú de Bronze', kind: 'box', lvl: 1, price: 5000, blade: '#c98a4a' },
+  { key: 'box_prata', name: 'Baú de Prata', kind: 'box', lvl: 1, price: 30000, blade: '#d6dee8' },
+  { key: 'box_ouro', name: 'Baú de Ouro', kind: 'box', lvl: 1, price: 200000, blade: '#ffd76a' },
+  { key: 'box_rei', name: 'Baú do Rei', kind: 'box', lvl: 1, price: 1500000, blade: '#ff6ad5' },
   { key: 'jewel_aurora', name: 'Joia da Aurora', kind: 'jewel', lvl: 1, price: 6000, blade: '#ffe08a' },
   { key: 'jewel_destiny', name: 'Joia do Destino', kind: 'jewel', lvl: 1, price: 30000, blade: '#6fd6ff' },
   { key: 'jewel_eclipse', name: 'Joia do Eclipse', kind: 'jewel', lvl: 1, price: 120000, blade: '#d86bff' },
@@ -116,23 +143,24 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'rime_armor', name: 'Couraça de Escarcha', kind: 'armor', lvl: 12, price: 2400, def: 20, hp: 90, tint: '#5b9bd0' },
   { key: 'rime_pants', name: 'Grevas de Escarcha', kind: 'pants', lvl: 12, price: 1700, def: 14, hp: 50, tint: '#477fb0' },
   { key: 'rime_boots', name: 'Botas de Escarcha', kind: 'boots', lvl: 12, price: 1300, def: 8, hp: 30, tint: '#3c6c98' },
-] as ItemDef[]).concat(SET_ITEMS, WING_ITEMS, WEAPON_ITEMS).map(i => [i.key, i]));
+] as ItemDef[]).concat(SET_ITEMS, WING_ITEMS, WEAPON_ITEMS, ACC_ITEMS).map(i => [i.key, i]));
 // Joias: faixa de melhoria, chance e quantos + perde ao falhar
 export const JEWELS: Record<string, { min: number; max: number; chance: number; fail: number }> = { jewel_aurora: { min: 0, max: 6, chance: 1, fail: 0 }, jewel_destiny: { min: 6, max: 9, chance: .6, fail: 1 }, jewel_eclipse: { min: 9, max: 15, chance: .4, fail: 2 } };
-export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material';
+export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material' || d.kind === 'box';
 export const JEWEL_PACKS: Record<string, string> = { jewel_aurora: 'pack_aurora', jewel_destiny: 'pack_destiny', jewel_eclipse: 'pack_eclipse' };
 export const glowTier = (p: number) => p >= 13 ? '#ff6ad5' : p >= 11 ? '#ffd76a' : p >= 9 ? '#7dffb0' : p >= 7 ? '#9fc8ff' : null;
 export const RARITY = [
   { name: 'Comum', mult: 1, color: '#e8e6df' }, { name: 'Incomum', mult: 1.25, color: '#6fdc7e' }, { name: 'Raro', mult: 1.6, color: '#68b6ff' }, { name: 'Excelente', mult: 1.8, color: '#7dffb0' },
+  { name: 'Ancestral', mult: 2.2, color: '#ff9d3c' }, // muito raro: 2 ou 3 opções excelentes
 ];
 export const SHOPS: Record<string, string[]> = {
-  alquimista: ['pot_hp', 'pot_mp'],
+  alquimista: ['pot_hp', 'pot_mp', 'pot_hp2', 'pot_mp2', 'pot_hp3', 'pot_mp3'],
   armeira: SET_ITEMS.map(i => i.key),
   wings: [],
   chest: [],
   reset: [],
   press: [],
-  ferreira: ['jewel_aurora', ...Object.values(ITEMS).filter(i => i.kind === 'weapon' && i.lvl < 70).sort((a, b) => a.wtype!.localeCompare(b.wtype!) || a.lvl - b.lvl).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
+  ferreira: ['jewel_aurora', ...Object.values(ITEMS).filter(i => i.kind === 'weapon' && i.lvl < 70).sort((a, b) => WTYPE_ORDER.indexOf(a.wtype!) - WTYPE_ORDER.indexOf(b.wtype!) || a.lvl - b.lvl).map(i => i.key), 'leather_helm', 'leather_armor', 'leather_pants', 'leather_boots'],
 };
 export interface MobDef {
   key: string; name: string; level: number; hp: number; dmg: number; def: number; speed: number; detect: number; leash: number;
@@ -154,12 +182,12 @@ export const MOBS: Record<string, MobDef> = {
   sentinel: { key: 'sentinel', name: 'Sentinela de Mármore', level: 62, hp: 30000, dmg: 480, def: 240, speed: 2.2, detect: 7, leash: 12, attackMs: 1700, xp: 26000, respawnMs: 28000, gold: [1200, 2200], drops: [['jewel_destiny', .06], ['jewel_eclipse', .02], ['ancient_scale', .006], ...setDrops('pegasus', .014), ...setDrops('hydra', .012), ...wep(56, .006)] },
   seraph: { key: 'seraph', name: 'Serafim Caído', level: 68, hp: 34000, dmg: 560, def: 200, speed: 3, detect: 9, leash: 14, attackMs: 1500, xp: 38000, respawnMs: 30000, gold: [1500, 2800], reach: 6.5, bolt: '#fff2b0', drops: [['jewel_eclipse', .03], ['ancient_scale', .01], ...setDrops('chimera', .012), ...setDrops('dragon', .012), ...wep(56, .01)] },
   ogriffin: { key: 'ogriffin', name: 'Grifo Ancião', level: 74, hp: 52000, dmg: 720, def: 260, speed: 4.2, detect: 9, leash: 15, attackMs: 1200, xp: 62000, respawnMs: 32000, gold: [2200, 4000], drops: [['jewel_eclipse', .04], ['ancient_scale', .016], ...setDrops('demon', .006), ...setDrops('chimera', .016), ...wep(56, .014)] },
-  archon: { key: 'archon', name: 'Arconte Dourado', level: 82, hp: 120000, dmg: 900, def: 340, speed: 2.8, detect: 8, leash: 13, attackMs: 1700, xp: 130000, respawnMs: 40000, gold: [4000, 7000], drops: [['jewel_eclipse', .08], ['ancient_scale', .03], ...setDrops('minotaur', .008), ...setDrops('sphinx', .008), ...setDrops('hummingbird', .008), ...setDrops('wyvern', .008), ...setDrops('reaper', .008), ...setDrops('demon', .012), ...setDrops('dragon', .02), ...wep(70, .006)] },
+  archon: { key: 'archon', name: 'Arconte Dourado', level: 82, hp: 120000, dmg: 900, def: 340, speed: 2.8, detect: 8, leash: 13, attackMs: 1700, xp: 130000, respawnMs: 40000, gold: [4000, 7000], drops: [...wep(90, .004), ['jewel_eclipse', .08], ['ancient_scale', .03], ...setDrops('minotaur', .008), ...setDrops('sphinx', .008), ...setDrops('hummingbird', .008), ...setDrops('wyvern', .008), ...setDrops('reaper', .008), ...setDrops('demon', .012), ...setDrops('dragon', .02), ...wep(70, .006)] },
   sandscarab: { key: 'sandscarab', name: 'Escaravelho das Dunas', level: 76, hp: 60000, dmg: 760, def: 280, speed: 3.6, detect: 8, leash: 13, attackMs: 1300, xp: 78000, respawnMs: 30000, gold: [2500, 4500], drops: [['jewel_destiny', .08], ['jewel_eclipse', .04], ['ancient_scale', .016], ...setDrops('mammoth', .012), ...setDrops('djinn', .012), ...setDrops('peacock', .012), ...setDrops('rhino', .012), ...setDrops('mummy', .012)] },
-  dunemummy: { key: 'dunemummy', name: 'Guardião Mumificado', level: 84, hp: 130000, dmg: 950, def: 350, speed: 2.4, detect: 8, leash: 13, attackMs: 1600, xp: 140000, respawnMs: 38000, gold: [4000, 7500], drops: [['jewel_eclipse', .08], ['ancient_scale', .03], ...setDrops('mammoth', .016), ...setDrops('djinn', .016), ...setDrops('peacock', .016), ...setDrops('rhino', .016), ...setDrops('mummy', .016), ...wep(70, .012)] },
-  sanddjinn: { key: 'sanddjinn', name: 'Djinn da Tempestade', level: 92, hp: 170000, dmg: 1100, def: 380, speed: 3, detect: 10, leash: 15, attackMs: 1500, xp: 200000, respawnMs: 42000, gold: [6000, 10000], reach: 6.5, bolt: '#6ae0ff', drops: [['jewel_eclipse', .1], ['ancient_scale', .04], ...setDrops('titan', .007), ...setDrops('oracle', .007), ...setDrops('unicorn', .007), ...setDrops('basilisk', .007), ...setDrops('lich', .007), ...wep(70, .018)] },
-  khepri: { key: 'khepri', name: 'Khepri, o Rei das Areias', level: 110, hp: 900000, dmg: 1700, def: 480, speed: 3.2, detect: 14, leash: 20, attackMs: 1400, xp: 2500000, respawnMs: 3600000, gold: [120000, 200000], boss: true, reach: 3.4, nova: '#ffcf5a', drops: [['pot_hp', 1], ['ancient_scale', 1], ['jewel_eclipse', 1], ...setDrops('titan', .12), ...setDrops('oracle', .12), ...setDrops('unicorn', .12), ...setDrops('basilisk', .12), ...setDrops('lich', .12)] },
-  aethon: { key: 'aethon', name: 'Aethon, o Eterno', level: 95, hp: 600000, dmg: 1400, def: 420, speed: 3.4, detect: 14, leash: 20, attackMs: 1400, xp: 1500000, respawnMs: 3600000, gold: [80000, 150000], boss: true, reach: 3.4, nova: '#fff2b0', drops: [['pot_hp', 1], ['ancient_scale', 1], ['jewel_eclipse', 1], ...setDrops('minotaur', .12), ...setDrops('sphinx', .12), ...setDrops('hummingbird', .12), ...setDrops('wyvern', .12), ...setDrops('reaper', .12), ...wep(70, .4), ...setDrops('demon', .2), ...setDrops('chimera', .25), ...setDrops('hydra', .25), ...setDrops('pegasus', .25), ...setDrops('dragon', .25)] },
+  dunemummy: { key: 'dunemummy', name: 'Guardião Mumificado', level: 84, hp: 130000, dmg: 950, def: 350, speed: 2.4, detect: 8, leash: 13, attackMs: 1600, xp: 140000, respawnMs: 38000, gold: [4000, 7500], drops: [...wep(90, .006), ['jewel_eclipse', .08], ['ancient_scale', .03], ...setDrops('mammoth', .016), ...setDrops('djinn', .016), ...setDrops('peacock', .016), ...setDrops('rhino', .016), ...setDrops('mummy', .016), ...wep(70, .012)] },
+  sanddjinn: { key: 'sanddjinn', name: 'Djinn da Tempestade', level: 92, hp: 170000, dmg: 1100, def: 380, speed: 3, detect: 10, leash: 15, attackMs: 1500, xp: 200000, respawnMs: 42000, gold: [6000, 10000], reach: 6.5, bolt: '#6ae0ff', drops: [...wep(90, .01), ...wep(110, .003), ['jewel_eclipse', .1], ['ancient_scale', .04], ...setDrops('titan', .007), ...setDrops('oracle', .007), ...setDrops('unicorn', .007), ...setDrops('basilisk', .007), ...setDrops('lich', .007), ...wep(70, .018)] },
+  khepri: { key: 'khepri', name: 'Khepri, o Rei das Areias', level: 110, hp: 900000, dmg: 1700, def: 480, speed: 3.2, detect: 14, leash: 20, attackMs: 1400, xp: 2500000, respawnMs: 3600000, gold: [120000, 200000], boss: true, reach: 3.4, nova: '#ffcf5a', drops: [...wep(90, .3), ...wep(110, .1), ['pot_hp', 1], ['ancient_scale', 1], ['jewel_eclipse', 1], ...setDrops('titan', .12), ...setDrops('oracle', .12), ...setDrops('unicorn', .12), ...setDrops('basilisk', .12), ...setDrops('lich', .12)] },
+  aethon: { key: 'aethon', name: 'Aethon, o Eterno', level: 95, hp: 600000, dmg: 1400, def: 420, speed: 3.4, detect: 14, leash: 20, attackMs: 1400, xp: 1500000, respawnMs: 3600000, gold: [80000, 150000], boss: true, reach: 3.4, nova: '#fff2b0', drops: [...wep(90, .15), ['pot_hp', 1], ['ancient_scale', 1], ['jewel_eclipse', 1], ...setDrops('minotaur', .12), ...setDrops('sphinx', .12), ...setDrops('hummingbird', .12), ...setDrops('wyvern', .12), ...setDrops('reaper', .12), ...wep(70, .4), ...setDrops('demon', .2), ...setDrops('chimera', .25), ...setDrops('hydra', .25), ...setDrops('pegasus', .25), ...setDrops('dragon', .25)] },
   imp: { key: 'imp', name: 'Diabrete Cinzento', level: 22, hp: 900, dmg: 70, def: 34, speed: 2.8, detect: 7, leash: 12, attackMs: 1500, xp: 380, respawnMs: 12000, gold: [50, 110], reach: 4.5, bolt: '#ff9d3c',
     drops: [['pot_hp', .3], ['pot_mp', .25], ['shard', .3], ['jewel_aurora', .03], ['jewel_destiny', .004], ...setDrops('griffin', .012)] },
   hound: { key: 'hound', name: 'Cão de Enxofre', level: 29, hp: 1900, dmg: 110, def: 50, speed: 4, detect: 8, leash: 14, attackMs: 1100, xp: 850, respawnMs: 15000, gold: [90, 190],
@@ -179,6 +207,15 @@ export const MOBS: Record<string, MobDef> = {
   boss: { key: 'boss', name: 'Hrímara, a Soberana', level: 24, hp: 6500, dmg: 70, def: 32, speed: 2.7, detect: 9, leash: 16, attackMs: 1400, xp: 4000, respawnMs: 600000, gold: [800, 1500], boss: true,
     drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ['plume', .6], ['jewel_aurora', 1], ['jewel_destiny', .5], ...wep(26, .2), ...setDrops('scorpion', .1), ...setDrops('spider', .1), ...setDrops('bear', .25), ...setDrops('owl', .1), ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
 };
+// Baús e acessórios caem de todos os monstros, conforme o nível (chefes têm chance bem maior)
+for (const m of Object.values(MOBS)) {
+  const L = m.level, acc = ACC_LVLS.filter(l => l <= L + 5).pop();
+  if (acc) m.drops.push([`ring_${acc}`, m.boss ? .15 : .004], [`amulet_${acc}`, m.boss ? .15 : .004]);
+  if (m.boss) m.drops.push(L >= 60 ? ['box_rei', .3] : L >= 30 ? ['box_ouro', .5] : ['box_prata', .6]);
+  else if (L >= 60) m.drops.push(['box_ouro', .008], ['box_prata', .006]);
+  else if (L >= 30) m.drops.push(['box_prata', .01], ['box_bronze', .006]);
+  else m.drops.push(['box_bronze', .012]);
+}
 export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse' | 'buff' | 'heal' | 'drain' | 'spirits' | 'cone' | 'chain' | 'wave';
 export interface Skill { lvl?: number; slow?: number; buff?: 'atk' | 'def'; heal?: number; curse?: number; n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number; arc?: number }
 export interface ClassDef {
@@ -187,23 +224,23 @@ export interface ClassDef {
 }
 // atk = pesos de Força, Agilidade e Energia no ataque
 export const CLASSES: Record<string, ClassDef> = {
-  dark_warrior: { key: 'dark_warrior', name: 'Dark Warrior', desc: 'Corpo a corpo, muita resistência.', base: { str: 28, agi: 20, vit: 25, ene: 10 }, range: 1.7, magic: false, atk: [.333, 0, 0], color: '#4d5873', pants: '#373b52', weapon: 'short_sword', weapons: ['sword', 'axe'], bolt: null, skills: [
+  dark_warrior: { key: 'dark_warrior', name: 'Dark Warrior', desc: 'Corpo a corpo, muita resistência.', base: { str: 28, agi: 20, vit: 25, ene: 10 }, range: 1.7, magic: false, atk: [.333, 0, 0], color: '#4d5873', pants: '#373b52', weapon: 'short_sword', weapons: ['sword', 'axe', 'mace', 'spear', 'gsword'], bolt: null, skills: [
     { n: 1, name: 'Golpe Circular', kind: 'spin', mana: 12, cd: 4000, mult: 1.3, radius: 2.4 }, { n: 2, name: 'Investida', kind: 'dash', mana: 18, cd: 7000, mult: 2, range: 7 },
     { n: 3, lvl: 10, name: 'Grito de Guerra', kind: 'buff', buff: 'atk', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#ff8a5c' }, { n: 4, lvl: 25, name: 'Terremoto', kind: 'spin', mana: 40, cd: 12000, mult: 2.4, radius: 3.8 }, { n: 5, lvl: 60, name: 'Ira do Titã', kind: 'spin', mana: 60, cd: 15000, mult: 3.4, radius: 4.8, color: '#ff8a3c' }, { n: 6, lvl: 120, name: 'Lâmina do Apocalipse', kind: 'dash', mana: 90, cd: 18000, mult: 5.6, range: 10 },
     { n: 7, lvl: 40, name: 'Golpe Cortante', kind: 'cone', mana: 30, cd: 5000, mult: 2.6, radius: 3.4, range: 3.4, arc: 130, color: '#ffe3a0' }] },
-  arcane_wizard: { key: 'arcane_wizard', name: 'Arcane Wizard', desc: 'Magia à distância, dano alto, pouca defesa.', base: { str: 18, agi: 18, vit: 15, ene: 32 }, range: 7, magic: true, atk: [0, 0, .4], color: '#3f4fa8', pants: '#2d3778', weapon: 'app_staff', weapons: ['staff'], bolt: '#8fd0ff', skills: [
+  arcane_wizard: { key: 'arcane_wizard', name: 'Arcane Wizard', desc: 'Magia à distância, dano alto, pouca defesa.', base: { str: 18, agi: 18, vit: 15, ene: 32 }, range: 7, magic: true, atk: [0, 0, .4], color: '#3f4fa8', pants: '#2d3778', weapon: 'app_staff', weapons: ['staff', 'scepter'], bolt: '#8fd0ff', skills: [
     { n: 1, name: 'Bola de Fogo', kind: 'splash', mana: 10, cd: 3000, mult: 1.5, radius: 2, range: 8, color: '#ff8a3c' }, { n: 2, name: 'Tempestade de Raios', kind: 'multi', mana: 20, cd: 8000, mult: 1.4, radius: 4, count: 5, range: 8, color: '#f6f07a' },
     { n: 3, lvl: 10, name: 'Nova Gélida', kind: 'spin', mana: 22, cd: 9000, mult: 1.2, radius: 3.6, slow: 5000, color: '#7fe3ff' }, { n: 4, lvl: 25, name: 'Meteoro', kind: 'splash', mana: 45, cd: 12000, mult: 3.2, radius: 3.2, range: 9, color: '#ff5a2c' }, { n: 5, lvl: 60, name: 'Corrente de Relâmpagos', kind: 'multi', mana: 65, cd: 14000, mult: 2.8, radius: 6, count: 8, range: 10, color: '#a8e4ff' }, { n: 6, lvl: 120, name: 'Cataclismo', kind: 'splash', mana: 110, cd: 20000, mult: 5.4, radius: 5, range: 10, color: '#ff3c7a' },
     { n: 7, lvl: 40, name: 'Espíritos Malignos', kind: 'spirits', mana: 50, cd: 10000, mult: .85, radius: 4.6, count: 4, color: '#9fe8ff' }] },
-  mystic_archer: { key: 'mystic_archer', name: 'Mystic Archer', desc: 'Arqueira veloz com um espírito auxiliar.', base: { str: 20, agi: 34, vit: 18, ene: 12 }, range: 8, magic: false, atk: [0, .34, 0], color: '#4f7a45', pants: '#3a5a33', weapon: 'oak_bow', weapons: ['bow'], bolt: '#f1e3b8', skills: [
+  mystic_archer: { key: 'mystic_archer', name: 'Mystic Archer', desc: 'Arqueira veloz com um espírito auxiliar.', base: { str: 20, agi: 34, vit: 18, ene: 12 }, range: 8, magic: false, atk: [0, .34, 0], color: '#4f7a45', pants: '#3a5a33', weapon: 'oak_bow', weapons: ['bow', 'crossbow'], bolt: '#f1e3b8', skills: [
     { n: 1, name: 'Flecha Tripla', kind: 'multi', mana: 10, cd: 4000, mult: 1.2, radius: 3.5, count: 3, range: 9, color: '#f1e3b8' }, { n: 2, name: 'Espírito da Mata', kind: 'summon', mana: 22, cd: 12000, mult: .7, pet: 'wisp', ms: 30000 },
     { n: 3, lvl: 10, name: 'Cura da Mata', kind: 'heal', heal: .35, mana: 28, cd: 14000, mult: 0, color: '#7dffa1' }, { n: 4, lvl: 25, name: 'Chuva de Flechas', kind: 'splash', mana: 38, cd: 11000, mult: 2.4, radius: 3.6, range: 10, color: '#f1e3b8' }, { n: 5, lvl: 60, name: 'Salva Perfurante', kind: 'multi', mana: 55, cd: 13000, mult: 2.7, radius: 6, count: 7, range: 11, color: '#6ae0ff' }, { n: 6, lvl: 120, name: 'Chuva Estelar', kind: 'splash', mana: 95, cd: 19000, mult: 5, radius: 5.2, range: 11, color: '#ffe08a' },
     { n: 7, lvl: 40, name: 'Flecha Perfurante', kind: 'wave', mana: 34, cd: 8000, mult: 2.5, radius: .9, range: 10, color: '#f1e3b8' }] },
-  spell_knight: { key: 'spell_knight', name: 'Spell Knight', desc: 'Híbrido de força e energia.', base: { str: 26, agi: 24, vit: 20, ene: 22 }, range: 1.7, magic: false, atk: [.2, 0, .18], color: '#7a3f5e', pants: '#552c43', weapon: 'short_sword', weapons: ['sword', 'axe'], bolt: null, skills: [
+  spell_knight: { key: 'spell_knight', name: 'Spell Knight', desc: 'Híbrido de força e energia.', base: { str: 26, agi: 24, vit: 20, ene: 22 }, range: 1.7, magic: false, atk: [.2, 0, .18], color: '#7a3f5e', pants: '#552c43', weapon: 'short_sword', weapons: ['sword', 'axe', 'mace', 'gsword'], bolt: null, skills: [
     { n: 1, name: 'Lâmina Arcana', kind: 'splash', mana: 12, cd: 3500, mult: 1.6, radius: 2, range: 2.6, color: '#d58cff' }, { n: 2, name: 'Explosão Rúnica', kind: 'spin', mana: 20, cd: 7000, mult: 1.7, radius: 3 },
     { n: 3, lvl: 10, name: 'Escudo Rúnico', kind: 'buff', buff: 'def', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#c9a4ff' }, { n: 4, lvl: 25, name: 'Corte Dimensional', kind: 'dash', mana: 40, cd: 11000, mult: 3.2, range: 8 }, { n: 5, lvl: 60, name: 'Tormenta Arcana', kind: 'spin', mana: 60, cd: 14000, mult: 3.2, radius: 4.6, color: '#d58cff' }, { n: 6, lvl: 120, name: 'Julgamento Rúnico', kind: 'splash', mana: 95, cd: 18000, mult: 5.2, radius: 4.4, range: 7, color: '#ffd76a' },
     { n: 7, lvl: 40, name: 'Lâmina Rúnica', kind: 'wave', mana: 38, cd: 8000, mult: 2.8, radius: 1.1, range: 7, color: '#d58cff' }] },
-  shadow_summoner: { key: 'shadow_summoner', name: 'Shadow Summoner', desc: 'Invoca sombras e amaldiçoa inimigos.', base: { str: 16, agi: 20, vit: 18, ene: 34 }, range: 6.5, magic: true, atk: [0, 0, .34], color: '#4a2f6b', pants: '#33214a', weapon: 'app_staff', weapons: ['staff'], bolt: '#b06bff', skills: [
+  shadow_summoner: { key: 'shadow_summoner', name: 'Shadow Summoner', desc: 'Invoca sombras e amaldiçoa inimigos.', base: { str: 16, agi: 20, vit: 18, ene: 34 }, range: 6.5, magic: true, atk: [0, 0, .34], color: '#4a2f6b', pants: '#33214a', weapon: 'app_staff', weapons: ['staff', 'scepter'], bolt: '#b06bff', skills: [
     { n: 1, name: 'Invocar Sombra', kind: 'summon', mana: 22, cd: 10000, mult: 1, pet: 'shade', ms: 35000 }, { n: 2, name: 'Maldição', kind: 'curse', mana: 14, cd: 6000, mult: .8, range: 8, ms: 8000, color: '#b06bff' },
     { n: 3, lvl: 10, name: 'Dreno Vital', kind: 'drain', heal: .5, mana: 18, cd: 7000, mult: 1.6, range: 8, color: '#ff5a7a' }, { n: 4, lvl: 25, name: 'Praga Sombria', kind: 'multi', curse: 8000, mana: 42, cd: 13000, mult: 2.2, radius: 4.5, count: 6, range: 9, color: '#9dff6b' }, { n: 5, lvl: 60, name: 'Legião de Almas', kind: 'multi', curse: 10000, mana: 65, cd: 15000, mult: 2.9, radius: 6, count: 8, range: 10, color: '#c77dff' }, { n: 6, lvl: 120, name: 'Colheita da Morte', kind: 'drain', heal: .8, mana: 100, cd: 20000, mult: 5, range: 10, color: '#ff3c5a' },
     { n: 7, lvl: 40, name: 'Correntes Sombrias', kind: 'chain', mana: 40, cd: 9000, mult: 2.4, radius: 4, count: 6, range: 8, slow: 3000, color: '#b06bff' }] },
