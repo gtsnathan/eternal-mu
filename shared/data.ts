@@ -251,6 +251,8 @@ export const HAIR_COLORS = ['#2b2230', '#7a4a22', '#d9b24a', '#b23a2e', '#d8dde6
 export const HAIR_STYLES = ['Curto', 'Espetado', 'Longo'];
 export const xpToNext = (lv: number) => Math.floor(50 * Math.pow(lv, 1.9) + 40);
 
+/** Master Level só começa a contar depois deste número de Resets. */
+export const MASTER_RESETS = 25;
 export const MASTER_MAX = 200, MASTER_NODE_MAX = 30, masterNext = (ml: number) => Math.floor(5e6 * Math.pow(1.06, ml));
 export const MASTER_NODES: Record<string, string> = { atk: 'Ataque +1%', def: 'Defesa +1%', hp: 'Vida +1%', crit: 'Crítico +0,3%' };
 export interface Base { mtree?: Record<string, number>; cls?: string; level: number; str: number; agi: number; vit: number; ene: number }

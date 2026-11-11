@@ -1,4 +1,4 @@
-import { masterNext, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { masterNext, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
@@ -624,7 +624,7 @@ export class MapRoom {
   }
   private addXp(p: Player, xp: number) {
     const gain = Math.floor(xp * (1 + p.streak * .05)); p.xp += gain; p.dirty = true; p.meDirty = true; this.send(p, { t: 'xpg', v: gain });
-    if (p.level >= CONFIG.maxLevel) { if (p.resets > 0 && p.ml < MASTER_MAX) { p.mxp += gain; let up = false; while (p.ml < MASTER_MAX && p.mxp >= masterNext(p.ml)) { p.mxp -= masterNext(p.ml); p.ml++; p.mpts++; up = true; } if (up) { this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Master Level ${p.ml}! +1 ponto mestre (tecla C).`); } } p.xp = 0; return; }
+    if (p.level >= CONFIG.maxLevel) { if (p.resets >= MASTER_RESETS && p.ml < MASTER_MAX) { p.mxp += gain; let up = false; while (p.ml < MASTER_MAX && p.mxp >= masterNext(p.ml)) { p.mxp -= masterNext(p.ml); p.ml++; p.mpts++; up = true; } if (up) { this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Master Level ${p.ml}! +1 ponto mestre (tecla C).`); } } p.xp = 0; return; }
     let up = false;
     while (p.level < CONFIG.maxLevel && p.xp >= xpToNext(p.level)) { p.xp -= xpToNext(p.level); p.level++; p.points += CONFIG.pointsPerLevel; up = true; }
     if (up) { const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Você alcançou o nível ${p.level}! +${CONFIG.pointsPerLevel} pontos (tecla C).`); for (const o of this.players.values()) o.known.delete(p.eid); }
