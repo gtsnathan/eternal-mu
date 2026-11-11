@@ -61,9 +61,9 @@ function solmira() {
   ([[21, 16], [29, 16], [21, 23], [29, 23], [38, 18], [38, 22], [12, 18], [12, 22]] as number[][]).forEach(([x, y]) => obj(m, 'lamp', x, y));
   ([[20, 18], [30, 21], [20, 22], [30, 17]] as number[][]).forEach(([x, y], i) => obj(m, 'palm', x, y, 1, 1, i % 2));
   obj(m, 'stall', 14, 18, 3, 2, 1); obj(m, 'stall', 33, 22, 3, 2, 0);
-  for (let y = 2; y < 38; y++) for (let x = 2; x < 48; x++) if (!plaza(x, y) && !road(y) && !m.solid[y * 50 + x] && r() < .07) obj(m, r() < .75 ? 'palm' : 'rock', x, y, 1, 1, r() * 2 | 0);
+  for (let y = 2; y < 38; y++) for (let x = 2; x < 48; x++) if (!plaza(x, y) && !road(y) && !(y >= 2 && y <= 8) && !m.solid[y * 50 + x] && r() < .07) obj(m, r() < .75 ? 'palm' : 'rock', x, y, 1, 1, r() * 2 | 0);
   m.spawn = { x: 25.5, y: 25 };
-  m.portals.push({ x: 3.5, y: 20.5, to: 'valoria', tx: 6, ty: 14.5, label: 'Valoria' }, { x: 46.5, y: 20.5, to: 'dunas', tx: 14, ty: 70, label: 'Dunas de Solmira', lvl: 70 });
+  m.portals.push({ x: 3.5, y: 20.5, to: 'valoria', tx: 6, ty: 14.5, label: 'Valoria' }, { x: 46.5, y: 20.5, to: 'dunas', tx: 14, ty: 70, label: 'Dunas de Solmira', lvl: 70 }, ...HI_MAPS.map((h, i) => ({ x: HI_PORTAL_X[i], y: 4.5, to: h.id, tx: 18, ty: 70, label: h.name, lvl: h.lvl })));
   m.npcs.push({ id: 'alquimista', name: 'Zahra, Alquimista', x: 20.5, y: 25.5, shop: 'alquimista', line: 'Bebam antes de cruzar as dunas.', look: 1 },
     { id: 'ferreira', name: 'Kasim, Ferreiro', x: 30.5, y: 25.5, shop: 'ferreira', line: 'Lâminas temperadas ao sol do deserto.', look: 2 },
     { id: 'armeira', name: 'Samira, Armeira de Sets', x: 25.5, y: 14.5, shop: 'armeira', line: 'As armaduras mais raras do reino chegam aqui.', look: 4 },
@@ -171,6 +171,44 @@ function celestial() {
   m.zones.push({ mob: 'sentinel', n: 11, cx: 30, cy: 20, r: 6 }, { mob: 'sentinel', n: 10, cx: 30, cy: 52, r: 6 }, { mob: 'seraph', n: 9, cx: 52, cy: 14, r: 6 }, { mob: 'seraph', n: 9, cx: 52, cy: 56, r: 6 }, { mob: 'ogriffin', n: 9, cx: 52, cy: 35, r: 5 }, { mob: 'archon', n: 7, cx: 73, cy: 22, r: 6 }, { mob: 'archon', n: 7, cx: 73, cy: 50, r: 6 }, { mob: 'aethon', n: 1, cx: 85, cy: 35, r: 1 });
   return m;
 }
+// ---------- Mundos de alto nível: saem dos portais do norte de Solmira ----------
+interface HiMap { id: string; name: string; lvl: number; seed: number; style: 'open' | 'rooms' | 'islands'; floor: number; base: number; patch?: number; patchSolid?: boolean; objs: Obj['k'][]; dens: number; mobs: [string, string, string]; boss: string; traps?: boolean }
+export const HI_MAPS: HiMap[] = [
+  { id: 'pantano', name: 'Pântano Venenoso', lvl: 120, seed: 501, style: 'open', floor: T.MOSS, base: T.MOSS, patch: T.WATER, patchSolid: true, objs: ['deadtree', 'shroom', 'oak'], dens: .06, mobs: ['bogtoad', 'venomspider', 'swamphag'], boss: 'hydraqueen' },
+  { id: 'cume', name: 'Cume Glacial', lvl: 150, seed: 502, style: 'open', floor: T.SNOW, base: T.SNOW, patch: T.ICE, objs: ['pine', 'rock', 'spire'], dens: .06, mobs: ['frostgolem', 'icewyrm', 'frostseraph'], boss: 'glacius' },
+  { id: 'vulcao', name: 'Coração do Vulcão', lvl: 180, seed: 503, style: 'open', floor: T.ASH, base: T.ASH, patch: T.LAVA, patchSolid: true, objs: ['spire', 'rock', 'deadtree'], dens: .05, mobs: ['lavagolem', 'flamehound', 'pyromancer'], boss: 'pyros' },
+  { id: 'necropole', name: 'Necrópole Esquecida', lvl: 210, seed: 504, style: 'rooms', floor: T.DUNGEON, base: T.DWALL, objs: ['pillar'], dens: 0, mobs: ['wraith', 'deathknight', 'bonedragon'], boss: 'morthul', traps: true },
+  { id: 'sombria', name: 'Floresta Sombria', lvl: 240, seed: 505, style: 'open', floor: T.MOSS, base: T.GRASS, patch: T.MOSS, objs: ['oak', 'tree', 'shroom', 'deadtree'], dens: .09, mobs: ['darktreant', 'shadowelf', 'nightwolf'], boss: 'sylvara' },
+  { id: 'abismo', name: 'Abismo Cristalino', lvl: 270, seed: 506, style: 'rooms', floor: T.ICE, base: T.DWALL, objs: ['spire', 'pillar'], dens: 0, mobs: ['crystalgolem', 'voidsprite', 'abyssknight'], boss: 'xalathar' },
+  { id: 'caos', name: 'Trono do Caos', lvl: 300, seed: 507, style: 'islands', floor: T.ASH, base: T.LAVA, objs: ['spire', 'statue'], dens: 0, mobs: ['chaosimp', 'chaoshound', 'chaoslord'], boss: 'kaorth' },
+  { id: 'vazio', name: 'Vazio Eterno', lvl: 340, seed: 508, style: 'islands', floor: T.MARBLE, base: T.DWALL, objs: ['pillar', 'statue'], dens: 0, mobs: ['voidseraph', 'starbeast', 'eternalarchon'], boss: 'nihilus' },
+];
+/** Mesma planta de 9 áreas para todos: entrada à esquerda, chefe no fundo à direita. */
+const HI_NODES = [[9, 35, 7, 6], [27, 20, 8, 7], [27, 50, 8, 7], [47, 35, 9, 7], [47, 12, 7, 5], [47, 59, 7, 5], [67, 22, 8, 7], [67, 50, 8, 7], [82, 35, 8, 10]];
+const HI_LINKS = [[0, 1], [0, 2], [1, 3], [2, 3], [3, 4], [3, 5], [1, 4], [2, 5], [3, 6], [3, 7], [4, 6], [5, 7], [6, 8], [7, 8]];
+function hiMap(d: HiMap, solX: number) {
+  const W = 92, H = 70, m = makeMap(d.id, d.name, W, H, false, d.base), r = rng(d.seed);
+  const inNode = (x: number, y: number, pad = 0) => HI_NODES.some(([cx, cy, a, b]) => Math.abs(x - cx) <= a + pad && Math.abs(y - cy) <= b + pad);
+  if (d.style === 'open') {
+    for (let x = 0; x < W; x++) for (const y of [0, H - 1]) m.solid[y * W + x] = 1; for (let y = 0; y < H; y++) for (const x of [0, W - 1]) m.solid[y * W + x] = 1;
+    const path = (x: number, y: number) => HI_LINKS.some(([a, b]) => { const [x0, y0] = HI_NODES[a], [x1, y1] = HI_NODES[b], L = Math.hypot(x1 - x0, y1 - y0), t = Math.max(0, Math.min(1, ((x - x0) * (x1 - x0) + (y - y0) * (y1 - y0)) / (L * L))); return Math.hypot(x - (x0 + (x1 - x0) * t), y - (y0 + (y1 - y0) * t)) < 2.5; });
+    if (d.patch !== undefined) for (let i = 0; i < 26; i++) { const cx = 3 + r() * (W - 6), cy = 3 + r() * (H - 6), rad = 2 + r() * 4; for (let y = Math.floor(cy - rad); y <= cy + rad; y++) for (let x = Math.floor(cx - rad); x <= cx + rad; x++) if (x > 0 && y > 0 && x < W - 1 && y < H - 1 && Math.hypot(x - cx, y - cy) <= rad && !inNode(x, y, 1) && !path(x, y)) { m.tiles[y * W + x] = d.patch; if (d.patchSolid) m.solid[y * W + x] = 1; } }
+    for (const [cx, cy, a, b] of HI_NODES) for (let y = cy - b; y <= cy + b; y++) for (let x = cx - a; x <= cx + a; x++) if (((x - cx) / a) ** 2 + ((y - cy) / b) ** 2 <= 1) m.tiles[y * W + x] = d.floor;
+    for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) if (!m.solid[y * W + x] && !inNode(x, y, 1) && !path(x, y) && r() < d.dens) obj(m, d.objs[r() * d.objs.length | 0], x, y, 1, 1, r() * 2 | 0);
+  } else {
+    m.solid.fill(1); if (d.traps) m.traps = new Set();
+    const floor = (x: number, y: number) => { if (x > 0 && y > 0 && x < W - 1 && y < H - 1) { m.tiles[y * W + x] = d.floor; m.solid[y * W + x] = 0; } };
+    for (const [cx, cy, a, b] of HI_NODES) for (let y = cy - b; y <= cy + b; y++) for (let x = cx - a; x <= cx + a; x++) if (d.style === 'rooms' || ((x - cx) / a) ** 2 + ((y - cy) / b) ** 2 <= 1) floor(x, y);
+    for (const [a, b] of HI_LINKS) { const [x0, y0] = HI_NODES[a], [x1, y1] = HI_NODES[b], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0)); for (let i = 0; i <= n; i++) { const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n); for (let o = -1; o <= 1; o++) for (let q = -1; q <= 1; q++) { floor(x + o, y + q); if (d.traps && !inNode(x + o, y + q) && r() < .05) m.traps!.add((y + q) * W + x + o); } } }
+    HI_NODES.forEach(([cx, cy, a, b], n) => { if (n === 0) return; for (let i = 0; i < 6; i++) { const t = r() * 6.283, x = Math.round(cx + Math.cos(t) * (a - 2) * (.6 + r() * .4)), y = Math.round(cy + Math.sin(t) * (b - 2) * (.6 + r() * .4)); if (!m.solid[y * W + x] && Math.hypot(x - cx, y - cy) > 2.5) obj(m, d.objs[r() * d.objs.length | 0], x, y, 1, 1, r() * 2 | 0); } });
+    if (d.style === 'rooms') for (const [cx, cy, a, b] of HI_NODES) for (let x = cx - a + 3; x <= cx + a - 3; x += 6) if (m.solid[(cy - b - 1) * W + x]) m.objs.push({ k: 'torch', x, y: cy - b - 1, w: 1, h: 1, v: 0 });
+  }
+  m.spawn = { x: 9, y: 35 }; m.portals.push({ x: 4.5, y: 35.5, to: 'solmira', tx: solX, ty: 6.5, label: 'Solmira' });
+  const [a, b, c] = d.mobs;
+  m.zones.push({ mob: a, n: 12, cx: 27, cy: 20, r: 6 }, { mob: a, n: 12, cx: 27, cy: 50, r: 6 }, { mob: b, n: 9, cx: 47, cy: 12, r: 5 }, { mob: b, n: 9, cx: 47, cy: 59, r: 5 }, { mob: b, n: 8, cx: 47, cy: 35, r: 6 }, { mob: c, n: 8, cx: 67, cy: 22, r: 6 }, { mob: c, n: 8, cx: 67, cy: 50, r: 6 }, { mob: d.boss, n: 1, cx: 82, cy: 35, r: 1 });
+  return m;
+}
+const HI_PORTAL_X = [5.5, 10.5, 15.5, 20.5, 29.5, 34.5, 39.5, 44.5];
 export const MAP_SCALE = 2; // quantas vezes cada lado dos mapas de caça é ampliado
 const DENSE = new Set(['tree', 'pine', 'oak', 'rock', 'spire', 'deadtree']);
 /** Amplia um mapa de caça mantendo caminhos, áreas e mais monstros proporcionais. */
@@ -190,12 +228,12 @@ function enlarge(m: GameMap, k = MAP_SCALE): GameMap {
   if (m.traps) { n.traps = new Set(); for (const t of m.traps) for (let b = 0; b < k; b++) for (let a = 0; a < k; a++) n.traps.add(((t / m.w | 0) * k + b) * n.w + (t % m.w) * k + a); }
   return n;
 }
-const MOBS_IS_BOSS = (k: string) => ['boss', 'ignarok', 'aracnia', 'vorgath', 'aethon'].includes(k);
+const MOBS_IS_BOSS = (k: string) => ['boss', 'ignarok', 'aracnia', 'vorgath', 'aethon', 'khepri', ...HI_MAPS.map(h => h.boss)].includes(k);
 const cache: Record<string, GameMap> = {};
 /** Destinos da janela de viagem (tecla M): mesmas regras e chegadas dos portais de Valoria. */
 export function travelList() { const v = getMap('valoria'); return [{ to: 'valoria', name: v.name, lvl: 0, x: v.spawn.x, y: v.spawn.y }, ...[...v.portals, ...getMap('solmira').portals.filter(g => g.to !== 'valoria')].map(g => ({ to: g.to, name: getMap(g.to).name, lvl: g.lvl ?? 0, x: g.tx, y: g.ty }))].sort((a, b) => a.lvl - b.lvl); }
-export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial', 'solmira', 'dunas'];
-export function getMap(id: string): GameMap { return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
+export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial', 'solmira', 'dunas', ...HI_MAPS.map(h => h.id)];
+export function getMap(id: string): GameMap { const hi = HI_MAPS.findIndex(h => h.id === id); if (hi >= 0) return cache[id] ??= enlarge(hiMap(HI_MAPS[hi], HI_PORTAL_X[hi])); return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
 
 export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return i < 0 || j < 0 || i >= m.w || j >= m.h || m.solid[j * m.w + i] === 1; };
 const R = .3;

@@ -499,7 +499,7 @@ function frame(ts: number) {
     if (Math.random() < .5) { const ri = x0 + Math.floor(Math.random() * (x1 - x0 + 1)), rj = y0 + Math.floor(Math.random() * (y1 - y0 + 1)), tt = map.tiles[rj * map.w + ri]; if (tt === T.LAVA) parts.push({ x: ri + Math.random(), y: rj + .9, vx: 0, vy: -1.6, life: 0, max: .5, c: '#ffd76a', s: 3, g: 3 }); else if (tt === T.WATER) parts.push({ x: ri + Math.random(), y: rj + Math.random() + .3, vx: 0, vy: 0, life: 0, max: .3, c: '#ffffff', s: 2 }); else if (tt === T.ICE) parts.push({ x: ri + Math.random(), y: rj + Math.random() + .3, vx: 0, vy: 0, life: 0, max: .4, c: '#ffffff', s: 2 }); }
   }
   // luz do dia/noite e fontes de luz
-  const night = map.id === 'dunas' ? 0 : map.id === 'ashen' ? .95 : map.id === 'celestial' ? 0 : map.id === 'eldergrove' ? Math.max(.42, nightFactor()) : nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
+  const night = map.id in DARK_MAPS ? DARK_MAPS[map.id] : map.id === 'dunas' ? 0 : map.id === 'ashen' ? .95 : map.id === 'celestial' ? 0 : map.id === 'eldergrove' ? Math.max(.42, nightFactor()) : nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
   if (night > .02) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : map.id === 'infernal' ? [255, 214, 190] : map.id === 'eldergrove' ? [214, 240, 214] : map.id === 'celestial' ? [255, 248, 228] : [226, 236, 255], [122, 130, 188], night); g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   const light = (x: number, y: number, r: number, c: string, al: number) => { g.globalAlpha = Math.min(1, al); g.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
   for (const p of map.portals) light(p.x * 32, p.y * 32 - 26, 96 + Math.sin(ts / 300) * 8, '#8a55ff', .55 + night * .35);
@@ -628,6 +628,8 @@ function edgeDepth(x: CanvasRenderingContext2D, m: GameMap, i: number, j: number
 const okCol = (c: unknown): c is string => typeof c === 'string' && c.length === 7;
 const GRADE: Record<string, [string, string, number]> = { valoria: ['#ffe9b0', '#2a3a6a', .3], frostvale: ['#dff1ff', '#1d3a78', .34], infernal: ['#ffb070', '#3a0812', .42], eldergrove: ['#d8ffb0', '#0a2a20', .38], ashen: ['#8a80b0', '#0a0818', .4], celestial: ['#ffe2b0', '#34488f', .62], solmira: ['#ffe0a0', '#7a3a20', .34], dunas: ['#fff0b8', '#8a4a20', .38] };
 const FOG: Record<string, string> = { frostvale: '#dcebff', eldergrove: '#7fbf8a', ashen: '#3a3550', infernal: '#5a2418', dunas: '#f0d8a0' };
+/** Escuridão fixa dos mundos de alto nível (0 = dia, 1 = breu). */
+const DARK_MAPS: Record<string, number> = { pantano: .45, vulcao: .55, necropole: .92, sombria: .7, abismo: .85, caos: .5, vazio: .75 };
 const RAYS = new Set(['valoria', 'solmira', 'dunas', 'eldergrove']);
 /** Luz solar, névoa e cor de cada mapa, em tela cheia e abaixo dos nomes. */
 function atmosphere(W: number, H: number, ts: number, night: number) {

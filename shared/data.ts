@@ -207,6 +207,28 @@ export const MOBS: Record<string, MobDef> = {
   boss: { key: 'boss', name: 'Hrímara, a Soberana', level: 24, hp: 6500, dmg: 70, def: 32, speed: 2.7, detect: 9, leash: 16, attackMs: 1400, xp: 4000, respawnMs: 600000, gold: [800, 1500], boss: true,
     drops: [['frost_blade', .4], ['glacier_staff', .4], ['aurora_bow', .4], ['rime_armor', .5], ['rime_helm', .5], ['pot_hp', 1], ['pot_mp', 1], ['plume', .6], ['jewel_aurora', 1], ['jewel_destiny', .5], ...wep(26, .2), ...setDrops('scorpion', .1), ...setDrops('spider', .1), ...setDrops('bear', .25), ...setDrops('owl', .1), ...setDrops('lion', .25), ...setDrops('serpent', .1), ...setDrops('phoenix', .04), ...setDrops('dragon', .015)] },
 };
+// ---------- Mundos de alto nível (120 a 380) ----------
+/** Atributos crescem com o nível, calibrados para um jogador do mesmo nível com equipamento da época. */
+const lerpT = (L: number, t: [number, number][]) => { for (let i = 1; i < t.length; i++) if (L <= t[i][0]) { const [a, va] = t[i - 1], [b, vb] = t[i]; return va + (vb - va) * (L - a) / (b - a); } return t[t.length - 1][1]; };
+const TOP_SETS = ['titan', 'oracle', 'unicorn', 'basilisk', 'lich'];
+function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?: number; bolt?: string; nova?: string } = {}): MobDef {
+  const b = !!o.boss, hp = Math.round(170000 * (L / 92) ** 1.5 * (b ? 6 : 1) / 1000) * 1000;
+  const dmg = Math.round(lerpT(L, [[120, 1180], [150, 1240], [180, 1735], [220, 2310], [260, 2510], [300, 2820], [340, 3420], [380, 3920], [400, 4200]]) * (b ? 1.5 : 1));
+  const def = Math.round(lerpT(L, [[120, 430], [150, 500], [180, 800], [220, 1050], [260, 1200], [300, 1350], [340, 1700], [380, 2100], [400, 2300]]) * (b ? 1.2 : 1));
+  const drops: [string, number][] = b ? [...wep(110, .3), ...wep(90, .5), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...TOP_SETS.flatMap(s => setDrops(s, .15))]
+    : [...wep(110, .004 + L / 40000), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...TOP_SETS.flatMap(s => setDrops(s, .006))];
+  return { key, name, level: L, hp, dmg, def, speed: b ? 3.2 : 3, detect: b ? 14 : 9, leash: b ? 20 : 14, attackMs: b ? 1400 : 1500, xp: Math.round(hp * (b ? 2.5 : 1.15)), respawnMs: b ? 3600000 : 42000, gold: b ? [L * 1400, L * 2400] : [L * 55, L * 95], drops, boss: b || undefined, reach: o.reach ?? (b ? 3.4 : undefined), bolt: o.bolt, nova: o.nova };
+}
+Object.assign(MOBS, Object.fromEntries([
+  hiMob('bogtoad', 'Sapo do Pântano', 120), hiMob('venomspider', 'Aranha Peçonhenta', 128), hiMob('swamphag', 'Bruxa do Brejo', 135, { reach: 6, bolt: '#9dff6b' }), hiMob('hydraqueen', 'Rainha Hidra', 150, { boss: true, nova: '#9dff6b' }),
+  hiMob('frostgolem', 'Golem de Gelo Eterno', 150), hiMob('icewyrm', 'Serpe Glacial', 158), hiMob('frostseraph', 'Serafim da Nevasca', 165, { reach: 6.5, bolt: '#bdf0ff' }), hiMob('glacius', 'Glacius, o Inverno', 180, { boss: true, nova: '#bdf0ff' }),
+  hiMob('lavagolem', 'Golem de Lava', 180), hiMob('flamehound', 'Cão Flamejante', 188), hiMob('pyromancer', 'Piromante', 195, { reach: 6.5, bolt: '#ff7a2b' }), hiMob('pyros', 'Pyros, Senhor do Vulcão', 210, { boss: true, nova: '#ff7a2b' }),
+  hiMob('wraith', 'Espectro Faminto', 210), hiMob('deathknight', 'Cavaleiro da Morte', 218), hiMob('bonedragon', 'Dragão de Ossos', 225), hiMob('morthul', 'Morthul, o Lich Rei', 240, { boss: true, nova: '#7dffb0' }),
+  hiMob('darktreant', 'Ent Sombrio', 240), hiMob('shadowelf', 'Elfo das Sombras', 248, { reach: 7, bolt: '#c77dff' }), hiMob('nightwolf', 'Lobo da Noite', 255), hiMob('sylvara', 'Sylvara, Mãe da Floresta', 270, { boss: true, nova: '#d6ff6a' }),
+  hiMob('crystalgolem', 'Golem de Cristal', 270), hiMob('voidsprite', 'Fada do Abismo', 278, { reach: 6.5, bolt: '#4af0ff' }), hiMob('abyssknight', 'Guardião do Abismo', 285), hiMob('xalathar', 'Xalathar, o Devorador', 300, { boss: true, nova: '#c9a0ff' }),
+  hiMob('chaosimp', 'Diabrete do Caos', 300), hiMob('chaoshound', 'Cão do Caos', 310), hiMob('chaoslord', 'Lorde do Caos', 320), hiMob('kaorth', 'Kaorth, Rei do Caos', 340, { boss: true, nova: '#ff4a6a' }),
+  hiMob('voidseraph', 'Serafim do Vazio', 340, { reach: 7, bolt: '#7a4aff' }), hiMob('starbeast', 'Fera Estelar', 350), hiMob('eternalarchon', 'Arconte Eterno', 360, { reach: 6.5, bolt: '#9fd8ff' }), hiMob('nihilus', 'Nihilus, o Fim', 380, { boss: true, nova: '#ff4af0' }),
+].map(m => [m.key, m])));
 // Baús e acessórios caem de todos os monstros, conforme o nível (chefes têm chance bem maior)
 for (const m of Object.values(MOBS)) {
   const L = m.level, acc = ACC_LVLS.filter(l => l <= L + 5).pop();
