@@ -235,6 +235,8 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
 .touch #bossbar{top:calc(240px + env(safe-area-inset-top));width:min(320px,80vw)}.touch #bossbar b{font-size:12px}
 @media (orientation:landscape) and (max-height:500px){.touch #bossbar{top:calc(84px + env(safe-area-inset-top));width:min(300px,40vw)}}
 body.boss #tframe{display:none!important}
+#duelbar{display:none;position:absolute;left:50%;top:calc(52px + env(safe-area-inset-top));transform:translateX(-50%);padding:5px 14px;border-radius:999px;background:#3a0c14e6;border:2px solid #ff4a6a;color:#ffd0d8;font-weight:700;font-size:13px;pointer-events:none;z-index:5;white-space:nowrap}
+.touch #duelbar{top:calc(270px + env(safe-area-inset-top));font-size:12px}
 </style>
 </head>
 <body>
@@ -244,7 +246,8 @@ body.boss #tframe{display:none!important}
   <div id="tframe"><div id="tfn"></div><div class="bar hp"><i id="tfb"></i></div></div>
   <div id="toast"></div>
   <div id="party" class="p"></div>
-  <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
+  <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button><button id="pmduel" style="display:block;width:100%;margin-top:4px">⚔ Desafiar para duelo</button></div>
+  <div id="duelbar"></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
   <div class="menu p"><button id="chatb" class="tonly" title="Chat">💬</button><button data-w="inv">Bolsa</button><button data-w="char" class="extra">Perfil</button><button data-w="map" class="extra">Mapa</button><button data-w="rank" class="extra">Rank</button><button id="auto" title="Auto ataque: ataca e usa habilidades sozinho">⚔<span class="lbl"> Auto</span></button><button id="autoloot" title="Auto coleta: anda até os itens e pega sozinho">✋<span class="lbl"> Coleta</span></button><button id="gfx" class="extra">Gráf: Auto</button><button id="exit" class="extra">Sair</button><button id="more" class="tonly" title="Mais">☰</button></div>

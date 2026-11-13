@@ -4,7 +4,7 @@ import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, tra
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; duel?: { with: number; until: number } | null; duelFrom?: { from: number; until: number } | null; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -144,7 +144,7 @@ export class MapRoom {
     if (!this.timer) { this.last = Date.now(); this.lastSave = this.last; this.timer = setInterval(() => this.safeTick(), CONFIG.tickMs); }
   }
   private leave(p: Player) {
-    if (p.gone) return; this.cancelTrade(p, 'O outro jogador saiu.'); p.gone = true;
+    if (p.gone) return; this.cancelTrade(p, 'O outro jogador saiu.'); this.endDuel(p, null, 'saiu do mapa'); p.gone = true;
     this.players.delete(p.eid);
     if (this.byChar.get(p.charId) === p) this.byChar.delete(p.charId);
     p.dirty = true; this.flush(p);
@@ -228,7 +228,10 @@ export class MapRoom {
         return;
       }
       case 'g': if (Number.isFinite(m.x) && Number.isFinite(m.y)) { p.target = 0; p.path = findPath(this.map, p.x, p.y, m.x, m.y); } return;
-      case 'a': if (this.mobs.get(m.id)?.hp && !this.map.safe) { p.target = m.id; p.nextRepath = 0; } return;
+      case 'a': if ((this.mobs.get(m.id)?.hp && !this.map.safe) || this.duelFoe(p, m.id)) { p.target = m.id; p.nextRepath = 0; } return;
+      case 'dui': return this.duelInvite(p, m.id);
+      case 'dua': return this.duelAccept(p);
+      case 'dud': { const f = p.duelFrom && this.players.get(p.duelFrom.from); p.duelFrom = null; if (f) this.sys(f, `${p.name} recusou o duelo.`); return; }
       case 'k': return this.skill(p, m.n, m.id, now);
       case 'u': return this.usePotion(p, m.slot, now);
       case 'e': return this.equip(p, m.slot);
@@ -392,6 +395,37 @@ export class MapRoom {
     for (const p of this.players.values()) this.sys(p, `⚜ INVASÃO DOURADA em ${this.map.name}! 8 monstros dourados apareceram por 10 minutos: muito mais XP, moedas, baús e joias.`);
     for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/news', { method: 'POST', body: JSON.stringify({ m: `⚜ Invasão Dourada começou em ${this.map.name} (10 minutos)!` }) })).catch(() => null);
   }
+  // ---------- Duelo: os dois aceitam, 2 minutos, ninguém morre de verdade (o perdedor fica com 1 de vida) ----------
+  private duelFoe(p: Player, id: unknown) { if (!p.duel || p.duel.with !== id) return null; const o = this.players.get(id as number); return o && o.duel?.with === p.eid && !o.gone ? o : null; }
+  private duelInvite(p: Player, id: unknown) {
+    const t = this.players.get(id as number); if (!t || t === p || dist(t, p) > 8 || p.deadUntil) return;
+    if (p.duel || t.duel) return this.sys(p, `${p.duel ? 'Você' : t.name} já está em um duelo.`);
+    t.duelFrom = { from: p.eid, until: Date.now() + 30000 }; this.send(t, { t: 'dinv', from: p.name }); this.sys(p, `Desafio de duelo enviado a ${t.name}.`);
+  }
+  private duelAccept(p: Player) {
+    const f = p.duelFrom, o = f && Date.now() < f.until ? this.players.get(f.from) : null; p.duelFrom = null;
+    if (!o || o.duel || p.duel || dist(o, p) > 10 || o.deadUntil || p.deadUntil) return this.sys(p, 'O desafio não está mais valendo.');
+    const until = Date.now() + 120000; p.duel = { with: o.eid, until }; o.duel = { with: p.eid, until };
+    for (const [a, b] of [[p, o], [o, p]]) { this.send(a, { t: 'duel', with: b.eid, name: b.name, until: 120000 }); this.sys(a, `⚔ Duelo contra ${b.name} começou! 2 minutos. Toque nele para atacar.`); }
+    this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }, { k: 'lvl', x: o.x, y: o.y, id: o.eid });
+  }
+  /** Termina o duelo de p: winner = quem ganhou (ou null para empate/saída). */
+  private endDuel(p: Player, winner: Player | null, why = '') {
+    if (!p.duel) return; const o = this.players.get(p.duel.with); p.duel = null; if (p.target === o?.eid) p.target = 0;
+    if (o?.duel?.with === p.eid) { o.duel = null; if (o.target === p.eid) o.target = 0; }
+    for (const a of [p, o]) if (a && !a.gone) this.send(a, { t: 'duel', with: 0 });
+    if (!o) return;
+    if (winner) { const loser = winner === p ? o : p; for (const x of this.players.values()) this.sys(x, `🏆 ${winner.name} venceu o duelo contra ${loser.name}!`); this.fx.push({ k: 'lvl', x: winner.x, y: winner.y, id: winner.eid }); }
+    else for (const a of [p, o]) if (!a.gone) this.sys(a, `O duelo terminou empatado${why ? ` (${o === a ? p.name : o.name} ${why})` : ''}.`);
+  }
+  private pvpHit(p: Player, o: Player, atk: number, crit: number) {
+    const os = this.stats(o); if (Math.random() < os.dodge) { this.fx.push({ k: 'miss', x: o.x, y: o.y, id: o.eid }); return; }
+    const isCrit = Math.random() < crit; let dmg = Math.max(1, Math.round(rollDamage(atk, os.def * .8, Math.random()) * .35)); if (isCrit) dmg = Math.round(dmg * 1.5);
+    dmg = Math.min(dmg, Math.ceil(os.maxHp * (isCrit ? .04 : .025))); // cada golpe tira no máximo 2,5% (4% no crítico): duelo dura, e quem tem mais vida/defesa leva vantagem
+    o.hp -= dmg; o.meDirty = true; this.fx.push({ k: 'hit', x: o.x, y: o.y, id: o.eid, v: dmg, c: isCrit ? 1 : 0, p: 1 });
+    if (o.hp <= 1) { o.hp = 1; this.endDuel(p, p); }
+  }
+  private tickDuels(now: number) { for (const p of this.players.values()) if (p.duel && now > p.duel.until) this.endDuel(p, null, ''); }
   private questAccept(p: Player, npc: unknown, id: unknown) {
     if (!this.nearNpc(p, npc)) return; const q = quests()[String(id)]; if (!q) return;
     if (p.quest) return this.sys(p, 'Termine ou abandone a missão atual antes de aceitar outra.');
@@ -460,7 +494,13 @@ export class MapRoom {
   // ---------- combate ----------
   private skill(p: Player, n: unknown, id: unknown, now: number) {
     const sk = classOf(p.cls).skills.find(x => x.n === n); if (sk && p.level < (sk.lvl ?? 1)) return this.sys(p, `Disponível no nível ${sk.lvl}.`);
-    if (!sk || (this.map.safe && sk.kind !== 'buff' && sk.kind !== 'heal') || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
+    if (!sk || (this.map.safe && sk.kind !== 'buff' && sk.kind !== 'heal' && !this.duelFoe(p, id)) || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
+    const foe = this.duelFoe(p, id), harm = !['buff', 'heal', 'summon'].includes(sk.kind);
+    if (foe && harm && now >= (p.cds[sk.n] ?? 0) && p.mp >= sk.mana && dist(foe, p) <= Math.max(sk.range ?? 0, sk.radius ?? 0, 2.5)) { // duelo: a habilidade acerta o oponente (dano de PvP reduzido)
+      const st = this.stats(p); p.mp -= sk.mana; p.cds[sk.n] = now + sk.cd; p.nextAtk = now + st.attackMs; p.meDirty = true; this.send(p, { t: 'cd', n: sk.n, ms: sk.cd });
+      this.fx.push({ k: 'bolt', x: p.x, y: p.y, id: p.eid, tx: foe.x, ty: foe.y, b: sk.color ?? classOf(p.cls).bolt ?? '#ffd76a' }); this.pvpHit(p, foe, st.atk * Math.min(sk.mult ?? 1, 3), st.crit); return;
+    }
+    if (this.map.safe && foe) return;
     const s = this.stats(p), m = this.mobs.get(id as number), targeted = sk.kind !== 'spin' && sk.kind !== 'spirits' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal';
     if (targeted && (!m || m.hp <= 0 || dist(m, p) > sk.range!)) return;
     p.mp -= sk.mana; p.cds[sk.n] = now + sk.cd; p.nextAtk = now + s.attackMs;
@@ -750,10 +790,10 @@ export class MapRoom {
     if (mob && s.reflect && mob.hp > 0) { mob.hp -= Math.ceil(dmg * s.reflect); if (mob.hp <= 0) this.killMob(mob, p); }
     p.hp -= dmg; p.dirty = true; p.meDirty = true;
     this.fx.push({ k: 'hit', x: p.x, y: p.y, id: p.eid, v: dmg, c: 0, p: 1 });
-    if (p.hp <= 0) { this.cancelTrade(p, 'A troca foi cancelada.'); p.hp = 0; p.deadUntil = now + 3000; p.path = null; p.target = 0; p.ix = p.iy = 0; this.fx.push({ k: 'die', x: p.x, y: p.y, id: p.eid }); this.sys(p, 'Você morreu. Retornando a Valoria…'); }
+    if (p.hp <= 0) { this.cancelTrade(p, 'A troca foi cancelada.'); this.endDuel(p, null, 'morreu'); p.hp = 0; p.deadUntil = now + 3000; p.path = null; p.target = 0; p.ix = p.iy = 0; this.fx.push({ k: 'die', x: p.x, y: p.y, id: p.eid }); this.sys(p, 'Você morreu. Retornando a Valoria…'); }
   }
   private travel(p: Player, map: string, x: number, y: number) {
-    this.cancelTrade(p, 'A troca foi cancelada.'); p.map = map; p.x = x; p.y = y; p.path = null; p.target = 0; p.gone = true; p.dirty = true;
+    this.cancelTrade(p, 'A troca foi cancelada.'); this.endDuel(p, null, 'saiu do mapa'); p.map = map; p.x = x; p.y = y; p.path = null; p.target = 0; p.gone = true; p.dirty = true;
     this.players.delete(p.eid); if (this.byChar.get(p.charId) === p) this.byChar.delete(p.charId);
     if (!this.players.size && this.timer) { clearInterval(this.timer); this.timer = null; }
     this.flush(p).then(() => { this.send(p, { t: 'portal' }); try { p.ws.close(1000, 'portal'); } catch { /* */ } });
@@ -773,7 +813,7 @@ export class MapRoom {
     const now = Date.now(), dt = Math.min(.25, (now - this.last) / 1000); this.last = now;
     for (const p of this.players.values()) this.tickPlayer(p, dt, now);
     for (const m of this.mobs.values()) this.tickMob(m, dt, now);
-    this.tickInvasion(now);
+    this.tickInvasion(now); this.tickDuels(now);
     if (this.timed.length) { const due = this.timed.filter(t => t.at <= now); if (due.length) { this.timed = this.timed.filter(t => t.at > now); for (const t of due) t.run(); } }
     this.separateMobs();
     this.tickSummons(now, dt);
@@ -816,6 +856,11 @@ export class MapRoom {
     if (this.map.traps && now >= p.nextTrap && trapUp(now) && this.map.traps.has(Math.floor(p.y) * this.map.w + Math.floor(p.x))) { p.nextTrap = now + 900; this.hurt(p, s.maxHp * .12 + s.def, now); if (p.deadUntil) return; }
     const dst = CONFIG.playerSpeed * dt;
     if (p.ix || p.iy) { step(this.map, p, p.ix * dst, p.iy * dst); p.dirty = true; }
+    else if (p.target && this.duelFoe(p, p.target)) { // duelo: persegue e ataca o outro jogador
+      const o = this.players.get(p.target)!;
+      if (dist(p, o) > classOf(p.cls).range) { if (now >= p.nextRepath) { p.nextRepath = now + 400; p.path = findPath(this.map, p.x, p.y, o.x, o.y, 600); } this.follow(p, dst); p.dirty = true; }
+      else { p.path = null; if (now >= p.nextAtk) { p.nextAtk = now + s.attackMs; this.fx.push({ k: 'swing', x: p.x, y: p.y, id: p.eid, tx: o.x, ty: o.y, b: classOf(p.cls).bolt }); this.pvpHit(p, o, s.atk, s.crit); } }
+    }
     else if (p.target) {
       const m = this.mobs.get(p.target);
       if (!m || m.hp <= 0) { p.target = 0; p.path = null; }

@@ -126,6 +126,8 @@ function handle(m: any) {
     case 'kick': log(m.m, 'sys'); break;
     case 'party': party = m.m ? m : null; renderParty(); break;
     case 'pinv': inviteKind = 'p'; $('#invt').textContent = `${m.from} convidou você para um grupo.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
+    case 'dinv': inviteKind = 'd'; $('#invt').textContent = `${m.from} desafiou você para um duelo (2 minutos, ninguém morre).`; $('#invite').style.display = 'block'; beep(330, 250, 'sawtooth', .05); break;
+    case 'duel': duelWith = m.with; duelUntil = m.with ? performance.now() + m.until : 0; duelName = m.name ?? ''; if (!m.with && ents.get(target)?.k === 'p') target = 0; $('#duelbar').style.display = m.with ? 'block' : 'none'; break;
     case 'tinv': inviteKind = 't'; $('#invt').textContent = `${m.from} quer negociar com você.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
     case 'tr': trade = m.m; if (m.msg) log(m.msg, 'sys'); renderTrade(); break;
   }
@@ -349,6 +351,7 @@ function skill(n: number, quiet = false) {
   if ((cds[n]?.until ?? 0) > now) return;
   if (me.mp < sk.mana) { warn('Sem mana'); return; }
   const needs = sk.kind !== 'spin' && sk.kind !== 'spirits' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal'; let t = ents.get(target);
+  if (needs && duelWith && target === duelWith && t) { if (Math.hypot(t.x - a.x, t.y - a.y) > Math.max(sk.range ?? 0, sk.radius ?? 0, 2.5)) { attack(t); return; } send({ t: 'k', n, id: t.id }); return; }
   if (needs && (!t || t.k !== 'm')) { const nm = nearestMob(Math.max(sk.range ?? 8, 8)); if (!nm) { if (!quiet) warn('Sem alvo'); return; } attack(nm); t = nm; }
   if (needs && t && Math.hypot(t.x - a.x, t.y - a.y) > (sk.range ?? 8)) { queued = { n, until: now + 4000 }; attack(t); return; }
   send({ t: 'k', n, id: t?.id ?? 0 });
@@ -371,9 +374,10 @@ addEventListener('keydown', e => {
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
 let chan: 'l' | 'g' | 'p' = 'l';
 $('#chan').onclick = () => { chan = chan === 'l' ? 'g' : chan === 'g' ? 'p' : 'l'; $('#chan').textContent = { l: 'Local', g: 'Global', p: 'Grupo' }[chan]; };
-$('#inva').onclick = () => { send({ t: inviteKind === 't' ? 'ta' : 'pa' }); $('#invite').style.display = 'none'; };
-$('#invd').onclick = () => { send({ t: inviteKind === 't' ? 'td' : 'pd' }); $('#invite').style.display = 'none'; };
+$('#inva').onclick = () => { send({ t: inviteKind === 'd' ? 'dua' : inviteKind === 't' ? 'ta' : 'pa' }); $('#invite').style.display = 'none'; };
+$('#invd').onclick = () => { send({ t: inviteKind === 'd' ? 'dud' : inviteKind === 't' ? 'td' : 'pd' }); $('#invite').style.display = 'none'; };
 $('#pminv').onclick = () => { if (menuFor) send({ t: 'pi', id: menuFor.id }); $('#pmenu').style.display = 'none'; };
+$('#pmduel').onclick = () => { if (menuFor) send({ t: 'dui', id: menuFor.id }); $('#pmenu').style.display = 'none'; };
 $('#pmtrade').onclick = () => { if (menuFor) send({ t: 'ti', id: menuFor.id }); $('#pmenu').style.display = 'none'; };
 $('#tcancel').onclick = () => send({ t: 'td' });
 $('#tok').onclick = () => send({ t: 'tk' });
@@ -424,7 +428,7 @@ const toWorld = (cx: number, cy: number) => { const dpr = canvas.width / canvas.
 function playerMenu(en: Ent, cx: number, cy: number) { $('#pminv').style.display = party?.m.some(m => m.name === en.info.name) ? 'none' : ''; menuFor = en; $('#pmname').textContent = en.info.name; const pm = $('#pmenu'); pm.style.display = 'block'; pm.style.left = `${Math.max(8, Math.min(innerWidth - 170, cx))}px`; pm.style.top = `${Math.max(8, Math.min(innerHeight - 110, cy))}px`; }
 /** Tecla D: abre grupo/troca do jogador sob o cursor ou, sem ninguém ali, do mais próximo. */
 function keyPlayerMenu() { const a = ents.get(you); if (!a) return; const w = toWorld(curX, curY); let best: Ent | null = null, bd = 1e9; for (const e of ents.values()) if (e.k === 'p' && e.id !== you && Math.hypot(e.x - a.x, e.y - a.y) <= 8) { const d = Math.hypot(e.x - w.x, e.y - .6 - w.y) < 1.2 ? -1 : Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; best = e; } } if (best) playerMenu(best, curX || innerWidth / 2, curY || innerHeight / 2); else log('Nenhum jogador por perto.', 'sys'); }
-function mobAt(wx: number, wy: number) { let best: Ent | null = null, bd = 1.2; for (const en of ents.values()) if (en.k === 'm') { const sz = mobSize(en.info.mob) / 32, d = Math.hypot(en.x - wx, en.y - sz / 2 - wy); if (d < Math.max(bd, sz * .7)) { bd = d; best = en; } } return best; }
+function mobAt(wx: number, wy: number) { const foe = duelWith ? ents.get(duelWith) : null; if (foe && Math.hypot(foe.x - wx, foe.y - .6 - wy) < 1) return foe; let best: Ent | null = null, bd = 1.2; for (const en of ents.values()) if (en.k === 'm') { const sz = mobSize(en.info.mob) / 32, d = Math.hypot(en.x - wx, en.y - sz / 2 - wy); if (d < Math.max(bd, sz * .7)) { bd = d; best = en; } } return best; }
 function selectSkill(n: number) { activeSkill = n; document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => b.classList.toggle('sel', +b.dataset.sk! === n)); }
 selectSkill(1);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -467,7 +471,7 @@ document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const c = cv
 
 // ---------- render ----------
 let chest: ItemInst[] = [], editId = 0;
-let jewelSlot = -1, gfxInit = false, trashMode = false;
+let jewelSlot = -1, gfxInit = false, trashMode = false, duelWith = 0, duelUntil = 0, duelName = '';
 $('#trash').onclick = () => { trashMode = !trashMode; jewelSlot = -1; renderInv(); };
 $('#stackb').onclick = () => send({ t: 'org' });
 $('#trashall').onclick = () => { const list = items.filter(junk); if (!list.length) return log('Nenhum item comum para descartar.', 'sys'); if (confirm(`Descartar ${list.length} item(ns) comum(ns)?\n\n${list.map(i => ITEMS[i.key].name).join(', ')}`)) send({ t: 'xa', slots: list.map(i => i.slot) }); };
@@ -512,7 +516,7 @@ function frame(ts: number) {
     if (pendingNpc && Math.hypot(a.x - pendingNpc.x, a.y - pendingNpc.y) < 2.6) { const n = pendingNpc; pendingNpc = null; log(`${n.name}: ${n.line}`, 'sys'); if (n.shop) { shop = n; renderShop(); openW('shop'); } }
     if (shop && Math.hypot(a.x - shop.x, a.y - shop.y) > 3.8) closeWin('shop');
     if (target && !ents.has(target)) target = 0;
-    updateBoss(a);
+    updateBoss(a); if (duelWith) { const left = Math.max(0, Math.ceil((duelUntil - ts) / 1000)), o = ents.get(duelWith); $('#duelbar').textContent = `⚔ Duelo: ${duelName}${o ? ` · ${o.hp}% de vida` : ''} · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; }
     if ((auto || autoLoot) && ts > autoAt && me && !me.dead && !map.safe) { autoAt = ts + 280; autoPlay(a, ts); }
   }
   const W = canvas.width, H = canvas.height, vw = W / Z, vh = H / Z;
