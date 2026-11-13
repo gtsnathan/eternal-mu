@@ -1,7 +1,8 @@
 // Versão do jogo mostrada no site e no jogo. Ao lançar uma atualização: troque VERSION (e o package.json) e coloque um item novo no topo de CHANGELOG.
-export const VERSION = '0.33.1';
+export const VERSION = '0.34.0';
 export interface Release { v: string; date: string; title: string; items: string[] }
 export const CHANGELOG: Release[] = [
+  { v: '0.34.0', date: '13/11/2026', title: 'Asas de mundo alto', items: ['3 novos níveis de asas para cada classe: Imperiais (150), Divinas (240) e Eternas (330)', 'Novos materiais: Pena do Caos e Cristal do Vazio, que caem nos 8 mundos novos', 'Asas altas brilham, deixam rastro de luz e soltam mais partículas', 'Ícones das asas mostram o nível com uma joia colorida'] },
   { v: '0.33.1', date: '13/11/2026', title: 'Versão no site', items: ['A versão atual aparece no site e no jogo.', 'Nova seção de Atualizações para acompanhar o desenvolvimento.'] },
   { v: '0.33.0', date: '13/11/2026', title: 'Duelo entre jogadores', items: ['Desafie outro jogador para um duelo de até 2 minutos, inclusive na cidade.', 'Ninguém morre nem perde nada, e o mapa inteiro fica sabendo quem venceu.'] },
   { v: '0.32.0', date: '13/11/2026', title: 'Invasão Dourada', items: ['A cada 30 minutos, 8 monstros dourados aparecem por 10 minutos.', 'Dão 6× mais XP, 8× mais moedas e muitos baús e joias.'] },

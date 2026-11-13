@@ -86,10 +86,13 @@ export const WING_THEME: Record<string, { name: string; style: 'bat' | 'feather'
   dark_warrior: { name: 'Rubras', style: 'bat', c: '#8c1f2e', c2: '#e0425a' }, arcane_wizard: { name: 'Celestes', style: 'feather', c: '#4f7fe0', c2: '#cfe6ff' }, mystic_archer: { name: 'da Floresta', style: 'leaf', c: '#3fae6a', c2: '#d6ffa8' },
   spell_knight: { name: 'Rúnicas', style: 'blade', c: '#7a4fd0', c2: '#e0c6ff' }, shadow_summoner: { name: 'do Abismo', style: 'bone', c: '#3a2458', c2: '#d9d2bb' },
 };
-export const WING_TIER = [{ name: 'Noviças', lvl: 20, def: 15, hp: 100, atk: .12, abs: .1, price: 30000 }, { name: 'Ancestrais', lvl: 40, def: 45, hp: 300, atk: .22, abs: .2, price: 250000 }, { name: 'Soberanas', lvl: 60, def: 100, hp: 700, atk: .35, abs: .3, price: 1500000 }];
+export const WING_TIER = [{ name: 'Noviças', lvl: 20, def: 15, hp: 100, atk: .12, abs: .1, price: 30000 }, { name: 'Ancestrais', lvl: 40, def: 45, hp: 300, atk: .22, abs: .2, price: 250000 }, { name: 'Soberanas', lvl: 60, def: 100, hp: 700, atk: .35, abs: .3, price: 1500000 },
+  // asas de mundo alto (0.34): criadas a partir das Soberanas
+  { name: 'Imperiais', lvl: 150, def: 320, hp: 2600, atk: .45, abs: .35, price: 15000000 }, { name: 'Divinas', lvl: 240, def: 650, hp: 5200, atk: .55, abs: .39, price: 60000000 }, { name: 'Eternas', lvl: 330, def: 1100, hp: 9000, atk: .66, abs: .43, price: 200000000 }];
 const WING_ITEMS: ItemDef[] = Object.entries(WING_THEME).flatMap(([c, t]) => WING_TIER.map((w, i) => ({ key: `wing_${c}_${i}`, name: `Asas ${w.name} ${t.name}`, kind: 'wings' as const, lvl: w.lvl, price: w.price, def: w.def, hp: w.hp, tint: t.c, blade: t.c2, cls: c, wtier: i })));
 // Receitas do Artífice: asas só existem por criação
-export const WING_RECIPES: { gold: number; mats: [string, number][] }[] = [{ gold: 30000, mats: [['shard', 10], ['plume', 1]] }, { gold: 250000, mats: [['plume', 3], ['magma_heart', 2]] }, { gold: 1500000, mats: [['plume', 5], ['magma_heart', 5], ['ancient_scale', 1]] }];
+export const WING_RECIPES: { gold: number; mats: [string, number][] }[] = [{ gold: 30000, mats: [['shard', 10], ['plume', 1]] }, { gold: 250000, mats: [['plume', 3], ['magma_heart', 2]] }, { gold: 1500000, mats: [['plume', 5], ['magma_heart', 5], ['ancient_scale', 1]] },
+  { gold: 15000000, mats: [['ancient_scale', 10], ['chaos_feather', 5]] }, { gold: 60000000, mats: [['ancient_scale', 20], ['chaos_feather', 15], ['void_crystal', 3]] }, { gold: 200000000, mats: [['chaos_feather', 30], ['void_crystal', 12], ['jewel_eclipse', 50]] }];
 // Itens excelentes: opções especiais sorteadas no drop
 export const EXC_WEAPON = ['atk', 'crit', 'speed', 'lifek', 'manak'], EXC_ARMOR = ['hp', 'mp', 'absorb', 'reflect', 'goldx', 'dodge'];
 export const EXC_TEXT: Record<string, string> = { atk: '+6% de ataque', crit: '+8% de crítico', speed: '+7% de velocidade de ataque', lifek: 'Recupera 8% da vida ao matar', manak: 'Recupera 10% da mana ao matar', hp: '+4% de vida', mp: '+4% de mana', absorb: '-4% de dano recebido', reflect: 'Reflete 5% do dano', goldx: '+30% de moedas', dodge: '+3% de esquiva' };
@@ -153,6 +156,8 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'plume', name: 'Pluma Gélida', kind: 'material', lvl: 1, price: 2000, blade: '#cfefff' },
   { key: 'magma_heart', name: 'Coração de Magma', kind: 'material', lvl: 1, price: 8000, blade: '#ff6a2b' },
   { key: 'ancient_scale', name: 'Escama Ancestral', kind: 'material', lvl: 1, price: 60000, blade: '#ffd76a' },
+  { key: 'chaos_feather', name: 'Pena do Caos', kind: 'material', lvl: 1, price: 250000, blade: '#ff5ad1' },
+  { key: 'void_crystal', name: 'Cristal do Vazio', kind: 'material', lvl: 1, price: 1500000, blade: '#9a7bff' },
   { key: 'shard', name: 'Estilhaço Gélido', kind: 'material', lvl: 1, price: 15 },
   { key: 'short_sword', name: 'Espada Curta', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#cfd8e3', wtype: 'sword' },
   { key: 'app_staff', name: 'Cajado do Aprendiz', kind: 'weapon', lvl: 1, price: 120, dmg: 8, blade: '#b58cff', wtype: 'staff' },
@@ -252,8 +257,8 @@ function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?
   const def = Math.round(lerpT(L, [[120, 675], [150, 925], [180, 1250], [210, 1575], [240, 2050], [270, 2500], [300, 3125], [340, 3875], [380, 4375], [400, 4600]]) * (b ? 1.2 : 1));
   // arma/acessório do nível do mundo (e o anterior); set do nível mais alto que o monstro alcança
   const wt = HI_TIERS.filter(t => t <= L).pop() ?? 110, wp = HI_TIERS[HI_TIERS.indexOf(wt) - 1] ?? 110, st = [120, 180, 240, 300].filter(t => t <= L).pop(), sets = st ? Object.values(SETS).filter(s => s.lvl === st).map(s => s.key) : TOP_SETS;
-  const drops: [string, number][] = b ? [...wep(wt, .5), ...wep(wp, .6), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...sets.flatMap(s => setDrops(s, .2)), ['box_mitico', L >= 200 ? .5 : .25]]
-    : [...wep(wt, .006), ...wep(wp, .008), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...sets.flatMap(s => setDrops(s, .005)), ['box_mitico', L >= 200 ? .004 : .002]];
+  const drops: [string, number][] = b ? [...wep(wt, .5), ...wep(wp, .6), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...sets.flatMap(s => setDrops(s, .2)), ['box_mitico', L >= 200 ? .5 : .25], ['chaos_feather', 1], ['chaos_feather', L >= 240 ? 1 : .6], ...(L >= 210 ? [['void_crystal', L >= 300 ? 1 : .5] as [string, number]] : [])]
+    : [...wep(wt, .006), ...wep(wp, .008), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...sets.flatMap(s => setDrops(s, .005)), ['box_mitico', L >= 200 ? .004 : .002], ['chaos_feather', L >= 150 ? .012 : .006], ...(L >= 210 ? [['void_crystal', L >= 300 ? .004 : .002] as [string, number]] : [])];
   return { key, name, level: L, hp, dmg, def, speed: b ? 3.2 : 3, detect: b ? 14 : 9, leash: b ? 20 : 14, attackMs: b ? 1400 : 1500, xp: Math.round(hp * (b ? 2.5 : 1.15)), respawnMs: b ? 3600000 : 42000, gold: b ? [L * 1400, L * 2400] : [L * 55, L * 95], drops, boss: b || undefined, reach: o.reach ?? (b ? 3.4 : undefined), bolt: o.bolt, nova: o.nova };
 }
 Object.assign(MOBS, Object.fromEntries([

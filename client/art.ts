@@ -536,9 +536,10 @@ function ignarok(f: number) { const c = cv(168, 138), g = ctx(c), b = '#6a1d1f',
 const wingCache = new Map<string, Cv[]>();
 /** Asas desenhadas em camadas a partir das costas, em dobro de resolução. */
 export const WING_ROOT = 66; // distância do ombro até o topo do quadro, em pixels do mundo
+const AURA = ['', '', '', '#ffd76a', '#f4fbff', '#ff5ad1'];
 export function wingSprites(cls: string, tier: number): Cv[] {
   const k = cls + tier; let out = wingCache.get(k); if (out) return out;
-  const t = WING_THEME[cls], L = [36, 46, 58][tier], W = (L + 8) * 2, H = WING_ROOT + L + 10, sc = 2;
+  const t = WING_THEME[cls], L = [36, 46, 58, 64, 70, 76][tier], W = (L + 8) * 2, H = WING_ROOT + L + 10 + (tier >= 4 ? Math.round(L * .55) : 0), sc = 2;
   const blade = (g: G, len: number, wid: number, base: string, tip: string, edge: string, pointed: boolean, shaft: string | null) => {
     const gr = g.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, base); gr.addColorStop(.62, base); gr.addColorStop(1, tip);
     g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * .35, -wid, len * .78, -wid * .55); if (pointed) g.lineTo(len, 0); else g.quadraticCurveTo(len * 1.03, -wid * .1, len, wid * .25); g.quadraticCurveTo(len * .55, wid * .7, 0, 0); g.closePath();
@@ -563,11 +564,14 @@ export function wingSprites(cls: string, tier: number): Cv[] {
     const lower = 6 + tier * 2; for (let i = lower - 1; i >= 0; i--) { const u = i / (lower - 1); rot(.0 + u * 1.12, () => blade(g, L * (.76 - u * .3), 3.5, t.c, t.c2, dark, pointed, shade(t.c, 45))); }
     const sec = 7 + tier * 2; for (let i = sec - 1; i >= 0; i--) { const u = i / (sec - 1); rot(-1.15 + u * 2.1, () => blade(g, L * (.58 - Math.abs(u - .35) * .18), 3.4, light, shade(t.c2, -18), dark, pointed, null)); }
     const cov = 6 + tier; for (let i = cov - 1; i >= 0; i--) { const u = i / (cov - 1); rot(-1.1 + u * 1.95, () => blade(g, L * .32, 3.2, dark, t.c, shade(t.c, -70), pointed, null)); }
-    if (tier >= 1) { g.beginPath(); g.arc(4, -1, 2.6 + tier * .6, 0, 6.3); g.fillStyle = tier === 2 ? '#f0cf65' : '#b08a3c'; g.fill(); g.beginPath(); g.arc(4, -1, 1.3 + tier * .3, 0, 6.3); g.fillStyle = t.c2; g.fill(); }
+    if (tier >= 1) { g.beginPath(); g.arc(4, -1, 2.6 + tier * .6, 0, 6.3); g.fillStyle = ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][tier]; g.fill(); g.beginPath(); g.arc(4, -1, 1.3 + tier * .3, 0, 6.3); g.fillStyle = t.c2; g.fill(); }
   };
   out = [-.3, -.17, -.02, .13, .02, -.15].map(a => {
-    const c = cv(W * sc, H * sc), g = ctx(c); noHd.add(c); g.scale(sc, sc); g.shadowColor = t.c2; g.shadowBlur = [0, 2, 4][tier];
+    const c = cv(W * sc, H * sc), g = ctx(c); noHd.add(c); g.scale(sc, sc); g.shadowColor = t.c2; g.shadowBlur = [0, 2, 4, 5, 6, 7][tier];
+    if (tier >= 4) for (const sgn of [1, -1]) { g.save(); g.translate(W / 2 + sgn * 2, WING_ROOT + 6); g.scale(sgn * .62, .62); g.rotate(a + .95); wing(g); g.restore(); }
+    if (tier >= 3) { g.shadowColor = AURA[tier]; g.shadowBlur = 6 + tier; }
     for (const sgn of [1, -1]) { g.save(); g.translate(W / 2 + sgn * 3, WING_ROOT); g.scale(sgn, 1); g.rotate(a); wing(g); g.restore(); }
+    if (tier >= 3) { g.globalCompositeOperation = 'source-atop'; const gr = g.createRadialGradient(W / 2, WING_ROOT, L * .55, W / 2, WING_ROOT, L * 1.05); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, AURA[tier]); g.fillStyle = gr; g.globalAlpha = .75; g.fillRect(0, 0, W, H); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
     return c;
   });
   wingCache.set(k, out); return out;
@@ -638,7 +642,7 @@ export function icon(key: string | null): Cv {
   else if (d.kind === 'armor') { r(g, 7, 6, 14, 18, t); r(g, 3, 6, 5, 11, dk); r(g, 20, 6, 5, 11, dk); r(g, 10, 4, 8, 4, '#1d2230'); r(g, 13, 10, 2, 11, l); }
   else if (d.kind === 'pants') { r(g, 7, 4, 14, 8, t); r(g, 7, 12, 6, 13, t); r(g, 15, 12, 6, 13, dk); r(g, 7, 4, 14, 2, l); }
   else { r(g, 6, 5, 7, 16, t); r(g, 6, 20, 12, 5, dk); r(g, 16, 8, 6, 12, dk); r(g, 16, 20, 10, 5, t); }
-  if (d?.kind === 'wings') { const th = WING_THEME[d.cls!]; for (let x = 0; x < 13; x++) { const top = 5 + Math.round(x * .25), bot = 22 - Math.round(x * .55) + (x % 3); r(g, 14 + x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 13 - x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 14 + x, top, 1, 2, th.c2); r(g, 13 - x, top, 1, 2, th.c2); } r(g, 12, 7, 4, 15, shade(th.c, -45)); }
+  if (d?.kind === 'wings') { const th = WING_THEME[d.cls!]; for (let x = 0; x < 13; x++) { const top = 5 + Math.round(x * .25), bot = 22 - Math.round(x * .55) + (x % 3); r(g, 14 + x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 13 - x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 14 + x, top, 1, 2, th.c2); r(g, 13 - x, top, 1, 2, th.c2); } r(g, 12, 7, 4, 15, shade(th.c, -45)); const tc = ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][d.wtier ?? 0]; if (tc) { r(g, 12, 10, 4, 4, tc); r(g, 13, 11, 2, 2, '#fff'); } if ((d.wtier ?? 0) >= 3) for (let i = 0; i < d.wtier! - 2; i++) { r(g, 3 + i * 3, 3, 2, 2, tc); r(g, 23 - i * 3, 3, 2, 2, tc); } }
   if (d?.set) {
     const S = SETS[d.set], tr = S.trim;
     if (d.kind === 'helm') {
