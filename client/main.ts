@@ -1,4 +1,4 @@
-import { fmtRes, MR_RESETS, MR_GOLD, MR_POINTS, WTYPE_NAME, MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
+import { GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_COLORS, GUILD_RANKS, GUILD_XP, GUILD_XP_MAX, fmtRes, MR_RESETS, MR_GOLD, MR_POINTS, WTYPE_NAME, MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
 import { VERSION } from '../shared/version';
 import { quests } from '../shared/quests';
 import { travelList, trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
@@ -72,6 +72,8 @@ const canvas = $<HTMLCanvasElement>('#game'), g = canvas.getContext('2d')!; hdCt
 let ws: WebSocket | null = null, charId = 0, running = false, you = 0, myName = '', map: GameMap | null = null, me: Me | null = null, items: ItemInst[] = [];
 let ents = new Map<number, Ent>(), target = 0, auto = false, autoLoot = false, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
 let pred: { x: number; y: number; path: { x: number; y: number }[] | null; stop: number; tx: number; ty: number; hold: number } | null = null;
+type GuildInfo = { id: number; name: string; tag: string; color: number; leader: number; notice: string; me: number; m: { id: number; name: string; rank: number; lv: number; cls: string; res: number; mr: number }[] };
+let guild: GuildInfo | null = null;
 let myCls = CLASSES.dark_warrior, party: { m: { id: number; name: string }[]; leader: number; mode: number; me: number } | null = null, menuFor: Ent | null = null, bolts: { x: number; y: number; tx: number; ty: number; t: number; c: string }[] = [];
 let myLook: { hc: number; hs: number } = { hc: 0, hs: 0 }, Z = 2, camX = 0, camY = 0, pingTimer = 0, lastFrame = 0, reconnectTimer = 0;
 const cds: Record<number, { until: number; ms: number }> = {};
@@ -124,10 +126,12 @@ function handle(m: any) {
     case 's': snapshot(m); break;
     case 'sys': log(m.m, 'sys'); if (String(m.m).startsWith('☠')) { const el = $('#toast'); el.textContent = String(m.m).split('! ')[0] + (String(m.m).includes('! ') ? '!' : ''); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(90, 500, 'sawtooth', .05); } break;
     case 'wbr': { const el = $('#wbrank'); if (!m.top?.length) { el.innerHTML = ''; el.style.display = 'none'; break; } el.style.display = 'block'; el.innerHTML = `<b>Dano no Chefe Mundial</b>${m.top.map((r: [string, number], i: number) => `<div><span>${i + 1}. ${esc(r[0])}</span><span>${r[1]}%</span></div>`).join('')}${m.me && m.me[0] > 5 ? `<div class=me><span>${m.me[0]}. Você</span><span>${m.me[1]}%</span></div>` : ''}`; break; }
-    case 'c': log(`<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : '', true); break;
+    case 'c': log(`${m.ch === 'u' ? '[Guilda] ' : ''}<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : m.ch === 'u' ? 'gu' : '', true); break;
     case 'cd': cds[m.n] = { until: performance.now() + m.ms, ms: m.ms }; break;
     case 'kick': log(m.m, 'sys'); break;
     case 'party': party = m.m ? m : null; renderParty(); break;
+    case 'guild': guild = m.g ? { ...m.g, me: m.me } : null; renderGuild(); if (shop?.shop === 'guild') renderShop(); break;
+    case 'ginv': inviteKind = 'g'; $('#invt').textContent = `${m.from} convidou você para a guilda «${m.tag}» ${m.name}.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
     case 'pinv': inviteKind = 'p'; $('#invt').textContent = `${m.from} convidou você para um grupo.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
     case 'dinv': inviteKind = 'd'; $('#invt').textContent = `${m.from} desafiou você para um duelo (2 minutos, ninguém morre).`; $('#invite').style.display = 'block'; beep(330, 250, 'sawtooth', .05); break;
     case 'duel': duelWith = m.with; duelUntil = m.with ? performance.now() + m.until : 0; duelName = m.name ?? ''; if (!m.with && ents.get(target)?.k === 'p') target = 0; $('#duelbar').style.display = m.with ? 'block' : 'none'; break;
@@ -204,9 +208,9 @@ function drawPortrait() { const c = $<HTMLCanvasElement>('#portrait'), x = c.get
 function myGear(): Look { const by = (s: string) => items.find(i => i.equip === s)?.key ?? null; return lookFromGear(myCls.name, HAIR_COLORS[myLook.hc], myLook.hs, { helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots'), weapon: by('weapon') }); }
 
 // ---------- janelas ----------
-const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); };
+const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); if (w === 'guild') renderGuild(); };
 function closeWin(w: string) { $('#w-' + w).style.display = 'none'; if (w === 'shop') shop = null; }
-function closeWins() { ['inv', 'char', 'map', 'shop', 'rank'].forEach(closeWin); }
+function closeWins() { ['inv', 'char', 'map', 'shop', 'rank', 'guild'].forEach(closeWin); }
 async function renderRank() { const ob = $('#onlb'); ob.replaceChildren(); api('online').then(({ online }) => { if (!online.length) { const tr = document.createElement('tr'), td = document.createElement('td'); td.colSpan = 4; td.textContent = 'Ninguém online.'; tr.appendChild(td); ob.appendChild(tr); } for (const p of online) { const tr = document.createElement('tr'); for (const v of [p.name, p.cls, `${p.resets || p.mr ? `${fmtRes(p.resets, p.mr)} · ` : ''}${p.level}`, p.map]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } ob.appendChild(tr); } }).catch(() => { /* sem conexão */ });
   const b = $('#rankb'); b.replaceChildren(); try { const { ranking } = await api('ranking'); ranking.forEach((r: any, n: number) => { const tr = document.createElement('tr'); for (const v of [n + 1, r.name, r.class, fmtRes(r.resets, r.mr), r.ml, r.level]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } b.appendChild(tr); }); } catch { /* sem conexão */ } }
 const toggle = (w: string) => $('#w-' + w).style.display === 'block' ? closeWin(w) : openW(w);
@@ -247,7 +251,7 @@ function renderChar() {
 }
 const setBonus = (k: string, n: number) => { const b = SETS[k].bonus, o: string[] = []; if (n >= 2) o.push(`+${b.def} def`); if (n >= 3) o.push(`+${b.hp} vida`); if (n >= 4) o.push(`+${Math.round(b.atk * 100)}% atq`); return o.join(' · ') || 'sem bônus'; };
 /** Lojas onde dá para vender (as que mostram "Vender da bolsa"). */
-const canSellHere = () => !!shop && !['reset', 'chest', 'press', 'wings', 'missoes'].includes(shop.shop!) && $('#w-shop').style.display === 'block';
+const canSellHere = () => !!shop && !['reset', 'chest', 'press', 'wings', 'missoes', 'guild'].includes(shop.shop!) && $('#w-shop').style.display === 'block';
 /** Vende a pilha inteira, com confirmação. */
 function sellAll(i: ItemInst) {
   if (!canSellHere()) return log('Abra uma loja (fale com um vendedor) para vender.', 'sys');
@@ -315,6 +319,15 @@ function renderShop() {
     const section = (title: string, cap: string, list: ItemInst[], act: (i: ItemInst) => void, base: number) => { const h = document.createElement('h4'); h.className = 'shoph'; h.textContent = `${title} (${list.length}/${CONFIG.invSize}) ${cap}`; const gr = document.createElement('div'); gr.className = 'grid'; for (let n = 0; n < CONFIG.invSize; n++) { const it = list.find(x => x.slot === base + n); gr.appendChild(makeCell(it, () => { if (it) act(it); })); } L.append(h, gr); };
     section('Baú', '· clique para retirar', chest, i => send({ t: 'wd', slot: i.slot }), 1000); section('Bolsa', '· clique para guardar', items.filter(i => !i.equip), i => send({ t: 'dep', slot: i.slot }), 0); return;
   }
+  if (npc.shop === 'guild') {
+    const info = document.createElement('div'); info.className = 'info';
+    if (guild) { info.innerHTML = `Você é ${esc(GUILD_RANKS[guild.m.find(x => x.id === guild!.me)?.rank ?? 0])} da guilda <b style="color:${GUILD_COLORS[guild.color]}">«${esc(guild.tag)}» ${esc(guild.name)}</b>.`; const b = document.createElement('button'); b.className = 'main'; b.textContent = 'Abrir a guilda'; b.onclick = () => { closeWin('shop'); openW('guild'); }; L.append(info, b); return; }
+    const ok = !!me && (me.level >= GUILD_LVL || me.resets > 0 || me.mr > 0);
+    info.innerHTML = `<b style="display:block;font-size:15px;margin-bottom:3px">Fundar uma guilda</b><small>Custa ${GUILD_GOLD.toLocaleString('pt-BR')} moedas · nível ${GUILD_LVL} ou ter reset · até ${GUILD_MAX} membros.<br>Membros caçando no mesmo mapa ganham +${GUILD_XP * 100}% de XP por colega (até +${GUILD_XP * GUILD_XP_MAX * 100}%).</small>`;
+    const f = document.createElement('form'); f.className = 'gform'; f.innerHTML = `<input name="n" maxlength="16" placeholder="Nome (3 a 16)" autocomplete="off"><input name="t" maxlength="4" placeholder="Sigla" autocomplete="off" style="text-transform:uppercase"><div class="gcols">${GUILD_COLORS.map((c, i) => `<label><input type="radio" name="c" value="${i}"${i ? '' : ' checked'}><i style="background:${c}"></i></label>`).join('')}</div><button class="main"${ok ? '' : ' disabled'}>${ok ? 'Fundar guilda' : `Requer nível ${GUILD_LVL}`}</button>`;
+    f.onsubmit = e => { e.preventDefault(); const d = new FormData(f); send({ t: 'gc', name: d.get('n'), tag: d.get('t'), color: +(d.get('c') ?? 0) }); };
+    L.append(info, f); return;
+  }
   if (npc.shop === 'wings') {
     const count = (k: string) => items.filter(i => i.key === k && !i.equip).reduce((a, i) => a + i.qty, 0), m0 = me;
     WING_RECIPES.forEach((rc, t) => { const key = `wing_${myCls.key}_${t}`, d = ITEMS[key], box = document.createElement('div'); box.className = 'sethead'; const ic = cv(56, 56); ic.getContext('2d')!.drawImage(hdOf(icon(key)), 0, 0); ic.style.cssText = 'width:42px;height:42px'; const tx = document.createElement('div'); tx.style.flex = '1'; const need: [string, number, number][] = rc.mats.map(([k, q]) => [ITEMS[k].name, count(k), q]); const prev = t > 0 ? `wing_${myCls.key}_${t - 1}` : null; if (prev) need.unshift([ITEMS[prev].name, count(prev), 1]); const lines = need.map(([n, h, q]) => `<small style="color:${h >= q ? '#79e08a' : '#ff9b8e'}">${esc(n)}: ${h}/${q}</small>`).join(''); tx.innerHTML = `<b style="color:${d.blade}">${esc(d.name)}</b><small>Nível ${d.lvl} · ${rc.gold.toLocaleString('pt-BR')} moedas</small>${lines}`; const b = document.createElement('button'); b.textContent = 'Criar'; b.disabled = m0.level < d.lvl || m0.gold < rc.gold || need.some(([, h, q]) => h < q); b.onclick = () => send({ t: 'cw', tier: t }); box.append(ic, tx, b); L.appendChild(box); });
@@ -375,11 +388,12 @@ addEventListener('keydown', e => {
   if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
-let chan: 'l' | 'g' | 'p' = 'l';
-$('#chan').onclick = () => { chan = chan === 'l' ? 'g' : chan === 'g' ? 'p' : 'l'; $('#chan').textContent = { l: 'Local', g: 'Global', p: 'Grupo' }[chan]; };
-$('#inva').onclick = () => { send({ t: inviteKind === 'd' ? 'dua' : inviteKind === 't' ? 'ta' : 'pa' }); $('#invite').style.display = 'none'; };
-$('#invd').onclick = () => { send({ t: inviteKind === 'd' ? 'dud' : inviteKind === 't' ? 'td' : 'pd' }); $('#invite').style.display = 'none'; };
+let chan: 'l' | 'g' | 'p' | 'u' = 'l';
+$('#chan').onclick = () => { chan = chan === 'l' ? 'g' : chan === 'g' ? 'p' : chan === 'p' ? 'u' : 'l'; $('#chan').textContent = ({ l: 'Local', g: 'Global', p: 'Grupo', u: 'Guilda' } as Record<string, string>)[chan]; };
+$('#inva').onclick = () => { send({ t: inviteKind === 'd' ? 'dua' : inviteKind === 't' ? 'ta' : inviteKind === 'g' ? 'ga' : 'pa' }); $('#invite').style.display = 'none'; };
+$('#invd').onclick = () => { send({ t: inviteKind === 'd' ? 'dud' : inviteKind === 't' ? 'td' : inviteKind === 'g' ? 'gx' : 'pd' }); $('#invite').style.display = 'none'; };
 $('#pminv').onclick = () => { if (menuFor) send({ t: 'pi', id: menuFor.id }); $('#pmenu').style.display = 'none'; };
+$('#pmguild').onclick = () => { if (menuFor) send({ t: 'gi', id: menuFor.id }); $('#pmenu').style.display = 'none'; };
 $('#pmduel').onclick = () => { if (menuFor) send({ t: 'dui', id: menuFor.id }); $('#pmenu').style.display = 'none'; };
 $('#pmtrade').onclick = () => { if (menuFor) send({ t: 'ti', id: menuFor.id }); $('#pmenu').style.display = 'none'; };
 $('#tcancel').onclick = () => send({ t: 'td' });
@@ -396,6 +410,32 @@ function renderTrade() {
   const bag = $('#tbag'); bag.replaceChildren(); const sel = trade.mine.items.map((i: ItemInst) => i.id);
   for (const i of items.filter(x => !x.equip).sort((a, b2) => a.slot - b2.slot)) { if (sel.includes(i.id)) continue; bag.appendChild(makeCell(i, () => pushOffer([...sel, i.id]))); }
   const hostM = $('#tmine'); trade.mine.items.forEach((i: ItemInst, n: number) => { (hostM.children[n] as HTMLElement).onclick = () => pushOffer(sel.filter((x: string) => x !== i.id)); });
+}
+function renderGuild() {
+  const W = $('#guildp'); if (!W) return; W.replaceChildren();
+  if (!guild) { W.innerHTML = `<div class="info">Você não está em uma guilda.<br><small>Funde a sua com Bertrand, o Mestre das Guildas (Valoria e Solmira), ou peça a um mestre/assistente para te convidar.</small></div>`; return; }
+  const g = guild, myRank = g.m.find(x => x.id === g.me)?.rank ?? 0, a = ents.get(you), near = a ? [...ents.values()].filter(e => e.k === 'p' && e.id !== you && e.info.gt === g.tag).length : 0;
+  const h = document.createElement('div'); h.className = 'ghead'; h.innerHTML = `<b style="color:${GUILD_COLORS[g.color]}">«${esc(g.tag)}» ${esc(g.name)}</b><small>${g.m.length}/${GUILD_MAX} membros · você é ${GUILD_RANKS[myRank]} · bônus de XP agora: +${Math.min(GUILD_XP_MAX, near) * GUILD_XP * 100}%</small>`; W.appendChild(h);
+  const n = document.createElement('div'); n.className = 'gnote'; n.textContent = g.notice || (myRank ? 'Sem aviso. Escreva um recado para a guilda abaixo.' : 'Sem aviso do mestre.'); W.appendChild(n);
+  if (myRank >= 1) { const f = document.createElement('form'); f.className = 'row'; f.innerHTML = `<input maxlength="140" placeholder="Aviso da guilda" style="flex:1"><button>Salvar</button>`; f.onsubmit = e => { e.preventDefault(); send({ t: 'gn', m: f.querySelector('input')!.value }); }; f.querySelector('input')!.value = g.notice; W.appendChild(f); }
+  const t = document.createElement('table'); t.className = 'rk'; t.innerHTML = '<thead><tr><th>Nome</th><th>Nível</th><th></th></tr></thead>'; const tb = document.createElement('tbody');
+  for (const m of g.m) {
+    const tr = document.createElement('tr'); tr.innerHTML = `<td><span class="grk r${m.rank}" title="${GUILD_RANKS[m.rank]}">${['', '◆', '★'][m.rank]}</span>${esc(m.name)}${m.rank ? `<small> ${GUILD_RANKS[m.rank]}</small>` : ''}</td><td>${m.res || m.mr ? `[${fmtRes(m.res, m.mr)}] ` : ''}${m.lv}</td>`; const td = document.createElement('td'); td.className = 'gact';
+    const btn = (txt: string, title: string, f: () => void) => { const b = document.createElement('button'); b.textContent = txt; b.title = title; b.onclick = f; td.appendChild(b); };
+    if (m.id !== g.me) {
+      if (myRank === 2) { btn(m.rank ? '▽' : '△', m.rank ? 'Rebaixar a membro' : 'Promover a assistente', () => send({ t: 'gp', char: m.id })); btn('★', 'Passar a liderança', () => { if (confirm(`Passar a liderança da guilda para ${m.name}?`)) send({ t: 'gm', char: m.id }); }); }
+      if (myRank > m.rank && myRank >= 1) btn('×', 'Remover da guilda', () => { if (confirm(`Remover ${m.name} da guilda?`)) send({ t: 'gk', char: m.id }); });
+    }
+    tr.appendChild(td); tb.appendChild(tr);
+  }
+  t.appendChild(tb); W.appendChild(t);
+  const f = document.createElement('div'); f.className = 'row'; f.style.marginTop = '8px';
+  const chatb = document.createElement('button'); chatb.textContent = 'Falar na guilda'; chatb.onclick = () => { chan = 'u'; $('#chan').textContent = 'Guilda'; closeWin('guild'); $<HTMLInputElement>('#chati').focus(); };
+  const l = document.createElement('button'); l.textContent = 'Sair da guilda'; l.onclick = () => { if (confirm(myRank === 2 && g.m.length > 1 ? 'Você é o mestre: a liderança passa para o próximo da lista. Sair mesmo?' : 'Sair da guilda?')) send({ t: 'gl' }); };
+  f.append(chatb, l);
+  if (myRank === 2) { const d = document.createElement('button'); d.textContent = 'Desfazer'; d.className = 'danger'; d.onclick = () => { if (confirm(`Desfazer a guilda ${g.name}? Todos os membros saem e o nome fica livre.`)) send({ t: 'gd' }); }; f.appendChild(d); }
+  W.appendChild(f);
+  const tip = document.createElement('small'); tip.className = 'gtip'; tip.textContent = myRank >= 1 ? 'Para convidar: clique (ou toque) num jogador e escolha "Convidar para guilda".' : 'Use o canal Guilda no chat para falar com todos, em qualquer mapa.'; W.appendChild(tip);
 }
 function renderParty() {
   const P = $('#party'); P.replaceChildren(); P.style.display = party ? 'block' : 'none'; if (!party) return;
@@ -428,7 +468,7 @@ stick.onpointermove = e => { if (e.pointerId === stickId) moveStick(e); };
 stick.onpointerup = stick.onpointercancel = () => { stickId = -1; joy = { x: 0, y: 0 }; knob.style.transform = ''; syncInput(); };
 let viewX = 0, viewY = 0, holding = false, holdAt = 0, curX = 0, curY = 0, activeSkill = 1;
 const toWorld = (cx: number, cy: number) => { const dpr = canvas.width / canvas.clientWidth; return { x: (cx * dpr / Z - viewX) / 32, y: (cy * dpr / Z - viewY) / 32 }; };
-function playerMenu(en: Ent, cx: number, cy: number) { $('#pminv').style.display = party?.m.some(m => m.name === en.info.name) ? 'none' : ''; menuFor = en; $('#pmname').textContent = en.info.name; const pm = $('#pmenu'); pm.style.display = 'block'; pm.style.left = `${Math.max(8, Math.min(innerWidth - 170, cx))}px`; pm.style.top = `${Math.max(8, Math.min(innerHeight - 110, cy))}px`; }
+function playerMenu(en: Ent, cx: number, cy: number) { $('#pmguild').style.display = guild && (guild.m.find(x => x.id === guild!.me)?.rank ?? 0) >= 1 && !en.info.gt ? '' : 'none'; $('#pminv').style.display = party?.m.some(m => m.name === en.info.name) ? 'none' : ''; menuFor = en; $('#pmname').textContent = en.info.name; const pm = $('#pmenu'); pm.style.display = 'block'; pm.style.left = `${Math.max(8, Math.min(innerWidth - 170, cx))}px`; pm.style.top = `${Math.max(8, Math.min(innerHeight - 110, cy))}px`; }
 /** Tecla D: abre grupo/troca do jogador sob o cursor ou, sem ninguém ali, do mais próximo. */
 function keyPlayerMenu() { const a = ents.get(you); if (!a) return; const w = toWorld(curX, curY); let best: Ent | null = null, bd = 1e9; for (const e of ents.values()) if (e.k === 'p' && e.id !== you && Math.hypot(e.x - a.x, e.y - a.y) <= 8) { const d = Math.hypot(e.x - w.x, e.y - .6 - w.y) < 1.2 ? -1 : Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; best = e; } } if (best) playerMenu(best, curX || innerWidth / 2, curY || innerHeight / 2); else log('Nenhum jogador por perto.', 'sys'); }
 function mobAt(wx: number, wy: number) { const foe = duelWith ? ents.get(duelWith) : null; if (foe && Math.hypot(foe.x - wx, foe.y - .6 - wy) < 1) return foe; let best: Ent | null = null, bd = 1.2; for (const en of ents.values()) if (en.k === 'm') { const sz = mobSize(en.info.mob) / 32, d = Math.hypot(en.x - wx, en.y - sz / 2 - wy); if (d < Math.max(bd, sz * .7)) { bd = d; best = en; } } return best; }
@@ -600,7 +640,7 @@ function frame(ts: number) {
     if (e.k === 's') continue;
     if (e.k === 'd') { label(e.x * 32, e.y * 32 - 22, e.info.key ? `${cmpItem({ key: e.info.key, rarity: e.info.rarity })?.arrow === '▲' ? '▲ ' : ''}${ITEMS[e.info.key].name}` : `${e.info.gold} moedas`, e.info.key ? (ITEMS[e.info.key].set ? '#ffd76a' : RARITY[e.info.rarity].color) : '#f0d27a'); continue; }
     const h = e.k === 'p' ? 50 : mobSize(e.info.mob) * (e.info.wb ? 1.4 : 1) + 10, X = Math.round(e.x * 32), Y = Math.round(e.y * 32) - h, boss = e.k === 'm' && MOBS[e.info.mob].boss, bw = boss ? 72 : 32;
-    if (e.k === 'p' || e.id === target || boss || e.info.g) label(X, Y - 6, e.k === 'p' ? `${e.info.res || e.info.mr ? `[${fmtRes(e.info.res, e.info.mr)}] ` : ''}${e.info.name}` : `${e.info.g ? '★ ' : e.info.wb ? '☠ ' : ''}${MOBS[e.info.mob].name}${e.info.g ? ' Dourado' : e.info.wb ? ' Desperto' : ''} Nv${MOBS[e.info.mob].level}`, e.id === target ? '#ffd24a' : e.k === 'p' ? '#fff' : e.info.g ? '#ffe08a' : e.info.wb ? '#ff6a4a' : '#ffb4a8');
+    if (e.k === 'p' || e.id === target || boss || e.info.g) label(X, Y - 6, e.k === 'p' ? `${e.info.gt ? `«${e.info.gt}» ` : ''}${e.info.res || e.info.mr ? `[${fmtRes(e.info.res, e.info.mr)}] ` : ''}${e.info.name}` : `${e.info.g ? '★ ' : e.info.wb ? '☠ ' : ''}${MOBS[e.info.mob].name}${e.info.g ? ' Dourado' : e.info.wb ? ' Desperto' : ''} Nv${MOBS[e.info.mob].level}`, e.id === target ? '#ffd24a' : e.k === 'p' ? '#fff' : e.info.g ? '#ffe08a' : e.info.wb ? '#ff6a4a' : '#ffb4a8');
     g.fillStyle = '#0a0814'; g.fillRect(X - bw / 2 - 1, Y - 3, bw + 2, 6); g.fillStyle = '#3a2f4a'; g.fillRect(X - bw / 2, Y - 2, bw, 4); { const w = Math.round(bw * e.hp / 100); g.fillStyle = e.k !== 'p' ? '#e0425a' : e.hp > 50 ? '#58d36a' : e.hp > 25 ? '#f0cf65' : '#ff6b6b'; g.fillRect(X - bw / 2, Y - 2, w, 4); g.fillStyle = '#ffffff66'; g.fillRect(X - bw / 2, Y - 2, w, 1); }
   }
   texts = texts.filter(t => (t.t += dt) < .85); for (const t of texts) { const u = t.t / .85; g.font = `bold ${Math.round((t.big ? 17 : 12) * (1 + Math.max(0, .12 - t.t) * 4))}px system-ui,Segoe UI,Roboto,sans-serif`; g.globalAlpha = 1 - u * u; g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = '#0a0814'; const y = t.y * 32 - 38 - u * 26; g.strokeText(t.s, t.x * 32, y); g.fillStyle = t.c; g.fillText(t.s, t.x * 32, y); } g.globalAlpha = 1;

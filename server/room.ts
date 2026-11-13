@@ -1,11 +1,11 @@
-import { masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
 import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG } from '../shared/events';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; duel?: { with: number; until: number } | null; duelFrom?: { from: number; until: number } | null; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; guildId?: number; gRank?: number; ginvite?: { gid: number; until: number } | null; duel?: { with: number; until: number } | null; duelFrom?: { from: number; until: number } | null; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -51,6 +51,8 @@ export class MapRoom {
   private timed: { at: number; run: () => void }[] = []; private saveWarnAt = 0;
   /** Invasão Dourada: a cada 30 min (a primeira entre 5 e 15 min depois que alguém entra no mapa), 8 monstros dourados por 10 min. */
   private nextInvasion = 0; private invasionEnd = 0;
+  /** Guildas dos jogadores desta sala (cache; o banco é a fonte). */
+  private guilds = new Map<number, { id: number; name: string; tag: string; color: number; leader: number; notice: string; m: { id: number; name: string; rank: number; lv: number; cls: string; res: number; mr: number }[] }>();
   /** Chefe Mundial: agenda pelo relógio (shared/events.ts). wbSlot = janela já tratada nesta sala. */
   private wbSlot = -1; private wbWarned = -1; private wbStarted = -1; private wbMob: Mob | null = null; private wbEnd = 0; private wbRankAt = 0;
   /** Agenda algo para alguns ticks depois (golpes em sequência das habilidades). */
@@ -73,6 +75,8 @@ export class MapRoom {
     if (route === '/addstats') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); const t = b.add.reduce((x: number, y: number) => x + y, 0); if (t > p.points) return new Response('{"handled":true,"error":"Pontos insuficientes."}'); p.str += b.add[0]; p.agi += b.add[1]; p.vit += b.add[2]; p.ene += b.add[3]; p.points -= t; p.dirty = true; p.meDirty = true; await this.flush(p); return new Response('{"handled":true}'); }
     if (route === '/global') { this.send_all(await req.text()); return new Response('ok'); }
     if (route === '/partychat') { const b: any = await req.json(); this.partySend(b.pid, b.msg); return new Response('ok'); }
+    if (route === '/guildchat') { const b: any = await req.json(); this.guildSend(b.gid, b.msg); return new Response('ok'); }
+    if (route === '/guild') { const b: any = await req.json(); if ([...this.players.values()].some(o => o.guildId === b.gid) || b.add?.some((c: number) => this.byChar.has(c))) await this.reloadGuild(b.gid); return new Response('ok'); }
     if (route === '/party') { await this.reloadParty(((await req.json()) as any).pid); return new Response('ok'); }
     this.init(req.headers.get('x-map')!);
     const pair = new WebSocketPair(); const client = pair[0], server = pair[1];
@@ -143,6 +147,8 @@ export class MapRoom {
     }
     const pm = await db.prepare('SELECT party_id FROM party_members WHERE char_id=?').bind(charId).first<{ party_id: number }>();
     if (pm && !p.gone) { p.partyId = pm.party_id; await this.reloadParty(pm.party_id); }
+    const gm = await db.prepare('SELECT guild_id FROM guild_members WHERE char_id=?').bind(charId).first<{ guild_id: number }>().catch(() => null);
+    if (gm && !p.gone) { p.guildId = gm.guild_id; await this.reloadGuild(gm.guild_id); }
     for (const m of early) this.onMessage(p, m);
     if (!this.timer) { this.last = Date.now(); this.lastSave = this.last; this.timer = setInterval(() => this.safeTick(), CONFIG.tickMs); }
   }
@@ -269,6 +275,16 @@ export class MapRoom {
       case 'pl': return this.enqueueParty(() => this.leaveParty(p.partyId, p.charId));
       case 'pk': return this.enqueueParty(() => this.kick(p, m.char));
       case 'pm': return this.enqueueParty(() => this.setMode(p));
+      case 'gc': return this.enqueueParty(() => this.guildCreate(p, m.name, m.tag, m.color));
+      case 'gi': return this.guildInvite(p, m.id);
+      case 'ga': return this.enqueueParty(() => this.guildAccept(p));
+      case 'gx': p.ginvite = null; return;
+      case 'gl': return this.enqueueParty(() => this.guildLeave(p));
+      case 'gk': return this.enqueueParty(() => this.guildKick(p, m.char));
+      case 'gp': return this.enqueueParty(() => this.guildPromote(p, m.char));
+      case 'gm': return this.enqueueParty(() => this.guildMaster(p, m.char));
+      case 'gn': return this.enqueueParty(() => this.guildNotice(p, m.m));
+      case 'gd': return this.enqueueParty(() => this.guildDisband(p));
     }
   }
   private chat(p: Player, m: any) {
@@ -276,6 +292,13 @@ export class MapRoom {
     if (typeof m.m !== 'string' || now - p.lastChat < 700) return;
     const txt = m.m.trim().slice(0, 160); if (!txt) return; p.lastChat = now;
     if (this.cfg.test && /^\/teste(\s|$)/i.test(txt)) return this.testKit(p, txt, now);
+    if (m.ch === 'u') {
+      if (!p.guildId) return this.sys(p, 'Você não está em uma guilda.');
+      const msg = JSON.stringify({ t: 'c', ch: 'u', from: p.name, m: txt });
+      this.guildSend(p.guildId, msg);
+      for (const id of MAP_IDS) if (id !== this.mapId) this.stub(id).fetch(new Request('https://room/guildchat', { method: 'POST', body: JSON.stringify({ gid: p.guildId, msg }) })).catch(() => { });
+      return;
+    }
     if (m.ch === 'p') {
       if (!p.partyId) return this.sys(p, 'Você não está em um grupo.');
       const msg = JSON.stringify({ t: 'c', ch: 'p', from: p.name, m: txt });
@@ -397,6 +420,99 @@ export class MapRoom {
     }
     for (const p of this.players.values()) this.sys(p, `⚜ INVASÃO DOURADA em ${this.map.name}! 8 monstros dourados apareceram por 10 minutos: muito mais XP, moedas, baús e joias.`);
     for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/news', { method: 'POST', body: JSON.stringify({ m: `⚜ Invasão Dourada começou em ${this.map.name} (10 minutos)!` }) })).catch(() => null);
+  }
+  // ---------- Guildas ----------
+  private guildSend(gid: number, msg: string) { for (const o of this.players.values()) if (o.guildId === gid) try { o.ws.send(msg); } catch { /* */ } }
+  private guildBonus(p: Player) { if (!p.guildId) return 0; let n = 0; for (const o of this.players.values()) if (o !== p && o.guildId === p.guildId && !o.deadUntil && !o.gone) n++; return Math.min(GUILD_XP_MAX, n) * GUILD_XP; }
+  private async guildChanged(gid: number, add: number[] = []) {
+    await this.reloadGuild(gid);
+    await Promise.all(MAP_IDS.filter(id => id !== this.mapId).map(id => this.stub(id).fetch(new Request('https://room/guild', { method: 'POST', body: JSON.stringify({ gid, add }) })).catch(() => { })));
+  }
+  private async reloadGuild(gid: number) {
+    const db = this.env.DB;
+    const rows = (await db.prepare('SELECT g.name g_name,g.tag,g.color,g.leader_char,g.notice,m.char_id,m.name,m.rank,c.level,c.class,c.resets,c.master_resets FROM guild_members m JOIN guilds g ON g.id=m.guild_id JOIN characters c ON c.id=m.char_id WHERE m.guild_id=? ORDER BY m.rank DESC,c.master_resets DESC,c.resets DESC,c.level DESC').bind(gid).all()).results as any[];
+    if (!rows.length) { await db.prepare('DELETE FROM guilds WHERE id=? AND NOT EXISTS (SELECT 1 FROM guild_members WHERE guild_id=?)').bind(gid, gid).run(); }
+    else if (!rows.some(r => r.char_id === r.leader_char && r.rank === 2)) { // mestre saiu ou foi apagado: o mais graduado assume
+      const nl = rows[0]; await db.batch([db.prepare('UPDATE guilds SET leader_char=? WHERE id=?').bind(nl.char_id, gid), db.prepare('UPDATE guild_members SET rank=2 WHERE char_id=?').bind(nl.char_id)]);
+      for (const r of rows) r.leader_char = nl.char_id; nl.rank = 2;
+    }
+    const ids = new Set(rows.map(r => r.char_id));
+    for (const o of this.players.values()) if (o.guildId === gid && !ids.has(o.charId)) { o.guildId = 0; o.gRank = 0; this.send(o, { t: 'guild', g: null }); this.forgetLook(o); }
+    if (!rows.length) { this.guilds.delete(gid); return; }
+    const g = { id: gid, name: rows[0].g_name, tag: rows[0].tag, color: rows[0].color, leader: rows[0].leader_char, notice: rows[0].notice, m: rows.map(r => ({ id: r.char_id, name: r.name, rank: r.rank, lv: r.level, cls: r.class, res: r.resets, mr: r.master_resets })) };
+    const old = this.guilds.get(gid); this.guilds.set(gid, g);
+    for (const r of g.m) { const o = this.byChar.get(r.id); if (!o) continue; const was = o.guildId; o.guildId = gid; o.gRank = r.rank; this.send(o, { t: 'guild', g, me: o.charId }); if (was !== gid || !old || old.tag !== g.tag || old.color !== g.color) this.forgetLook(o); }
+  }
+  /** Faz todo mundo receber de novo a aparência do jogador (para atualizar a etiqueta da guilda). */
+  private forgetLook(o: Player) { for (const q of this.players.values()) q.known.delete(o.eid); }
+  private async guildCreate(p: Player, name: unknown, tag: unknown, color: unknown) {
+    if (!this.nearNpc(p, 'guildas')) return;
+    if (p.guildId) return this.sys(p, 'Você já está em uma guilda.');
+    if (p.level < GUILD_LVL && !p.resets && !p.mr) return this.sys(p, `Para fundar uma guilda é preciso nível ${GUILD_LVL} (ou ter feito reset).`);
+    if (p.gold < GUILD_GOLD) return this.sys(p, `Fundar uma guilda custa ${GUILD_GOLD.toLocaleString('pt-BR')} moedas.`);
+    const n = cleanGuildName(name), t = cleanGuildName(tag).toUpperCase(), c = Number(color);
+    if (!validGuildName(n)) return this.sys(p, 'Nome da guilda: 3 a 16 letras, números ou espaços.');
+    if (!validGuildTag(t)) return this.sys(p, 'Sigla da guilda: 2 a 4 letras ou números.');
+    if (!Number.isInteger(c) || c < 0 || c >= GUILD_COLORS.length) return;
+    const db = this.env.DB, now = Date.now(); let gid = 0;
+    try { gid = (await db.prepare('INSERT INTO guilds(name,tag,color,leader_char,created_at) VALUES(?,?,?,?,?) RETURNING id').bind(n, t, c, p.charId, now).first<{ id: number }>())!.id; }
+    catch { return this.sys(p, 'Já existe uma guilda com esse nome ou sigla.'); }
+    try { await db.prepare('INSERT INTO guild_members(char_id,guild_id,name,rank,joined_at) VALUES(?,?,?,2,?)').bind(p.charId, gid, p.name, now).run(); }
+    catch { await db.prepare('DELETE FROM guilds WHERE id=?').bind(gid).run(); return this.sys(p, 'Não foi possível fundar a guilda agora.'); }
+    if (p.gone || p.gold < GUILD_GOLD) { await db.batch([db.prepare('DELETE FROM guild_members WHERE char_id=?').bind(p.charId), db.prepare('DELETE FROM guilds WHERE id=?').bind(gid)]); return; }
+    p.gold -= GUILD_GOLD; p.logs.push(['guild_create', null, t, 0, -GUILD_GOLD, now]); p.dirty = true; p.meDirty = true;
+    await this.guildChanged(gid); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
+    this.sys(p, `Guilda «${t}» ${n} fundada! Clique num jogador e use "Convidar para guilda".`);
+    const msg = JSON.stringify({ t: 'news', m: `${p.name} fundou a guilda «${t}» ${n}!` }); this.send_all(msg);
+    for (const id of MAP_IDS) if (id !== this.mapId) this.stub(id).fetch(new Request('https://room/global', { method: 'POST', body: msg })).catch(() => { });
+  }
+  private guildInvite(p: Player, id: unknown) {
+    const g = p.guildId ? this.guilds.get(p.guildId) : null; if (!g) return this.sys(p, 'Você não está em uma guilda.');
+    if ((p.gRank ?? 0) < 1) return this.sys(p, 'Só o mestre e os assistentes podem convidar.');
+    const t = this.players.get(id as number); if (!t || t === p || t.gone) return;
+    if (t.guildId) return this.sys(p, `${t.name} já está em uma guilda.`);
+    if (g.m.length >= GUILD_MAX) return this.sys(p, `A guilda está cheia (${GUILD_MAX} membros).`);
+    t.ginvite = { gid: g.id, until: Date.now() + 30000 };
+    this.send(t, { t: 'ginv', from: p.name, name: g.name, tag: g.tag }); this.sys(p, `Convite de guilda enviado a ${t.name}.`);
+  }
+  private async guildAccept(p: Player) {
+    const inv = p.ginvite; p.ginvite = null; if (!inv || Date.now() > inv.until || p.guildId || p.gone) return;
+    const db = this.env.DB; let ok = 0;
+    try { ok = (await db.prepare('INSERT INTO guild_members(char_id,guild_id,name,rank,joined_at) SELECT ?,?,?,0,? WHERE EXISTS (SELECT 1 FROM guilds WHERE id=?) AND (SELECT COUNT(*) FROM guild_members WHERE guild_id=?)<?').bind(p.charId, inv.gid, p.name, Date.now(), inv.gid, inv.gid, GUILD_MAX).run()).meta.changes; } catch { ok = 0; }
+    if (!ok) return this.sys(p, 'Não foi possível entrar na guilda (cheia ou desfeita).');
+    p.guildId = inv.gid; await this.guildChanged(inv.gid, [p.charId]);
+    const g = this.guilds.get(inv.gid); if (g) this.guildSend(inv.gid, JSON.stringify({ t: 'c', ch: 'u', from: '⚑', m: `${p.name} entrou na guilda.` }));
+  }
+  private async guildLeave(p: Player) {
+    const gid = p.guildId; if (!gid) return;
+    await this.env.DB.prepare('DELETE FROM guild_members WHERE char_id=? AND guild_id=?').bind(p.charId, gid).run();
+    this.guildSend(gid, JSON.stringify({ t: 'c', ch: 'u', from: '⚑', m: `${p.name} saiu da guilda.` }));
+    await this.guildChanged(gid); this.sys(p, 'Você saiu da guilda.');
+  }
+  private async guildKick(p: Player, char: unknown) {
+    const gid = p.guildId, g = gid ? this.guilds.get(gid) : null, t = g?.m.find(x => x.id === char); if (!g || !t || t.id === p.charId || (p.gRank ?? 0) < 1 || t.rank >= (p.gRank ?? 0)) return;
+    await this.env.DB.prepare('DELETE FROM guild_members WHERE char_id=? AND guild_id=? AND rank<?').bind(t.id, g.id, p.gRank).run();
+    this.guildSend(g.id, JSON.stringify({ t: 'c', ch: 'u', from: '⚑', m: `${t.name} foi removido da guilda por ${p.name}.` }));
+    await this.guildChanged(g.id);
+  }
+  private async guildPromote(p: Player, char: unknown) {
+    const g = p.guildId ? this.guilds.get(p.guildId) : null, t = g?.m.find(x => x.id === char); if (!g || !t || p.gRank !== 2 || t.rank === 2) return;
+    if (t.rank === 0 && g.m.filter(x => x.rank === 1).length >= 3) return this.sys(p, 'A guilda pode ter no máximo 3 assistentes.');
+    await this.env.DB.prepare('UPDATE guild_members SET rank=? WHERE char_id=? AND guild_id=?').bind(t.rank ? 0 : 1, t.id, g.id).run(); await this.guildChanged(g.id);
+  }
+  private async guildMaster(p: Player, char: unknown) {
+    const g = p.guildId ? this.guilds.get(p.guildId) : null, t = g?.m.find(x => x.id === char); if (!g || !t || p.gRank !== 2 || t.id === p.charId) return;
+    const db = this.env.DB; await db.batch([db.prepare('UPDATE guild_members SET rank=2 WHERE char_id=? AND guild_id=?').bind(t.id, g.id), db.prepare('UPDATE guild_members SET rank=1 WHERE char_id=? AND guild_id=?').bind(p.charId, g.id), db.prepare('UPDATE guilds SET leader_char=? WHERE id=?').bind(t.id, g.id)]);
+    this.guildSend(g.id, JSON.stringify({ t: 'c', ch: 'u', from: '⚑', m: `${t.name} agora é o mestre da guilda.` })); await this.guildChanged(g.id);
+  }
+  private async guildNotice(p: Player, txt: unknown) {
+    const g = p.guildId ? this.guilds.get(p.guildId) : null; if (!g || (p.gRank ?? 0) < 1 || typeof txt !== 'string') return;
+    await this.env.DB.prepare('UPDATE guilds SET notice=? WHERE id=?').bind(txt.trim().slice(0, 140), g.id).run(); await this.guildChanged(g.id);
+  }
+  private async guildDisband(p: Player) {
+    const g = p.guildId ? this.guilds.get(p.guildId) : null; if (!g || p.gRank !== 2) return;
+    const db = this.env.DB; await db.batch([db.prepare('DELETE FROM guild_members WHERE guild_id=?').bind(g.id), db.prepare('DELETE FROM guilds WHERE id=?').bind(g.id)]);
+    this.guildSend(g.id, JSON.stringify({ t: 'c', ch: 'u', from: '⚑', m: `A guilda ${g.name} foi desfeita.` })); await this.guildChanged(g.id);
   }
   // ---------- Chefe Mundial ----------
   private allSys(t: string) { for (const p of this.players.values()) this.sys(p, t); }
@@ -832,7 +948,7 @@ export class MapRoom {
     if (m.def.boss && !m.wb) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {
-    const gain = Math.floor(xp * (1 + p.streak * .05)); p.xp += gain; p.dirty = true; p.meDirty = true; this.send(p, { t: 'xpg', v: gain });
+    const gain = Math.floor(xp * (1 + p.streak * .05) * (1 + this.guildBonus(p))); p.xp += gain; p.dirty = true; p.meDirty = true; this.send(p, { t: 'xpg', v: gain });
     if (p.level >= CONFIG.maxLevel) { if (p.resets >= MASTER_RESETS && p.ml < MASTER_MAX) { p.mxp += gain; let up = false; while (p.ml < MASTER_MAX && p.mxp >= masterNext(p.ml)) { p.mxp -= masterNext(p.ml); p.ml++; p.mpts++; up = true; } if (up) { this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Master Level ${p.ml}! +1 ponto mestre (tecla C).`); } } p.xp = 0; return; }
     let up = false;
     while (p.level < CONFIG.maxLevel && p.xp >= xpToNext(p.level)) { p.xp -= xpToNext(p.level); p.level++; p.points += CONFIG.pointsPerLevel; up = true; }
@@ -981,7 +1097,7 @@ export class MapRoom {
     const near = (o: Pt) => Math.abs(o.x - p.x) < R && Math.abs(o.y - p.y) < R;
     const note = (id: number, full: () => unknown) => { seen.add(id); if (!p.known.has(id)) { p.known.add(id); news.push(full()); } };
     for (const o of this.players.values()) if (near(o)) {
-      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
+      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; const gg = o.guildId ? this.guilds.get(o.guildId) : undefined; return { id: o.eid, k: 'p', ...(gg ? { gt: gg.tag, gc: gg.color } : {}), name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
       e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
     for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => (m.wb ? { id: m.eid, k: 'm', mob: m.def.key, wb: 1 } : m.golden ? { id: m.eid, k: 'm', mob: m.def.key, g: 1 } : { id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }

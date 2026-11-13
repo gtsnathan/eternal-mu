@@ -149,6 +149,10 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
     const { results } = await db.prepare('SELECT c.name,c.class,c.level,c.resets,c.master_resets AS mr,c.master_level AS ml FROM characters c JOIN accounts a ON a.id=c.account_id WHERE a.banned=0 ORDER BY c.master_resets DESC, c.resets DESC, c.master_level DESC, c.level DESC, c.xp DESC LIMIT 50').all();
     return json({ ranking: results });
   }
+  if (path === '/api/guilds' && req.method === 'GET') {
+    const { results } = await db.prepare('SELECT g.name,g.tag,g.color,(SELECT name FROM characters WHERE id=g.leader_char) leader,COUNT(m.char_id) n,COALESCE(SUM(c.master_resets),0) mr,COALESCE(SUM(c.resets),0) res,COALESCE(SUM(c.level),0) lv FROM guilds g JOIN guild_members m ON m.guild_id=g.id JOIN characters c ON c.id=m.char_id GROUP BY g.id ORDER BY mr DESC,res DESC,lv DESC LIMIT 20').all().catch(() => ({ results: [] }));
+    return json({ guilds: results });
+  }
   if (path === '/api/guide' && req.method === 'GET') {
     const r = await db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>(), c = r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, v = getMap('valoria');
     return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { id, name: m.name, req: travelList().find(p => p.to === id)?.lvl || 1, w: m.w, h: m.h, spawn: m.spawn, grid: guideGrid(id), mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { key: k, name: d.name, level: d.level, boss: !!d.boss, hp: d.hp, areas: m.zones.filter(z => z.mob === k).map(z => ({ x: z.cx, y: z.cy, r: z.r, n: z.n })), drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });
@@ -216,7 +220,7 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
     // se o personagem estiver no jogo, tira do mapa antes (senão a próxima gravação dele falharia sem fim)
     const dc = await db.prepare('SELECT id,map FROM characters WHERE id=? AND account_id=?').bind(+del[1], me.id).first<{ id: number; map: string }>();
     if (dc && MAP_IDS.includes(dc.map)) await env.MAP_ROOM.get(env.MAP_ROOM.idFromName(dc.map + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/dropchar', { method: 'POST', body: JSON.stringify({ char: dc.id }) })).catch(() => null);
-    await db.batch([db.prepare('DELETE FROM items WHERE char_id=(SELECT id FROM characters WHERE id=? AND account_id=?)').bind(+del[1], me.id), db.prepare('DELETE FROM characters WHERE id=? AND account_id=?').bind(+del[1], me.id)]);
+    await db.batch([db.prepare('DELETE FROM items WHERE char_id=(SELECT id FROM characters WHERE id=? AND account_id=?)').bind(+del[1], me.id), db.prepare('DELETE FROM characters WHERE id=? AND account_id=?').bind(+del[1], me.id), db.prepare('DELETE FROM guilds WHERE NOT EXISTS (SELECT 1 FROM guild_members m WHERE m.guild_id=guilds.id)')]);
     return json({ characters: await listChars(env, me.id) });
   }
   return err('Não encontrado.', 404);

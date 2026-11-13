@@ -1,3 +1,4 @@
+import { GUILD_COLORS } from '../shared/data';
 import { upcomingBosses, WB_NAMES, WB_LIFE } from '../shared/events';
 import { VERSION, CHANGELOG } from '../shared/version';
 import { fmtRes, CLASSES, HAIR_COLORS, ITEMS, MOBS, SETS, WING_THEME } from '../shared/data';
@@ -57,6 +58,11 @@ function drawOnline(list: { name: string; cls: string; level: number; resets: nu
   }
 }
 let ranking: any[] = [];
+function drawGuilds(list: { name: string; tag: string; color: number; leader: string; n: number; mr: number; res: number }[]) {
+  const b = document.getElementById('guildb'); if (!b) return; b.replaceChildren();
+  if (!list.length) { const r = el('tr'), d = el('td', '', 'Nenhuma guilda ainda. Funde a primeira com Bertrand, em Valoria ou Solmira!'); d.setAttribute('colspan', '5'); r.append(d); b.append(r); return; }
+  list.forEach((g, i) => { const r = el('tr'), n = el('td'), t = el('b', '', `«${g.tag}» `); t.style.color = GUILD_COLORS[g.color] ?? '#ffd76a'; n.append(t, document.createTextNode(g.name)); r.append(el('td', '', i + 1), n, el('td', '', g.leader ?? '—'), el('td', '', g.n), el('td', '', fmtRes(g.res, g.mr))); b.append(r); });
+}
 function drawRank() {
   const f = $<HTMLSelectElement>('#rankf').value, list = f ? ranking.filter(r => r.class === f) : ranking, b = $('#rankb'); b.replaceChildren();
   list.forEach((r, i) => { const tr = el('tr', i < 3 ? 'top' : ''); for (const v of [i + 1, r.name, r.class, fmtRes(r.resets, r.mr), r.ml, r.level]) tr.append(el('td', '', v)); b.append(tr); });
@@ -77,6 +83,7 @@ drawUpdates(); drawBosses(); setInterval(drawBosses, 30000);
 async function loadPublic() {
   try { const s = await api('status'); $('#online').textContent = fmt(s.online); $('#accs').textContent = fmt(s.accounts); $('#chars').textContent = fmt(s.characters); $('#rx').textContent = `x${s.xp}`; $('#rd').textContent = `x${s.drop}`; $('#rg').textContent = `x${s.gold}`; $('#rr').textContent = s.resetLevel; document.querySelectorAll('.v-rl').forEach(e => e.textContent = s.resetLevel); document.querySelectorAll('.v-rg').forEach(e => e.textContent = fmt(s.resetGold)); document.querySelectorAll('.v-rp').forEach(e => e.textContent = fmt(s.resetPoints)); } catch { $('#online').textContent = '—'; }
   try { ranking = (await api('ranking')).ranking; drawRank(); } catch { /* sem conexão */ }
+  try { drawGuilds((await api('guilds')).guilds); } catch { drawGuilds([]); }
   try { drawOnline((await api('online')).online); } catch { /* sem conexão */ }
 }
 

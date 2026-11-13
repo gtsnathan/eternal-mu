@@ -360,3 +360,11 @@ export function cleanSettings(x: any): Settings {
     for (const f of Object.keys(lim) as (keyof MobOverride)[]) if (o[f] !== '' && o[f] != null) { const v = clampN(o[f], lim[f][0], lim[f][1]); if (v !== null) r[f] = v; } if (Object.keys(r).length) s.mobs[k] = r; }
   return s;
 }
+
+// Guildas
+export const GUILD_LVL = 100, GUILD_GOLD = 5000000, GUILD_MAX = 30, GUILD_XP = .05, GUILD_XP_MAX = 4;
+export const GUILD_COLORS = ['#ffd76a', '#ff6a5a', '#6ad0ff', '#7ce08a', '#c58bff', '#ff9ee6', '#ffffff', '#ff9d3c'];
+export const GUILD_RANKS = ['Membro', 'Assistente', 'Mestre'];
+export const cleanGuildName = (s: unknown) => typeof s === 'string' ? s.trim().replace(/\s+/g, ' ') : '';
+export const validGuildName = (s: string) => /^[\p{L}\p{N} ]{3,16}$/u.test(s);
+export const validGuildTag = (s: string) => /^[A-Za-z0-9]{2,4}$/.test(s);

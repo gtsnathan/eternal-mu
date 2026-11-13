@@ -1,0 +1,18 @@
+-- Guildas (0.36.0)
+CREATE TABLE guilds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  tag TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  color INTEGER NOT NULL DEFAULT 0,
+  leader_char INTEGER NOT NULL,
+  notice TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE guild_members (
+  char_id INTEGER PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+  guild_id INTEGER NOT NULL REFERENCES guilds(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  rank INTEGER NOT NULL DEFAULT 0,
+  joined_at INTEGER NOT NULL
+);
+CREATE INDEX idx_guild_members_guild ON guild_members(guild_id);
