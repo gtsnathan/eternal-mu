@@ -97,6 +97,13 @@ async function admin(req: Request, env: Env, path: string, b: any, adminId: numb
     await db.batch([db.prepare('UPDATE accounts SET banned=? WHERE id=?').bind(ban, id), ...(ban ? [db.prepare('DELETE FROM sessions WHERE account_id=?').bind(id)] : [])]);
     if (ban) await toRooms(env, '/kick', { account: id }); await audit(ban ? 'ban' : 'unban', { id }); return json({ ok: 1 });
   }
+  if (path === '/api/admin/password') { // troca a senha de uma conta e desconecta as sessões dela (a senha nunca vai para o histórico)
+    const id = Number(b.accountId), pw = b.password; if (!Number.isInteger(id)) return err('Conta inválida.');
+    if (typeof pw !== 'string' || pw.length < 8 || pw.length > 128) return err('A nova senha precisa ter de 8 a 128 caracteres.');
+    const a = await db.prepare('SELECT username FROM accounts WHERE id=?').bind(id).first<{ username: string }>(); if (!a) return err('Conta não encontrada.');
+    await db.batch([db.prepare('UPDATE accounts SET pass_hash=? WHERE id=?').bind(await hashPw(pw), id), db.prepare('DELETE FROM sessions WHERE account_id=?').bind(id)]);
+    await audit('password', { id, username: a.username }); return json({ ok: 1 });
+  }
   if (path === '/api/admin/announce') {
     const m = String(b.m ?? '').trim().slice(0, 200); if (!m) return err('Escreva a mensagem.');
     await toRooms(env, '/news', { m }); await audit('announce', { m }); return json({ ok: 1 });
