@@ -146,10 +146,10 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
 .touch .tonly{display:inline-block}
 .touch .frame{width:min(250px,calc(100vw - 150px));padding:5px}
 .touch .mini{width:124px;padding:3px}.touch #minimap{width:116px;height:72px}.touch .minfo{font-size:10px;flex-wrap:nowrap;overflow:hidden;margin-top:2px}.touch #where{overflow:hidden;text-overflow:ellipsis}
-/* menu: só Chat, Bolsa, Auto e ☰ (o resto abre no ☰) */
+/* menu: só Chat, Bolsa, Auto, Coleta e ☰ (o resto abre no ☰) */
 .touch .menu{position:absolute;top:calc(116px + env(safe-area-inset-top));bottom:auto;right:calc(8px + env(safe-area-inset-right));left:auto;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:4px;width:auto;max-width:200px}
 .touch .menu button{padding:5px 9px;font-size:12px;min-width:0}
-.touch .menu .extra{display:none}.touch .menu.open .extra{display:block;width:100%;text-align:center}
+.touch .menu .lbl{display:none}.touch .menu{max-width:240px}.touch .menu .extra{display:none}.touch .menu.open .extra{display:block;width:100%;text-align:center}
 .touch .menu.open button{width:100%;text-align:center}.touch #bar [data-pot] u{display:none}.touch .menu.open{background:#151024ee;border:1px solid #8a6a32;border-radius:10px;padding:5px;max-width:132px}
 /* chat: só as últimas linhas, sem caixa; o campo de digitar aparece no botão 💬 */
 .touch #chat{top:calc(152px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));bottom:auto;transform:none;width:min(320px,calc(100vw - 16px));pointer-events:none}
@@ -234,7 +234,7 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
   <div id="pmenu" class="p"><div id="pmname"></div><button id="pminv" style="display:block;width:100%;margin-bottom:4px">Convidar para grupo</button><button id="pmtrade" style="display:block;width:100%">Negociar</button></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
-  <div class="menu p"><button id="chatb" class="tonly" title="Chat">💬</button><button data-w="inv">Bolsa</button><button data-w="char" class="extra">Perfil</button><button data-w="map" class="extra">Mapa</button><button data-w="rank" class="extra">Rank</button><button id="auto">Auto</button><button id="gfx" class="extra">Gráf: Auto</button><button id="exit" class="extra">Sair</button><button id="more" class="tonly" title="Mais">☰</button></div>
+  <div class="menu p"><button id="chatb" class="tonly" title="Chat">💬</button><button data-w="inv">Bolsa</button><button data-w="char" class="extra">Perfil</button><button data-w="map" class="extra">Mapa</button><button data-w="rank" class="extra">Rank</button><button id="auto" title="Auto ataque: ataca e usa habilidades sozinho">⚔<span class="lbl"> Auto</span></button><button id="autoloot" title="Auto coleta: anda até os itens e pega sozinho">✋<span class="lbl"> Coleta</span></button><button id="gfx" class="extra">Gráf: Auto</button><button id="exit" class="extra">Sair</button><button id="more" class="tonly" title="Mais">☰</button></div>
   <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
   <div id="stick" class="p"><i></i></div>
   <div id="bar" class="p">

@@ -68,7 +68,7 @@ interface Ent { id: number; k: string; info: any; snaps: { t: number; x: number;
 interface Me { hp: number; mp: number; maxHp: number; maxMp: number; xp: number; xpNext: number; level: number; points: number; str: number; agi: number; vit: number; ene: number; atk: number; def: number; gold: number; dead: boolean; loot: number; lootMs: number; resets: number; mr: number; ml: number; mxp: number; mxpNext: number; mpts: number; mtree: Record<string, number> }
 const canvas = $<HTMLCanvasElement>('#game'), g = canvas.getContext('2d')!; hdCtx(g);
 let ws: WebSocket | null = null, charId = 0, running = false, you = 0, myName = '', map: GameMap | null = null, me: Me | null = null, items: ItemInst[] = [];
-let ents = new Map<number, Ent>(), target = 0, auto = false, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
+let ents = new Map<number, Ent>(), target = 0, auto = false, autoLoot = false, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
 let pred: { x: number; y: number; path: { x: number; y: number }[] | null; stop: number; tx: number; ty: number; hold: number } | null = null;
 let myCls = CLASSES.dark_warrior, party: { m: { id: number; name: string }[]; leader: number; mode: number; me: number } | null = null, menuFor: Ent | null = null, bolts: { x: number; y: number; tx: number; ty: number; t: number; c: string }[] = [];
 let myLook: { hc: number; hs: number } = { hc: 0, hs: 0 }, Z = 2, camX = 0, camY = 0, pingTimer = 0, lastFrame = 0, reconnectTimer = 0;
@@ -373,7 +373,12 @@ $('#more').onclick = e => { e.stopPropagation(); $('.menu').classList.toggle('op
 document.querySelectorAll<HTMLElement>('.menu .extra').forEach(b => b.addEventListener('click', () => $('.menu').classList.remove('open')));
 $('#chatb').onclick = () => { const c = $('#chat'), o = !c.classList.contains('open'); c.classList.toggle('open', o); if (o) $<HTMLInputElement>('#chati').focus(); };
 $('#chati').addEventListener('blur', () => { if (touch) setTimeout(() => { if (document.activeElement !== $('#chati') && !$<HTMLInputElement>('#chati').value) $('#chat').classList.remove('open'); }, 150); });
-$('#auto').onclick = () => { auto = !auto; $('#auto').style.borderColor = auto ? 'var(--gold)' : ''; };
+// Auto ataque e Auto coleta são separados: dá para ligar só um, os dois ou nenhum (fica lembrado neste aparelho)
+const autoUi = () => { for (const [id, on] of [['#auto', auto], ['#autoloot', autoLoot]] as [string, boolean][]) { $(id).style.borderColor = on ? 'var(--gold)' : ''; $(id).style.color = on ? 'var(--gold)' : ''; } try { localStorage.setItem('em_auto', JSON.stringify([auto, autoLoot])); } catch { /* sem armazenamento */ } };
+try { [auto, autoLoot] = JSON.parse(localStorage.getItem('em_auto') ?? '[false,false]'); } catch { /* sem armazenamento */ }
+$('#auto').onclick = () => { auto = !auto; autoUi(); log(auto ? 'Auto ataque ligado.' : 'Auto ataque desligado.', 'sys'); };
+$('#autoloot').onclick = () => { autoLoot = !autoLoot; autoUi(); log(autoLoot ? 'Auto coleta ligada: os itens somem 10 s depois de cair.' : 'Auto coleta desligada.', 'sys'); };
+autoUi();
 $('#atk').onclick = () => { const m = nearestMob(12); if (m) attack(m); };
 document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => b.onclick = () => touch ? skill(+b.dataset.sk!) : selectSkill(+b.dataset.sk!));
 document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => b.onclick = () => potion(b.dataset.pot!));
@@ -475,7 +480,7 @@ function frame(ts: number) {
     if (pendingNpc && Math.hypot(a.x - pendingNpc.x, a.y - pendingNpc.y) < 2.6) { const n = pendingNpc; pendingNpc = null; log(`${n.name}: ${n.line}`, 'sys'); if (n.shop) { shop = n; renderShop(); openW('shop'); } }
     if (shop && Math.hypot(a.x - shop.x, a.y - shop.y) > 3.8) closeWin('shop');
     if (target && !ents.has(target)) target = 0;
-    if (auto && ts > autoAt && me && !me.dead && !map.safe) { autoAt = ts + 280; autoPlay(a, ts); }
+    if ((auto || autoLoot) && ts > autoAt && me && !me.dead && !map.safe) { autoAt = ts + 280; autoPlay(a, ts); }
   }
   const W = canvas.width, H = canvas.height, vw = W / Z, vh = H / Z;
   const cx = Math.max(vw / 2, Math.min(map.w * 32 - vw / 2, camX * 32)), cy = Math.max(vh / 2, Math.min(map.h * 32 - vh / 2, camY * 32));
@@ -678,18 +683,18 @@ function drawObj(o: GameMap['objs'][number], ts: number) {
 }
 const npcLooks: Look[] = [{ hc: '#000', hs: 0 }, { hc: '#d8dde6', hs: 2, robe: '#6a3f96' }, { hc: '#b23a2e', hs: 0, armor: '#7a5230', weapon: 'iron_axe', boots: '#3c2a1c' }, { hc: '#2b2230', hs: 0, helm: '#8b95a6', armor: '#8b95a6', pants: '#5c6577', weapon: 'short_sword' }, lookFromGear('Dark Warrior', '#d9b24a', 2, { helm: null, armor: 'lion_armor', pants: 'lion_pants', boots: 'lion_boots', weapon: 'frost_blade' }), { hc: '#d8dde6', hs: 1, armor: '#3e5a9a', pants: '#2a3a68', boots: '#c9a44c' }, { hc: '#e8e6df', hs: 2, robe: '#7a2f3a', weapon: 'glacier_staff' }];
 const skillLock: Record<number, number> = {}, lootTried = new Set<number>();
-/** Modo Auto: usa poções, habilidades, ataca o monstro mais próximo e recolhe o que cair. */
+/** Auto ataque: poções, habilidades e ataca o monstro mais próximo. Auto coleta: anda até os itens caídos por perto. */
 function autoPlay(a: Ent, ts: number) {
   const m0 = me!, ready = (s: { n: number; mana: number; lvl?: number }) => m0.level >= (s.lvl ?? 1) && m0.mp >= s.mana && ts > (cds[s.n]?.until ?? 0) && ts > (skillLock[s.n] ?? 0), cast = (s: { n: number }, id: number) => { skillLock[s.n] = ts + 500; send({ t: 'k', n: s.n, id }); };
-  if (m0.hp < m0.maxHp * .4) potion('pot_hp'); else if (m0.mp < m0.maxMp * .25) potion('pot_mp');
-  const near = nearestMob(14), heal = myCls.skills.find(s => s.kind === 'heal');
-  if (heal && m0.hp < m0.maxHp * .6 && ready(heal)) return cast(heal, 0);
+  const heal = myCls.skills.find(s => s.kind === 'heal');
+  if (auto) { if (m0.hp < m0.maxHp * .4) potion('pot_hp'); else if (m0.mp < m0.maxMp * .25) potion('pot_mp'); if (heal && m0.hp < m0.maxHp * .6 && ready(heal)) return cast(heal, 0); }
   let t = ents.get(target); if (!t || t.k !== 'm') t = undefined;
-  if (!t) {
-    let drop: Ent | null = null, bd = 6; for (const e of ents.values()) if (e.k === 'd' && !lootTried.has(e.id)) { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; drop = e; } }
+  if (!t && autoLoot) {
+    let drop: Ent | null = null, bd = auto ? 6 : 8; for (const e of ents.values()) if (e.k === 'd' && !lootTried.has(e.id)) { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; drop = e; } }
     if (drop) { lootTried.add(drop.id); if (lootTried.size > 300) lootTried.clear(); send({ t: 'g', x: drop.x, y: drop.y }); startPred(drop.x, drop.y); autoAt = ts + Math.min(1400, 250 + bd * 210); return; }
-    if (near) { attack(near); t = near; } else return;
   }
+  if (!auto) return;
+  if (!t) { const near = nearestMob(14); if (near) { attack(near); t = near; } else return; }
   const dist = Math.hypot(t.x - a.x, t.y - a.y);
   for (const s of [...myCls.skills].reverse()) {
     if (!ready(s)) continue;
