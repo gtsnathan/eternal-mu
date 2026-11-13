@@ -4,7 +4,7 @@ import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, tra
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -13,19 +13,25 @@ interface Player extends Pt {
   nextMove?: number; budget: number; lastChat: number; nextTrap: number; nextRegen: number; gone: boolean; lastInvFull: number;
 }
 interface Trade { peer: Player; ids: Set<string>; gold: number; st: number }
-interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number> }
+interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number>; golden?: number }
 interface Summon extends Pt { eid: number; owner: Player; pet: string; atk: number; expires: number; nextAtk: number }
 interface Drop extends Pt { eid: number; key: string | null; gold: number; rarity: number; opts: string[]; owner: number; party: number; ownUntil: number; expires: number }
 
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 const round = (n: number) => Math.round(n * 100) / 100;
 /** Junta registros repetidos de coleta (ouro e itens empilháveis) em uma linha por gravação. */
-const MERGE_LOG = new Set(['loot_gold', 'loot']);
-function mergeLogs(logs: unknown[][]): unknown[][] {
+const MERGE_LOG = new Set(['loot', 'sell', 'use', 'buy']);
+/** O que nunca vai para o histórico (economiza gravações): moedas já ficam salvas no personagem, mover para o Baú não muda o dono. */
+const SKIP_LOG = new Set(['loot_gold', 'box_gold', 'quest_gold', 'test_gold', 'chest_in', 'chest_out']);
+/** Itens que valem registro: raridade Rara+, + ou opções, set, asas, acessórios, joias, pacotes e baús. Poções e equipamento comum não. */
+const worthLog = (key: unknown, it?: ItemInst) => { const d = ITEMS[key as string]; if (!d) return true; if (['wings', 'ring', 'amulet', 'jewel', 'pack', 'box'].includes(d.kind) || d.set) return true; if (d.kind === 'potion' || d.kind === 'material') return false; return !it || it.rarity >= 2 || (it.plus ?? 0) > 0 || !!it.opts?.length; };
+function mergeLogs(logs: unknown[][], find: (id: unknown) => ItemInst | undefined = () => undefined): unknown[][] {
   const out: unknown[][] = [], by = new Map<string, unknown[]>();
   for (const l of logs) {
-    if (!MERGE_LOG.has(l[0] as string)) { out.push(l); continue; }
-    const k = `${l[0]}|${l[1]}|${l[2]}`, m = by.get(k);
+    const a = l[0] as string; if (SKIP_LOG.has(a)) continue;
+    if ((a === 'loot' || a === 'use' || a === 'buy' || a === 'discard') && !worthLog(l[2], find(l[1]))) continue;
+    if (!MERGE_LOG.has(a)) { out.push(l); continue; }
+    const k = a === 'sell' || a === 'use' || a === 'buy' ? `${a}|${l[2]}` : `${l[0]}|${l[1]}|${l[2]}`, m = by.get(k);
     if (m) { m[3] = (m[3] as number) + (l[3] as number); m[4] = (m[4] as number) + (l[4] as number); m[5] = l[5]; }
     else { const c = [...l]; by.set(k, c); out.push(c); }
   }
@@ -42,6 +48,8 @@ export class MapRoom {
   private tickN = 0; private announced = new Map<number, number>();
   private fx: (Pt & Record<string, unknown>)[] = [];
   private timed: { at: number; run: () => void }[] = []; private saveWarnAt = 0;
+  /** Invasão Dourada: a cada 30 min (a primeira entre 5 e 15 min depois que alguém entra no mapa), 8 monstros dourados por 10 min. */
+  private nextInvasion = 0; private invasionEnd = 0;
   /** Agenda algo para alguns ticks depois (golpes em sequência das habilidades). */
   private later(at: number, run: () => void) { this.timed.push({ at, run }); }
 
@@ -116,7 +124,7 @@ export class MapRoom {
     const items = all.filter(i => i.equip || i.slot < 1000), chest = all.filter(i => !i.equip && i.slot >= 1000);
     const p: Player = {
       accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, mr: c.master_resets ?? 0, quest: (() => { try { const q = JSON.parse(c.quest || 'null'); return q && quests()[q.id] ? { id: q.id, have: +q.have || 0 } : null; } catch { return null; } })(), questCol: 'quest' in c, savedQuest: '', ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
-      x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), delta, lastE: new Map(), idleSnaps: 0, dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], qtyItems: new Set(), savedRow: '', savedRank: '', budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
+      x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), delta, lastE: new Map(), idleSnaps: 0, newAt: new Map(), dbPos: new Map(all.map(i => [i.id, `${i.slot}|${i.equip ?? ''}`])), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], qtyItems: new Set(), savedRow: '', savedRank: '', budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) p.dirty = true; } // junta joias, poções etc. em pilhas de até 1000
     { const [r, k] = this.rowOf(p); p.savedRow = r; p.savedRank = k; p.savedQuest = JSON.stringify(p.quest); } // estado igual ao do banco
@@ -152,12 +160,22 @@ export class MapRoom {
     const db = this.env.DB, dels: D1PreparedStatement[] = [], ins: D1PreparedStatement[] = [], rest: D1PreparedStatement[] = [], undo: (() => void)[] = [];
     for (const p of ps) {
       if (!p.dirty && !p.dirtyItems.size && !p.delItems.size && !p.qtyItems.size && !p.logs.length) continue;
-      const logs = mergeLogs(p.logs); p.logs = [];
+      const logs = mergeLogs(p.logs, id => p.items.find(i => i.id === id) ?? p.chest.find(i => i.id === id)); p.logs = [];
       // apaga antes de regravar: os índices de posição são únicos
-      for (const id of p.delItems) dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId));
-      const dirtyIds = [...p.dirtyItems], changed = [...p.items, ...p.chest].filter(i => p.dirtyItems.has(i.id));
-      for (const i of changed) { dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId)); ins.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity,plus,opts) VALUES(?,?,?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity, i.plus ?? 0, i.opts?.length ? JSON.stringify(i.opts) : null)); }
-      for (const id of p.qtyItems) { if (p.dirtyItems.has(id) || p.delItems.has(id)) continue; const i = p.items.find(x => x.id === id) ?? p.chest.find(x => x.id === id); if (i) rest.push(db.prepare('UPDATE items SET qty=? WHERE id=? AND char_id=?').bind(i.qty, i.id, p.charId)); }
+      // dbPos = itens que existem no banco e onde estão. Item novo que já sumiu (pegou e descartou/vendeu) nem chega ao banco.
+      const posBefore = new Map(p.dbPos), pos = (i: ItemInst) => `${i.slot}|${i.equip ?? ''}`;
+      for (const id of p.delItems) if (p.dbPos.has(id)) { dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(id, p.charId)); p.dbPos.delete(id); }
+      const dirtyIds = [...p.dirtyItems], changed = [...p.items, ...p.chest].filter(i => p.dirtyItems.has(i.id)), later: string[] = [], now = Date.now();
+      for (const i of changed) {
+        // equipamento comum recém-pegado espera até 5 min (ou a saída do jogo): quase sempre é vendido ou descartado antes e nunca precisa ser gravado
+        if (!p.dbPos.has(i.id) && !p.gone && !worthLog(i.key, i) && !i.equip) { const t0 = p.newAt.get(i.id) ?? now; p.newAt.set(i.id, t0); if (now - t0 < 300000) { later.push(i.id); continue; } }
+        p.newAt.delete(i.id);
+        const opts = i.opts?.length ? JSON.stringify(i.opts) : null, was = p.dbPos.get(i.id);
+        if (was === pos(i)) { rest.push(db.prepare('UPDATE items SET item_key=?,qty=?,rarity=?,plus=?,opts=? WHERE id=? AND char_id=?').bind(i.key, i.qty, i.rarity, i.plus ?? 0, opts, i.id, p.charId)); continue; } // mesmo lugar: 1 linha
+        if (was !== undefined) dels.push(db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(i.id, p.charId)); // mudou de lugar: apaga antes (posições são únicas)
+        ins.push(db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity,plus,opts) VALUES(?,?,?,?,?,?,?,?,?)').bind(i.id, p.charId, i.key, i.qty, i.slot, i.equip, i.rarity, i.plus ?? 0, opts)); p.dbPos.set(i.id, pos(i));
+      }
+      for (const id of p.qtyItems) { if (p.dirtyItems.has(id) || p.delItems.has(id) || !p.dbPos.has(id)) continue; const i = p.items.find(x => x.id === id) ?? p.chest.find(x => x.id === id); if (i) rest.push(db.prepare('UPDATE items SET qty=? WHERE id=? AND char_id=?').bind(i.qty, i.id, p.charId)); }
       // só grava o personagem se algo mudou desde a última gravação; nível/resets à parte para não mexer no índice do ranking à toa
       const [row, rank] = this.rowOf(p), oldRow = p.savedRow, oldRank = p.savedRank;
       if (row !== oldRow) rest.push(db.prepare('UPDATE characters SET master_xp=?,master_points=?,master_tree=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(...JSON.parse(row), p.charId));
@@ -165,8 +183,9 @@ export class MapRoom {
       const qs = JSON.stringify(p.quest), oldQuest = p.savedQuest; if (p.questCol && qs !== oldQuest) rest.push(db.prepare('UPDATE characters SET quest=? WHERE id=?').bind(p.quest ? qs : '', p.charId)); p.savedQuest = qs;
       p.savedRow = row; p.savedRank = rank;
       for (const l of logs) rest.push(db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,?,?)').bind(p.charId, ...l));
-      const delIds = [...p.delItems], qtyIds = [...p.qtyItems]; p.delItems.clear(); p.dirtyItems.clear(); p.qtyItems.clear(); p.dirty = false;
-      undo.push(() => { p.dirty = true; p.savedRow = oldRow; p.savedRank = oldRank; p.savedQuest = oldQuest; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); qtyIds.forEach(i => p.qtyItems.add(i)); p.logs.unshift(...logs); });
+      for (const id of p.delItems) p.newAt.delete(id);
+      const delIds = [...p.delItems], qtyIds = [...p.qtyItems]; p.delItems.clear(); p.dirtyItems.clear(); p.qtyItems.clear(); p.dirty = false; for (const id of later) p.dirtyItems.add(id);
+      undo.push(() => { p.dbPos = posBefore; p.dirty = true; p.savedRow = oldRow; p.savedRank = oldRank; p.savedQuest = oldQuest; dirtyIds.forEach(i => p.dirtyItems.add(i)); delIds.forEach(i => p.delItems.add(i)); qtyIds.forEach(i => p.qtyItems.add(i)); p.logs.unshift(...logs); });
     }
     const prev = Promise.all(ps.map(p => this.saves.get(p.charId)));
     if (!undo.length) return prev;
@@ -351,6 +370,27 @@ export class MapRoom {
     for (const x of prizes) if (this.give(p, x.key, x.qty, x.rarity, 'box', x.opts)) got.push(`${x.qty > 1 ? x.qty + 'x ' : ''}${ITEMS[x.key].name}${x.rarity ? ` (${RARITY[x.rarity].name})` : ''}`);
     p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
     this.sys(p, `${ITEMS[it.key].name} aberto: ${got.join(', ')}.`);
+  }
+  private tickInvasion(now: number) {
+    if (this.map.safe || !this.map.zones.length) return;
+    if (this.invasionEnd && now > this.invasionEnd) { // acabou: os dourados que sobraram vão embora
+      this.invasionEnd = 0; let left = 0; for (const m of this.mobs.values()) if (m.golden) { this.mobs.delete(m.eid); left++; }
+      if (left) for (const p of this.players.values()) this.sys(p, 'A Invasão Dourada terminou. Os monstros dourados fugiram.');
+    }
+    if (!this.players.size) return;
+    if (!this.nextInvasion) { this.nextInvasion = now + 300000 + Math.random() * 600000; return; }
+    if (now < this.nextInvasion || this.invasionEnd) return;
+    this.nextInvasion = now + 1800000; this.invasionEnd = now + 600000;
+    const zones = this.map.zones.filter(z => !this.defs[z.mob].boss); if (!zones.length) return;
+    for (let i = 0; i < 8; i++) {
+      const z = zones[Math.floor(Math.random() * zones.length)], b = this.defs[z.mob], L = b.level, p = this.randomFree(z.cx, z.cy, z.r);
+      const box = L < 30 ? 'box_bronze' : L < 60 ? 'box_prata' : L < 120 ? 'box_ouro' : 'box_mitico', jewel = L < 40 ? 'jewel_aurora' : L < 90 ? 'jewel_destiny' : 'jewel_eclipse';
+      const def = { ...b, name: `${b.name} Dourado`, hp: b.hp * 4, xp: b.xp * 6, gold: [b.gold[0] * 8, b.gold[1] * 8] as [number, number], respawnMs: 1e12, drops: [...b.drops.map(([k, c]) => [k, Math.min(1, c * 3)] as [string, number]), [box, .6], [jewel, .8]] as [string, number][] };
+      const m: Mob = { eid: this.nextId++, def, x: p.x, y: p.y, hx: p.x, hy: p.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, curseUntil: 0, slowUntil: 0, hitBy: new Map(), golden: 1 };
+      this.mobs.set(m.eid, m);
+    }
+    for (const p of this.players.values()) this.sys(p, `⚜ INVASÃO DOURADA em ${this.map.name}! 8 monstros dourados apareceram por 10 minutos: muito mais XP, moedas, baús e joias.`);
+    for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/news', { method: 'POST', body: JSON.stringify({ m: `⚜ Invasão Dourada começou em ${this.map.name} (10 minutos)!` }) })).catch(() => null);
   }
   private questAccept(p: Player, npc: unknown, id: unknown) {
     if (!this.nearNpc(p, npc)) return; const q = quests()[String(id)]; if (!q) return;
@@ -683,7 +723,7 @@ export class MapRoom {
     if (m.hp <= 0) this.killMob(m, p);
   }
   private killMob(m: Mob, killer: Player) {
-    m.hp = 0; m.respawnAt = Date.now() + m.def.respawnMs; m.path = null; m.state = 'idle'; m.target = 0;
+    m.hp = 0; m.respawnAt = Date.now() + m.def.respawnMs; m.path = null; m.state = 'idle'; m.target = 0; if (m.golden) this.mobs.delete(m.eid); // dourado não volta
     this.fx.push({ k: 'die', x: m.x, y: m.y, id: m.eid });
     { const ks = this.stats(killer); if (ks.lifeK || ks.manaK) { killer.hp = Math.min(ks.maxHp, killer.hp + ks.maxHp * ks.lifeK); killer.mp = Math.min(ks.maxMp, killer.mp + ks.maxMp * ks.manaK); killer.meDirty = true; killer.dirty = true; } }
     let topChar = killer.charId, top = 0; for (const [c, d] of m.hitBy) if (d > top) { top = d; topChar = c; }
@@ -733,6 +773,7 @@ export class MapRoom {
     const now = Date.now(), dt = Math.min(.25, (now - this.last) / 1000); this.last = now;
     for (const p of this.players.values()) this.tickPlayer(p, dt, now);
     for (const m of this.mobs.values()) this.tickMob(m, dt, now);
+    this.tickInvasion(now);
     if (this.timed.length) { const due = this.timed.filter(t => t.at <= now); if (due.length) { this.timed = this.timed.filter(t => t.at > now); for (const t of due) t.run(); } }
     this.separateMobs();
     this.tickSummons(now, dt);
@@ -842,7 +883,7 @@ export class MapRoom {
       note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
       e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
-    for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => ({ id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }
+    for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => (m.golden ? { id: m.eid, k: 'm', mob: m.def.key, g: 1 } : { id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }
     for (const s of this.summons.values()) if (near(s)) { note(s.eid, () => ({ id: s.eid, k: 's', mob: s.pet })); e.push([s.eid, round(s.x), round(s.y), 100]); }
     for (const d of this.drops.values()) if (near(d)) { note(d.eid, () => ({ id: d.eid, k: 'd', key: d.key, rarity: d.rarity, gold: d.gold })); e.push([d.eid, d.x, d.y, 0]); }
     const gone: number[] = []; for (const id of p.known) if (!seen.has(id)) { p.known.delete(id); gone.push(id); }

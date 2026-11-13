@@ -603,6 +603,16 @@ Object.assign(NEW_MOBS, {
   chaosimp: tint(imp, 280, 1.2, 0), chaoshound: tint(hound, 300, 3, .1), chaoslord: tint(imp2, 290, 1.2, -.05), kaorth: (f: number) => skel(f, '#5a2a3a', { armor: '#8a1f3a', crown: true, sz: 2.4 }),
   voidseraph: (f: number) => winged(f, '#14102a', '#3a2a6a', { head: '#0a0814', halo: '#7a4aff' }), starbeast: tint(ogriffin, 220, 1.3, -.15), eternalarchon: (f: number) => winged(f, '#3a3a5a', '#c0c8ff', { halo: '#9fd8ff', sz: 1.3 }), nihilus: (f: number) => winged(f, '#0a0820', '#4a3a8a', { halo: '#ff4af0', sz: 2.2 }),
 });
+/** Versão dourada de um monstro (Invasão Dourada): troca as cores por tons de ouro conforme o brilho de cada pixel. */
+const goldCache = new Map<string, Cv[][]>();
+export function goldSprites(key: string): Cv[][] {
+  let s = goldCache.get(key); if (s) return s;
+  const gold = (src: Cv) => { const c = cv(src.width, src.height), g = ctx(c); g.drawImage(src, 0, 0); const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+    for (let i = 0; i < d.length; i += 4) { if (!d[i + 3]) continue; const l = (d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11) / 255; if (l < .1) continue;
+      const t = Math.min(1, l * 1.25), [r0, g0, b0] = t < .5 ? [90 + t * 2 * 150, 58 + t * 2 * 120, 8 + t * 2 * 30] : [240 + (t - .5) * 2 * 15, 178 + (t - .5) * 2 * 70, 38 + (t - .5) * 2 * 170]; d[i] = r0; d[i + 1] = g0; d[i + 2] = b0; }
+    g.putImageData(im, 0, 0); return c; };
+  s = mobSprites(key).map(fr => fr.map(gold)); goldCache.set(key, s); return s;
+}
 export function mobSprites(key: string): Cv[][] {
   let s = mobCache.get(key); if (s) return s;
   const f = key === 'wisp' ? wisp : key === 'shade' ? shadeMob : NEW_MOBS[key] ?? (key === 'imp' ? imp : key === 'hound' ? hound : key === 'magma' ? magma : key === 'wyrm' ? wyrm : key === 'ignarok' ? ignarok : key === 'slime' ? slime : key === 'wolf' ? wolf : key === 'golem' ? golem : boss);

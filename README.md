@@ -1,4 +1,4 @@
-# Eternal MU · versão 0.31
+# Eternal MU · versão 0.32
 
 MMORPG 2D em pixel art com servidor autoritativo em Cloudflare Workers, Durable Objects (um por mapa) e D1.
 
