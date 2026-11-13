@@ -222,6 +222,19 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
 .touch #chat{top:calc(196px + env(safe-area-inset-top));width:380px}.touch #log{font-size:12px;max-height:72px}
 .touch #stick{width:140px;height:140px;left:28px;bottom:36px}.touch #stick i{left:42px;top:42px;width:54px;height:54px}
 }
+
+/* missão e chefe */
+#qtrack{display:none;position:absolute;left:calc(8px + env(safe-area-inset-left));top:calc(100px + env(safe-area-inset-top));max-width:300px;padding:4px 10px;border-radius:999px;background:#151024d9;border:1px solid #8a6a32;color:#ece6d8;font-size:12px;font-weight:600;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#qtrack.done{border-color:#7dffb0;color:#7dffb0}
+.touch #qtrack{top:calc(212px + env(safe-area-inset-top));max-width:70vw;font-size:11px;padding:3px 8px}
+@media (orientation:landscape) and (max-height:500px){.touch #qtrack{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));left:calc(140px + env(safe-area-inset-left));max-width:calc(100vw - 420px)}}
+#bossbar{display:none;position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(440px,46vw);text-align:center;pointer-events:none;z-index:4}
+#bossbar b{display:block;color:#ffd76a;font-size:14px;text-shadow:0 2px 0 #000,0 0 10px #ff4a2a;letter-spacing:.5px}
+#bossbar div{height:12px;margin-top:3px;border:2px solid #c9a24f;border-radius:7px;background:#1a0a0e;overflow:hidden;box-shadow:0 4px 14px #000a}
+#bossbar i{display:block;height:100%;background:linear-gradient(180deg,#ff6a4a,#a01a1a);transition:width .2s}
+.touch #bossbar{top:calc(240px + env(safe-area-inset-top));width:min(320px,80vw)}.touch #bossbar b{font-size:12px}
+@media (orientation:landscape) and (max-height:500px){.touch #bossbar{top:calc(84px + env(safe-area-inset-top));width:min(300px,40vw)}}
+body.boss #tframe{display:none!important}
 </style>
 </head>
 <body>
@@ -255,6 +268,8 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
   <div class="win p" id="w-char"><h3>Personagem <button data-close>×</button></h3><div id="charp"></div></div>
   <div class="win p" id="w-map"><h3 id="mapt">Mapa <button data-close>×</button></h3><canvas id="bigmap" style="width:100%;image-rendering:pixelated;display:block"></canvas><h4 style="margin:10px 0 6px;color:var(--gold)">Viajar para</h4><div id="moves"></div></div>
   <div id="lootc" class="p"></div>
+  <div id="qtrack"></div>
+  <div id="bossbar"><b></b><div><i></i></div></div>
   <div class="win p" id="w-trade"><h3>Troca com <span id="tname"></span></h3>
     <div class="tcols"><div><b>Sua oferta</b> <small id="tstm"></small><div class="tgrid" id="tmine"></div><label>Moedas</label><input id="tgold" type="text" inputmode="numeric" value="0" autocomplete="off"></div>
     <div><b>Oferta dele</b> <small id="tstt"></small><div class="tgrid" id="ttheirs"></div><div id="ttg" class="info"></div></div></div>

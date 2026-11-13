@@ -48,6 +48,7 @@ function valoria() {
     { id: 'mestre', name: 'Mestre Ancião', x: 33.5, y: 23, shop: 'reset', line: 'Quem alcança o topo pode renascer ainda mais forte.', look: 6 },
     { id: 'bau', name: 'Baú', x: 27.5, y: 23, shop: 'chest', line: 'Seus itens ficam guardados aqui.', look: 0 },
     { id: 'armeira', name: 'Isaura, Armeira de Sets', x: 25.5, y: 15.5, shop: 'armeira', line: 'Armaduras de lenda, para quem pode pagar.', look: 4 },
+    { id: 'missoes', name: 'Capitã Lyra, Missões', x: 19.5, y: 22.5, shop: 'missoes', line: 'Tenho trabalho para quem sabe lutar. Recompensa garantida!', look: 3 },
     { id: 'guarda', name: 'Guarda Teodoro', x: 44.5, y: 17.5, line: 'O portal leva a Frostvale. Lá fora, os monstros não perdoam.', look: 3 });
   return m;
 }
@@ -69,6 +70,7 @@ function solmira() {
     { id: 'armeira', name: 'Samira, Armeira de Sets', x: 25.5, y: 14.5, shop: 'armeira', line: 'As armaduras mais raras do reino chegam aqui.', look: 4 },
     { id: 'bau', name: 'Baú', x: 22.5, y: 14.5, shop: 'chest', line: 'Seus itens ficam guardados aqui.', look: 0 },
     { id: 'mestre', name: 'Mestre Ancião', x: 28.5, y: 14.5, shop: 'reset', line: 'Quem alcança o topo pode renascer ainda mais forte.', look: 6 },
+    { id: 'missoes', name: 'Capitã Lyra, Missões', x: 33.5, y: 20.5, shop: 'missoes', line: 'Os mundos do norte estão cheios de trabalho.', look: 3 },
     { id: 'guarda', name: 'Guarda Nadir', x: 44.5, y: 17.5, line: 'Depois deste portal, só as dunas e o Rei das Areias.', look: 3 });
   return m;
 }

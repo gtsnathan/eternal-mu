@@ -1,4 +1,5 @@
 import { fmtRes, MR_RESETS, MR_GOLD, MR_POINTS, WTYPE_NAME, MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
+import { quests } from '../shared/quests';
 import { travelList, trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
 import { pressSprite, chestSprite, WING_ROOT, wingSprites, gfx, hdCtx, hdOf, noHd, tintFrame, archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
 
@@ -65,7 +66,7 @@ function showCreate(ed?: any) {
 
 // ---------- jogo ----------
 interface Ent { id: number; k: string; info: any; snaps: { t: number; x: number; y: number }[]; x: number; y: number; hp: number; dir: number; moving: boolean; anim: number; atkUntil: number; look?: Cv[][]; flash?: number; stepN?: number }
-interface Me { hp: number; mp: number; maxHp: number; maxMp: number; xp: number; xpNext: number; level: number; points: number; str: number; agi: number; vit: number; ene: number; atk: number; def: number; gold: number; dead: boolean; loot: number; lootMs: number; resets: number; mr: number; ml: number; mxp: number; mxpNext: number; mpts: number; mtree: Record<string, number> }
+interface Me { quest?: { id: string; have: number } | null; hp: number; mp: number; maxHp: number; maxMp: number; xp: number; xpNext: number; level: number; points: number; str: number; agi: number; vit: number; ene: number; atk: number; def: number; gold: number; dead: boolean; loot: number; lootMs: number; resets: number; mr: number; ml: number; mxp: number; mxpNext: number; mpts: number; mtree: Record<string, number> }
 const canvas = $<HTMLCanvasElement>('#game'), g = canvas.getContext('2d')!; hdCtx(g);
 let ws: WebSocket | null = null, charId = 0, running = false, you = 0, myName = '', map: GameMap | null = null, me: Me | null = null, items: ItemInst[] = [];
 let ents = new Map<number, Ent>(), target = 0, auto = false, autoLoot = false, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
@@ -88,7 +89,7 @@ function startGame(id: number) { charId = id; root.innerHTML = ''; menuOn = fals
 function over(s: string) { const o = $('#over'); o.textContent = s; o.style.display = s ? 'flex' : 'none'; }
 function connect(first = false) { if (!gfxInit) { gfxInit = true; applyGfx(); }
   clearTimeout(reconnectTimer); over(retries ? 'Reconectando…' : 'Entrando no mundo…');
-  ws?.close(); const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?char=${charId}${first === true ? '&login=1' : ''}`); ws = sock; let portal = false;
+  ws?.close(); const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?char=${charId}&v=2${first === true ? '&login=1' : ''}`); ws = sock; let portal = false;
   sock.onmessage = e => { const m = JSON.parse(e.data); if (m.t === 'portal') portal = true; else handle(m); };
   sock.onclose = async e => {
     if (ws !== sock || manualClose) return;
@@ -116,7 +117,7 @@ function handle(m: any) {
     case 'jc': for (const k of Object.keys(m.jc)) JEWELS[k].chance = m.jc[k]; break;
     case 'news': { log(`Aviso: ${m.m}`, 'sys'); const el = $('#toast'); el.textContent = m.m; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(520, 240, 'triangle', .05); break; }
     case 'pong': rtt = Math.round(performance.now() - m.c); setConn(true); break;
-    case 'me': { const lv = me?.level; me = m; updateHud(); if (lv !== undefined && lv !== m.level) beep(660, 400, 'triangle', .06); break; }
+    case 'me': { const lv = me?.level; me = m; updateHud(); updateQuest(); if (lv !== undefined && lv !== m.level) { beep(660, 400, 'triangle', .06); setTimeout(() => beep(880, 300, 'triangle', .05), 120); } if (shop?.shop === 'missoes') renderShop(); break; }
     case 'inv': chest = m.chest ?? []; items = m.items; updateHud(); renderInv(); drawPortrait(); if (shop) renderShop(); break;
     case 's': snapshot(m); break;
     case 'sys': log(m.m, 'sys'); break;
@@ -139,9 +140,11 @@ function snapshot(m: any) {
   for (const [id, x, y, hp] of m.e) {
     seen.add(id); const e = ents.get(id); if (!e) continue;
     if (!e.snaps.length || Math.hypot(e.x - x, e.y - y) > 6) { e.x = x; e.y = y; e.snaps = []; if (id === you) pred = null; }
+    else if (m.d) { const last = e.snaps[e.snaps.length - 1]; if (t - last.t > 120) e.snaps.push({ t: t - 50, x: last.x, y: last.y }); } // ficou parado: recomeça o movimento a partir de agora
     e.snaps.push({ t, x, y }); if (e.snaps.length > 8) e.snaps.shift(); e.hp = hp;
   }
-  for (const id of ents.keys()) if (!seen.has(id)) { ents.delete(id); if (id === target) target = 0; }
+  if (m.d) { for (const id of m.r ?? []) { ents.delete(id); if (id === target) target = 0; } } // modo econômico: só remove quem o servidor avisou
+  else for (const id of ents.keys()) if (!seen.has(id)) { ents.delete(id); if (id === target) target = 0; }
   for (const f of m.fx ?? []) effect(f);
 }
 function burst(x: number, y: number, n: number, c: string, sp = 3) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, v = sp * (.3 + Math.random()); parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1, life: 0, max: .35 + Math.random() * .35, c, s: 2 + (Math.random() * 3 | 0), g: 5 }); } }
@@ -160,7 +163,7 @@ function effect(f: any) {
     case 'spin': if (e) e.atkUntil = now + 300; rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: .35, c: '#ffe08a' }); burst(f.x, f.y, 26, '#ffd76a', 6); beep(320, 180, 'sawtooth', .04); break;
     case 'dash': for (let i = 0; i < 14; i++) { const u = i / 14; parts.push({ x: f.fx + (f.x - f.fx) * u, y: f.fy + (f.y - f.fy) * u, vx: 0, vy: 0, life: 0, max: .4, c: '#ffcf6a', s: 5 }); } beep(200, 160, 'sawtooth', .04); break;
     case 'die': if (e?.k === 'm') ghosts.push({ c: mobSprites(e.info.mob)[0][e.dir === 3 ? 1 : 0], x: f.x, y: f.y, t: 0 }); burst(f.x, f.y - .3, 26, '#d8f4ff', 5); beep(110, 260); break;
-    case 'lvl': for (let i = 0; i < 44; i++) parts.push({ x: f.x + (Math.random() - .5), y: f.y, vx: 0, vy: -3 - Math.random() * 3, life: 0, max: .9, c: '#ffe08a', s: 3 }); break;
+    case 'lvl': for (let i = 0; i < 70; i++) { const an = Math.random() * 6.283, r0 = Math.random() * .7; parts.push({ x: f.x + Math.cos(an) * r0, y: f.y + Math.sin(an) * r0 * .5, vx: Math.cos(an) * .6, vy: -3 - Math.random() * 4, life: 0, max: 1.1, c: i % 3 ? '#ffe08a' : '#ffffff', s: i % 4 ? 3 : 5 }); } rings.push({ x: f.x, y: f.y, r: 2.6, t: 0, max: .9, c: '#ffd76a' }, { x: f.x, y: f.y, r: 1.6, t: 0, max: .6, c: '#fff2b0' }); if (f.id === you) texts.push({ x: f.x, y: f.y - 1.6, s: 'LEVEL UP!', c: '#ffd76a', t: 0, big: true }); break;
     case 'spirits': { if (e) e.atkUntil = now + 300; rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: f.d / 1000, c: f.b }); beep(140, 700, 'triangle', .05);
       const N = Math.round(f.d / 45); for (let k = 0; k < N; k++) setTimeout(() => { if (!running) return; const c = ents.get(f.id) ?? f, u = k / N;
         for (let i = 0; i < 5; i++) { const an = u * 14 + i * 1.2566, R = f.r * (.3 + .7 * Math.abs(Math.sin(u * 6.28 + i))); parts.push({ x: c.x + Math.cos(an) * R, y: c.y + Math.sin(an) * R * .75, vx: -Math.sin(an) * 2.5, vy: Math.cos(an) * 1.8 - .8, life: 0, max: .4, c: i % 2 ? f.b : '#eefaff', s: i % 2 ? 4 : 3 }); } }, k * 45); break; }
@@ -239,7 +242,7 @@ function renderChar() {
 }
 const setBonus = (k: string, n: number) => { const b = SETS[k].bonus, o: string[] = []; if (n >= 2) o.push(`+${b.def} def`); if (n >= 3) o.push(`+${b.hp} vida`); if (n >= 4) o.push(`+${Math.round(b.atk * 100)}% atq`); return o.join(' · ') || 'sem bônus'; };
 /** Lojas onde dá para vender (as que mostram "Vender da bolsa"). */
-const canSellHere = () => !!shop && !['reset', 'chest', 'press', 'wings'].includes(shop.shop!) && $('#w-shop').style.display === 'block';
+const canSellHere = () => !!shop && !['reset', 'chest', 'press', 'wings', 'missoes'].includes(shop.shop!) && $('#w-shop').style.display === 'block';
 /** Vende a pilha inteira, com confirmação. */
 function sellAll(i: ItemInst) {
   if (!canSellHere()) return log('Abra uma loja (fale com um vendedor) para vender.', 'sys');
@@ -262,11 +265,40 @@ function dragToSell(e: PointerEvent, i: ItemInst, cel: HTMLElement) {
   };
   addEventListener('pointermove', move, { passive: false }); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
+/** Rastreador da missão no canto da tela. */
+function updateQuest() {
+  const el = $('#qtrack'), q = me?.quest ? quests()[me.quest.id] : null; if (!q) { el.style.display = 'none'; return; }
+  const have = Math.min(me!.quest!.have, q.need), done = have >= q.need; el.style.display = 'block'; el.classList.toggle('done', done);
+  el.textContent = done ? `✔ ${q.name}: volte à Capitã Lyra` : `📜 ${q.name}: ${have}/${q.need}`;
+}
+/** Barra grande de vida do chefe mais próximo (estilo MU). */
+let bossShown = 0;
+function updateBoss(a: Ent) {
+  let best: Ent | null = null, bd = 16; for (const e of ents.values()) if (e.k === 'm' && e.info?.mob && MOBS[e.info.mob]?.boss) { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; best = e; } }
+  const bar = $('#bossbar'); if (!best) { if (bossShown) { bar.style.display = 'none'; document.body.classList.remove('boss'); bossShown = 0; } return; }
+  if (bossShown !== best.id) { bossShown = best.id; bar.style.display = 'block'; document.body.classList.add('boss'); bar.querySelector('b')!.textContent = `${MOBS[best.info.mob].name} · Nv ${MOBS[best.info.mob].level}`; beep(110, 700, 'sawtooth', .04); }
+  bar.querySelector<HTMLElement>('i')!.style.width = `${best.hp ?? 100}%`;
+}
 function renderShop() {
   if (!shop || !me) return; const sk = `${you}|${shop.id}|${me.level}|${me.gold}|${JSON.stringify(items)}|${JSON.stringify(chest)}`; if (sk === shopKey) return; shopKey = sk; $('#shopt').textContent = shop.name; const L = $('#shopl'), npc = shop; L.replaceChildren();
   if (npc.shop === 'reset') {
     const info = document.createElement('div'); info.className = 'info'; info.textContent = `O Reset volta o personagem ao nível 1 e zera os atributos, mas concede pontos extras permanentes a cada Reset. Itens, moedas e Master Level continuam. Depois do primeiro Reset, ao chegar no nível máximo a XP passa a subir o Master Level.`; const st = document.createElement('div'); st.className = 'stat'; st.innerHTML = `<span>Resets: ${me.resets}${me.mr ? ` · Master Resets: ${me.mr}` : ''}</span><span>Nível atual: ${me.level}</span>`; const b = document.createElement('button'); b.className = 'main'; b.style.width = '100%'; b.textContent = 'Fazer Reset'; b.onclick = () => { if (confirm('Fazer Reset agora? Seu personagem volta ao nível 1.')) send({ t: 'rs' }); };
     const mi = document.createElement('div'); mi.className = 'info'; mi.style.marginTop = '14px'; const mcost = MR_GOLD * ((me.mr ?? 0) + 1); mi.innerHTML = `<b style="color:var(--gold)">Master Reset</b><br>Com <b>${MR_RESETS} Resets</b> e no nível de Reset, você zera os Resets, volta ao nível 1 e ganha <b>${MR_POINTS.toLocaleString('pt-BR')} pontos permanentes</b> por Master Reset (somados em todos os Resets seguintes). Master Level, itens e moedas restantes continuam. Custo: ${mcost.toLocaleString('pt-BR')} moedas.`; const mb = document.createElement('button'); mb.className = 'main'; mb.style.width = '100%'; mb.textContent = me.resets >= MR_RESETS ? `Fazer Master Reset ${(me.mr ?? 0) + 1}` : `Master Reset (faltam ${MR_RESETS - me.resets} Resets)`; mb.disabled = me.resets < MR_RESETS; mb.onclick = () => { if (confirm('Fazer Master Reset agora? Seus Resets voltam a 0 e o personagem volta ao nível 1.')) send({ t: 'mrs' }); }; L.append(info, st, b, mi, mb); return;
+  }
+  if (npc.shop === 'missoes') { // Capitã Lyra: missão atual + lista das que combinam com o nível
+    const Q = quests(), cur = me.quest ? Q[me.quest.id] : null, row = (html: string) => { const d = document.createElement('div'); d.className = 'info'; d.innerHTML = html; return d; };
+    const rw = (q: typeof Q[string]) => `${q.xp.toLocaleString('pt-BR')} XP · ${q.gold.toLocaleString('pt-BR')} moedas · ${q.items.map(([k, n]) => `${n > 1 ? n + 'x ' : ''}${ITEMS[k].name}`).join(', ')}`;
+    if (cur) {
+      const have = Math.min(me.quest!.have, cur.need), done = have >= cur.need;
+      L.append(row(`<b style="color:var(--gold)">Missão atual</b><br>${esc(cur.name)} · ${esc(cur.map)}<div style="height:8px;background:#1a1426;border-radius:4px;margin:6px 0;overflow:hidden"><div style="height:100%;width:${have / cur.need * 100}%;background:${done ? '#7dffb0' : 'var(--gold)'}"></div></div>${have}/${cur.need} · Recompensa: ${rw(cur)}`));
+      const b = document.createElement('button'); b.className = 'main'; b.style.width = '100%'; b.textContent = done ? 'Entregar missão' : `Faltam ${cur.need - have}`; b.disabled = !done; b.onclick = () => send({ t: 'qd', npc: npc.id });
+      const x = document.createElement('button'); x.style.cssText = 'width:100%;margin-top:6px'; x.textContent = 'Abandonar missão'; x.onclick = () => { if (confirm('Abandonar a missão atual? O progresso será perdido.')) send({ t: 'qx' }); };
+      L.append(b, x); return;
+    }
+    L.append(row('Aceite <b>uma missão por vez</b>. Os abates do seu grupo por perto também contam. Volte aqui para receber a recompensa. As missões podem ser repetidas.'));
+    const lv = me.level + (me.resets || me.mr ? 400 : 0), list = Object.values(Q).filter(q => q.lvl <= lv).sort((a, b) => b.lvl - a.lvl).slice(0, 14);
+    for (const q of list) { const r = document.createElement('div'); r.className = 'shopitem'; const t = document.createElement('div'); t.innerHTML = `<b>${esc(q.name)}</b>${q.boss ? ' <span style="color:#ff9d3c">★ Chefe</span>' : ''}<br><small>${esc(q.map)} · nível ${q.lvl}+ · ${rw(q)}</small>`; t.style.flex = '1'; const b = document.createElement('button'); b.textContent = 'Aceitar'; b.onclick = () => send({ t: 'qa', npc: npc.id, id: q.id }); r.append(t, b); L.append(r); }
+    return;
   }
   if (npc.shop === 'press') {
     const count = (k: string) => items.filter(i => i.key === k && !i.equip).reduce((a, i) => a + i.qty, 0);
@@ -480,6 +512,7 @@ function frame(ts: number) {
     if (pendingNpc && Math.hypot(a.x - pendingNpc.x, a.y - pendingNpc.y) < 2.6) { const n = pendingNpc; pendingNpc = null; log(`${n.name}: ${n.line}`, 'sys'); if (n.shop) { shop = n; renderShop(); openW('shop'); } }
     if (shop && Math.hypot(a.x - shop.x, a.y - shop.y) > 3.8) closeWin('shop');
     if (target && !ents.has(target)) target = 0;
+    updateBoss(a);
     if ((auto || autoLoot) && ts > autoAt && me && !me.dead && !map.safe) { autoAt = ts + 280; autoPlay(a, ts); }
   }
   const W = canvas.width, H = canvas.height, vw = W / Z, vh = H / Z;

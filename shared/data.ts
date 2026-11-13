@@ -246,9 +246,10 @@ export const MOBS: Record<string, MobDef> = {
 const lerpT = (L: number, t: [number, number][]) => { for (let i = 1; i < t.length; i++) if (L <= t[i][0]) { const [a, va] = t[i - 1], [b, vb] = t[i]; return va + (vb - va) * (L - a) / (b - a); } return t[t.length - 1][1]; };
 const TOP_SETS = ['titan', 'oracle', 'unicorn', 'basilisk', 'lich'];
 function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?: number; bolt?: string; nova?: string } = {}): MobDef {
-  const b = !!o.boss, hp = Math.round(170000 * (L / 92) ** 1.5 * (b ? 6 : 1) / 1000) * 1000;
-  const dmg = Math.round(lerpT(L, [[120, 1180], [150, 1240], [180, 1735], [220, 2310], [260, 2510], [300, 2820], [340, 3420], [380, 3920], [400, 4200]]) * (b ? 1.5 : 1));
-  const def = Math.round(lerpT(L, [[120, 430], [150, 500], [180, 800], [220, 1050], [260, 1200], [300, 1350], [340, 1700], [380, 2100], [400, 2300]]) * (b ? 1.2 : 1));
+  // recalibrado para quem usa o equipamento do próprio mundo (armas/sets de alto nível): ~3x mais forte que o de nível 110
+  const b = !!o.boss, hp = Math.round(lerpT(L, [[120, 300000], [150, 407000], [180, 550000], [210, 693000], [240, 900000], [270, 1100000], [300, 1375000], [340, 1700000], [380, 1930000], [400, 2050000]]) * (b ? 6 : 1) / 1000) * 1000;
+  const dmg = Math.round(lerpT(L, [[120, 1810], [150, 2006], [180, 2660], [210, 2940], [240, 3620], [270, 3995], [300, 4678], [340, 5240], [380, 5585], [400, 5800]]) * (b ? 1.5 : 1));
+  const def = Math.round(lerpT(L, [[120, 675], [150, 925], [180, 1250], [210, 1575], [240, 2050], [270, 2500], [300, 3125], [340, 3875], [380, 4375], [400, 4600]]) * (b ? 1.2 : 1));
   // arma/acessório do nível do mundo (e o anterior); set do nível mais alto que o monstro alcança
   const wt = HI_TIERS.filter(t => t <= L).pop() ?? 110, wp = HI_TIERS[HI_TIERS.indexOf(wt) - 1] ?? 110, st = [120, 180, 240, 300].filter(t => t <= L).pop(), sets = st ? Object.values(SETS).filter(s => s.lvl === st).map(s => s.key) : TOP_SETS;
   const drops: [string, number][] = b ? [...wep(wt, .5), ...wep(wp, .6), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...sets.flatMap(s => setDrops(s, .2)), ['box_mitico', L >= 200 ? .5 : .25]]
