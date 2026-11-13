@@ -1,7 +1,8 @@
 // Versão do jogo mostrada no site e no jogo. Ao lançar uma atualização: troque VERSION (e o package.json) e coloque um item novo no topo de CHANGELOG.
-export const VERSION = '0.34.0';
+export const VERSION = '0.35.0';
 export interface Release { v: string; date: string; title: string; items: string[] }
 export const CHANGELOG: Release[] = [
+  { v: '0.35.0', date: '13/11/2026', title: 'Chefe Mundial', items: ['A cada 2 horas um chefe desperta num mundo de caça, em rodízio por todos os 14 mundos', 'Desperto: 10x mais vida, maior, com aura vermelha, e fica 20 minutos', 'Recompensa para todos que ajudarem, pelo dano causado: XP, moedas, baús, joias e materiais de asa', 'Ranking de dano ao vivo na tela e aviso 5 minutos antes em todos os mapas', 'Agenda dos próximos chefes no site'] },
   { v: '0.34.0', date: '13/11/2026', title: 'Asas de mundo alto', items: ['3 novos níveis de asas para cada classe: Imperiais (150), Divinas (240) e Eternas (330)', 'Novos materiais: Pena do Caos e Cristal do Vazio, que caem nos 8 mundos novos', 'Asas altas brilham, deixam rastro de luz e soltam mais partículas', 'Ícones das asas mostram o nível com uma joia colorida'] },
   { v: '0.33.1', date: '13/11/2026', title: 'Versão no site', items: ['A versão atual aparece no site e no jogo.', 'Nova seção de Atualizações para acompanhar o desenvolvimento.'] },
   { v: '0.33.0', date: '13/11/2026', title: 'Duelo entre jogadores', items: ['Desafie outro jogador para um duelo de até 2 minutos, inclusive na cidade.', 'Ninguém morre nem perde nada, e o mapa inteiro fica sabendo quem venceu.'] },

@@ -1,3 +1,4 @@
+import { upcomingBosses, WB_NAMES, WB_LIFE } from '../shared/events';
 import { VERSION, CHANGELOG } from '../shared/version';
 import { fmtRes, CLASSES, HAIR_COLORS, ITEMS, MOBS, SETS, WING_THEME } from '../shared/data';
 import { FRAME_H, FRAME_W, hdOf, heroSprites, lookFromGear, wingSprites, WING_ROOT } from './art';
@@ -42,6 +43,11 @@ function classes() {
 
 // ---------- ranking e situação ----------
 /** Lista de quem está jogando agora, agrupada por mapa/cidade. */
+function drawBosses() {
+  const box = document.getElementById('wboss'); if (!box) return; const now = Date.now();
+  const t = (ms: number) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), d = (ms: number) => new Date(ms).toDateString() === new Date().toDateString() ? 'hoje' : 'amanhã';
+  box.innerHTML = '<h3>☠ Chefe Mundial</h3>' + upcomingBosses(now, 4).map(b => { const [n, l] = WB_NAMES[b.map]; return `<div class="st"><span>${n}<small>a partir do nível ${l}</small></span><b${b.live ? ' class="live"' : ''}>${b.live ? `AGORA · ${Math.max(1, Math.ceil((b.start + WB_LIFE - now) / 60000))} min` : `${d(b.start)} ${t(b.start)}`}</b></div>`; }).join('') + '<p>A cada 2 horas um chefe desperta. Todo mundo que ajudar ganha XP, moedas, baús e joias conforme o dano causado.</p>';
+}
 function drawOnline(list: { name: string; cls: string; level: number; resets: number; mr: number; map: string }[]) {
   const u = $('#onl'); u.replaceChildren(); if (!list.length) { u.append(el('li', '', 'Ninguém online agora.')); return; }
   const by = new Map<string, typeof list>(); for (const p of list) by.set(p.map, [...(by.get(p.map) ?? []), p]);
@@ -67,7 +73,7 @@ function drawUpdates(all = false) {
   }
   if (CHANGELOG.length > 4) { const b = el('button', '', all ? 'Mostrar menos' : `Ver todas as ${CHANGELOG.length} atualizações`); b.onclick = () => drawUpdates(!all); box.append(b); }
 }
-drawUpdates();
+drawUpdates(); drawBosses(); setInterval(drawBosses, 30000);
 async function loadPublic() {
   try { const s = await api('status'); $('#online').textContent = fmt(s.online); $('#accs').textContent = fmt(s.accounts); $('#chars').textContent = fmt(s.characters); $('#rx').textContent = `x${s.xp}`; $('#rd').textContent = `x${s.drop}`; $('#rg').textContent = `x${s.gold}`; $('#rr').textContent = s.resetLevel; document.querySelectorAll('.v-rl').forEach(e => e.textContent = s.resetLevel); document.querySelectorAll('.v-rg').forEach(e => e.textContent = fmt(s.resetGold)); document.querySelectorAll('.v-rp').forEach(e => e.textContent = fmt(s.resetPoints)); } catch { $('#online').textContent = '—'; }
   try { ranking = (await api('ranking')).ranking; drawRank(); } catch { /* sem conexão */ }

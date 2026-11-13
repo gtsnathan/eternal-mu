@@ -170,7 +170,7 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
 .touch #lootc{top:calc(92px + env(safe-area-inset-top));bottom:auto;left:calc(8px + env(safe-area-inset-left));transform:none;font-size:11px;padding:2px 8px;border-radius:999px}
 .touch #tframe{top:calc(214px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(220px,50vw);font-size:11px}
 .touch #party{top:calc(214px + env(safe-area-inset-top));width:140px}
-.touch #toast{top:auto;bottom:calc(300px + env(safe-area-inset-bottom));font-size:12px}
+.touch #toast{top:auto;bottom:calc(300px + env(safe-area-inset-bottom));font-size:12px;white-space:normal;width:max-content;max-width:88vw;text-align:center;border-radius:14px}
 .touch #atk{position:absolute;right:8px;bottom:8px;width:74px;height:74px;border-radius:50%}
 .touch #bar [data-sk="1"]{position:absolute;right:117px;bottom:19px;width:52px;height:52px;border-radius:50%}
 .touch #bar [data-sk="2"]{position:absolute;right:104px;bottom:68px;width:52px;height:52px;border-radius:50%}
@@ -232,6 +232,7 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
 #bossbar{display:none;position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(440px,46vw);text-align:center;pointer-events:none;z-index:4}
 #bossbar b{display:block;color:#ffd76a;font-size:14px;text-shadow:0 2px 0 #000,0 0 10px #ff4a2a;letter-spacing:.5px}
 #bossbar div{height:12px;margin-top:3px;border:2px solid #c9a24f;border-radius:7px;background:#1a0a0e;overflow:hidden;box-shadow:0 4px 14px #000a}
+#wbrank{display:none;position:absolute;right:12px;top:calc(170px + env(safe-area-inset-top));width:190px;padding:7px 9px;border-radius:9px;background:#140a0ecc;border:1px solid #7a2a22;color:#f3e6d6;font-size:12px;pointer-events:none;z-index:4}#wbrank b{display:block;color:#ff8a6a;margin-bottom:3px;font-size:12px}#wbrank div{display:flex;justify-content:space-between;gap:6px}#wbrank span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#wbrank .me{color:#ffd76a;border-top:1px solid #5a2a22;margin-top:2px;padding-top:2px}.touch #wbrank{top:auto;bottom:calc(150px + env(safe-area-inset-bottom));left:8px;right:auto;width:150px;font-size:11px}
 #bossbar i{display:block;height:100%;background:linear-gradient(180deg,#ff6a4a,#a01a1a);transition:width .2s}
 .touch #bossbar{top:calc(240px + env(safe-area-inset-top));width:min(320px,80vw)}.touch #bossbar b{font-size:12px}
 @media (orientation:landscape) and (max-height:500px){.touch #bossbar{top:calc(84px + env(safe-area-inset-top));width:min(300px,40vw)}}
@@ -274,6 +275,7 @@ body.boss #tframe{display:none!important}
   <div id="lootc" class="p"></div>
   <div id="qtrack"></div>
   <div id="bossbar"><b></b><div><i></i></div></div>
+  <div id="wbrank"></div>
   <div class="win p" id="w-trade"><h3>Troca com <span id="tname"></span></h3>
     <div class="tcols"><div><b>Sua oferta</b> <small id="tstm"></small><div class="tgrid" id="tmine"></div><label>Moedas</label><input id="tgold" type="text" inputmode="numeric" value="0" autocomplete="off"></div>
     <div><b>Oferta dele</b> <small id="tstt"></small><div class="tgrid" id="ttheirs"></div><div id="ttg" class="info"></div></div></div>

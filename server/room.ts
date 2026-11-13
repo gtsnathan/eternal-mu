@@ -1,5 +1,6 @@
 import { masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
+import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG } from '../shared/events';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
@@ -13,7 +14,7 @@ interface Player extends Pt {
   nextMove?: number; budget: number; lastChat: number; nextTrap: number; nextRegen: number; gone: boolean; lastInvFull: number;
 }
 interface Trade { peer: Player; ids: Set<string>; gold: number; st: number }
-interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number>; golden?: number }
+interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number>; golden?: number; wb?: number }
 interface Summon extends Pt { eid: number; owner: Player; pet: string; atk: number; expires: number; nextAtk: number }
 interface Drop extends Pt { eid: number; key: string | null; gold: number; rarity: number; opts: string[]; owner: number; party: number; ownUntil: number; expires: number }
 
@@ -50,6 +51,8 @@ export class MapRoom {
   private timed: { at: number; run: () => void }[] = []; private saveWarnAt = 0;
   /** Invasão Dourada: a cada 30 min (a primeira entre 5 e 15 min depois que alguém entra no mapa), 8 monstros dourados por 10 min. */
   private nextInvasion = 0; private invasionEnd = 0;
+  /** Chefe Mundial: agenda pelo relógio (shared/events.ts). wbSlot = janela já tratada nesta sala. */
+  private wbSlot = -1; private wbWarned = -1; private wbStarted = -1; private wbMob: Mob | null = null; private wbEnd = 0; private wbRankAt = 0;
   /** Agenda algo para alguns ticks depois (golpes em sequência das habilidades). */
   private later(at: number, run: () => void) { this.timed.push({ at, run }); }
 
@@ -394,6 +397,58 @@ export class MapRoom {
     }
     for (const p of this.players.values()) this.sys(p, `⚜ INVASÃO DOURADA em ${this.map.name}! 8 monstros dourados apareceram por 10 minutos: muito mais XP, moedas, baús e joias.`);
     for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/news', { method: 'POST', body: JSON.stringify({ m: `⚜ Invasão Dourada começou em ${this.map.name} (10 minutos)!` }) })).catch(() => null);
+  }
+  // ---------- Chefe Mundial ----------
+  private allSys(t: string) { for (const p of this.players.values()) this.sys(p, t); }
+  private tickWorldBoss(now: number) {
+    if (this.wbMob) {
+      const m = this.wbMob;
+      if (!this.mobs.has(m.eid)) { this.wbMob = null; return; }
+      if (now > this.wbEnd) { this.mobs.delete(m.eid); this.wbMob = null; this.allSys(`☠ ${m.def.name} voltou ao sono. Ninguém conseguiu derrotá-lo a tempo.`); this.send_all(JSON.stringify({ t: 'wbr', top: [] })); return; }
+      if (now >= this.wbRankAt) { this.wbRankAt = now + 2000; this.sendWbRank(m); }
+      return;
+    }
+    const ev = worldBoss(now), nx = worldBoss(now, true), name = getMap(ev.map).name;
+    if (nx.start - now <= WB_WARN && nx.start > now && this.wbWarned !== nx.slot) { this.wbWarned = nx.slot; this.allSys(`☠ Em ${Math.ceil((nx.start - now) / 60000)} min o Chefe Mundial desperta em ${getMap(nx.map).name}!`); }
+    if (now < ev.start || now >= ev.start + WB_LIFE || this.wbSlot === ev.slot) return;
+    this.wbSlot = ev.slot;
+    if (ev.map !== this.mapId) { if (now - ev.start < 60000) this.allSys(`☠ O CHEFE MUNDIAL despertou em ${name}! Todos que ajudarem ganham recompensas pelo dano causado (20 min).`); return; }
+    if (this.wbStarted === ev.slot) return; this.wbStarted = ev.slot;
+    const z = this.map.zones.find(q => this.defs[q.mob].boss); if (!z) return;
+    const b = this.defs[z.mob], at = this.randomFree(z.cx, z.cy, Math.max(2, z.r));
+    const def = { ...b, name: `${b.name} Desperto`, hp: b.hp * WB_HP, dmg: Math.round(b.dmg * WB_DMG), respawnMs: 1e12, detect: b.detect + 4, leash: b.leash + 10 };
+    const m: Mob = { eid: this.nextId++, def, x: at.x, y: at.y, hx: at.x, hy: at.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, curseUntil: 0, slowUntil: 0, hitBy: new Map(), wb: 1 };
+    // o chefe normal do mapa dá lugar ao desperto
+    for (const o of this.mobs.values()) if (o.def.key === b.key && !o.wb && o.hp > 0) { o.hp = 0; o.respawnAt = ev.start + WB_LIFE + 60000; }
+    this.mobs.set(m.eid, m); this.wbMob = m; this.wbEnd = ev.start + WB_LIFE; this.wbRankAt = 0;
+    this.allSys(`☠ ${def.name} DESPERTOU aqui em ${name} (perto de ${Math.round(at.x)},${Math.round(at.y)})! Cada golpe conta: recompensa para todos pelo dano causado.`);
+  }
+  private wbRanking(m: Mob) {
+    const total = [...m.hitBy.values()].reduce((a, d) => a + d, 0) || 1;
+    return { total, list: [...m.hitBy.entries()].sort((a, b) => b[1] - a[1]).map(([c, d]) => ({ c, d, share: d / total })) };
+  }
+  private sendWbRank(m: Mob) {
+    const { list } = this.wbRanking(m), name = (c: number) => this.byChar.get(c)?.name ?? '—';
+    const top = list.slice(0, 5).map(r => [name(r.c), Math.round(r.share * 1000) / 10]);
+    for (const p of this.players.values()) { const i = list.findIndex(r => r.c === p.charId); this.send(p, { t: 'wbr', top, me: i < 0 ? null : [i + 1, Math.round(list[i].share * 1000) / 10] }); }
+  }
+  private worldBossRewards(m: Mob) {
+    const { list } = this.wbRanking(m), b = this.defs[m.def.key] ?? m.def, L = b.level, now = Date.now();
+    const box = L < 30 ? 'box_bronze' : L < 60 ? 'box_prata' : L < 86 ? 'box_ouro' : L < 120 ? 'box_rei' : 'box_mitico', jewel = L < 40 ? 'jewel_aurora' : L < 90 ? 'jewel_destiny' : 'jewel_eclipse';
+    const lines: string[] = [];
+    list.forEach((r, i) => {
+      const p = this.byChar.get(r.c); if (!p || p.gone || r.share < .005) return;
+      const xp = Math.floor(xpToNext(Math.min(p.level, CONFIG.maxLevel - 1)) * (.4 + Math.min(1.6, r.share * 4))), gold = Math.floor(b.gold[1] * (1 + r.share * 10) * (this.cfg.gold || 1));
+      this.addXp(p, xp); p.gold += gold; p.logs.push(['wboss_gold', null, m.def.key, 0, gold, now]);
+      const prizes: [string, number][] = i === 0 ? [[box, 3], [jewel, 5]] : i < 3 ? [[box, 2], [jewel, 3]] : i < 10 ? [[box, 1], [jewel, 1]] : [[box, 1]];
+      if (L >= 120) prizes.push(['chaos_feather', i === 0 ? 3 : 1]); if (L >= 210 && i < 3) prizes.push(['void_crystal', 1]);
+      const got = [`${xp.toLocaleString('pt-BR')} XP`, `${gold.toLocaleString('pt-BR')} moedas`];
+      for (const [k, q] of prizes) if (this.give(p, k, q, 0, 'wboss')) got.push(`${q > 1 ? q + 'x ' : ''}${ITEMS[k].name}`); else got.push(`(sem espaço para ${ITEMS[k].name})`);
+      p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
+      this.sys(p, `☠ Recompensa do Chefe Mundial (${i + 1}º, ${(r.share * 100).toFixed(1)}% do dano): ${got.join(', ')}.`);
+      if (i < 3) lines.push(`${i + 1}º ${p.name} (${(r.share * 100).toFixed(1)}%)`);
+    });
+    this.allSys(`☠ ${m.def.name} foi derrotado! ${lines.join(' · ')}`); this.wbMob = null; this.send_all(JSON.stringify({ t: 'wbr', top: [] }));
   }
   // ---------- Duelo: os dois aceitam, 2 minutos, ninguém morre de verdade (o perdedor fica com 1 de vida) ----------
   private duelFoe(p: Player, id: unknown) { if (!p.duel || p.duel.with !== id) return null; const o = this.players.get(id as number); return o && o.duel?.with === p.eid && !o.gone ? o : null; }
@@ -763,9 +818,10 @@ export class MapRoom {
     if (m.hp <= 0) this.killMob(m, p);
   }
   private killMob(m: Mob, killer: Player) {
-    m.hp = 0; m.respawnAt = Date.now() + m.def.respawnMs; m.path = null; m.state = 'idle'; m.target = 0; if (m.golden) this.mobs.delete(m.eid); // dourado não volta
+    m.hp = 0; m.respawnAt = Date.now() + m.def.respawnMs; m.path = null; m.state = 'idle'; m.target = 0; if (m.golden || m.wb) this.mobs.delete(m.eid); // dourado e chefe mundial não voltam
     this.fx.push({ k: 'die', x: m.x, y: m.y, id: m.eid });
     { const ks = this.stats(killer); if (ks.lifeK || ks.manaK) { killer.hp = Math.min(ks.maxHp, killer.hp + ks.maxHp * ks.lifeK); killer.mp = Math.min(ks.maxMp, killer.mp + ks.maxMp * ks.manaK); killer.meDirty = true; killer.dirty = true; } }
+    if (m.wb) this.worldBossRewards(m);
     let topChar = killer.charId, top = 0; for (const [c, d] of m.hitBy) if (d > top) { top = d; topChar = c; }
     const owner = this.byChar.get(topChar) ?? killer; m.hitBy.clear();
     this.shareXp(owner, m.def.xp, m); this.questKill(m, owner);
@@ -773,7 +829,7 @@ export class MapRoom {
     const drop = (key: string | null, gold: number, rarity: number, opts: string[] = []) => { const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, opts, owner: owner.charId, party: owner.partyId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
     drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
     for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), lm = (1 + Math.max(0, m.def.level - 100) / 100) * (m.def.boss ? 2 : 1), anc = gear && k !== 'wings' && Math.random() < .003 * lm * this.cfg.exc, exc = gear && k !== 'wings' && Math.random() < .03 * lm * this.cfg.exc; if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 * lm ? 2 : Math.random() < Math.min(.6, .3 * lm) ? 1 : 0; drop(key, 0, r); }
-    if (m.def.boss) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
+    if (m.def.boss && !m.wb) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {
     const gain = Math.floor(xp * (1 + p.streak * .05)); p.xp += gain; p.dirty = true; p.meDirty = true; this.send(p, { t: 'xpg', v: gain });
@@ -813,7 +869,7 @@ export class MapRoom {
     const now = Date.now(), dt = Math.min(.25, (now - this.last) / 1000); this.last = now;
     for (const p of this.players.values()) this.tickPlayer(p, dt, now);
     for (const m of this.mobs.values()) this.tickMob(m, dt, now);
-    this.tickInvasion(now); this.tickDuels(now);
+    this.tickInvasion(now); this.tickWorldBoss(now); this.tickDuels(now);
     if (this.timed.length) { const due = this.timed.filter(t => t.at <= now); if (due.length) { this.timed = this.timed.filter(t => t.at > now); for (const t of due) t.run(); } }
     this.separateMobs();
     this.tickSummons(now, dt);
@@ -890,7 +946,7 @@ export class MapRoom {
     if (m.state === 'back') {
       if (now >= m.nextThink) { m.nextThink = now + 500; m.path = findPath(this.map, m.x, m.y, m.hx, m.hy, 800); }
       this.follow(m, def.speed * 1.8 * dt);
-      if (Math.hypot(m.x - m.hx, m.y - m.hy) < 1 || !m.path) { m.state = 'idle'; m.hp = def.hp; m.phase = 1; m.hitBy.clear(); }
+      if (Math.hypot(m.x - m.hx, m.y - m.hy) < 1 || !m.path) { m.state = 'idle'; if (!m.wb) { m.hp = def.hp; m.phase = 1; m.hitBy.clear(); } }
       return;
     }
     if (m.state === 'idle') {
@@ -928,7 +984,7 @@ export class MapRoom {
       note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; return { id: o.eid, k: 'p', name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
       e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
-    for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => (m.golden ? { id: m.eid, k: 'm', mob: m.def.key, g: 1 } : { id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }
+    for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => (m.wb ? { id: m.eid, k: 'm', mob: m.def.key, wb: 1 } : m.golden ? { id: m.eid, k: 'm', mob: m.def.key, g: 1 } : { id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }
     for (const s of this.summons.values()) if (near(s)) { note(s.eid, () => ({ id: s.eid, k: 's', mob: s.pet })); e.push([s.eid, round(s.x), round(s.y), 100]); }
     for (const d of this.drops.values()) if (near(d)) { note(d.eid, () => ({ id: d.eid, k: 'd', key: d.key, rarity: d.rarity, gold: d.gold })); e.push([d.eid, d.x, d.y, 0]); }
     const gone: number[] = []; for (const id of p.known) if (!seen.has(id)) { p.known.delete(id); gone.push(id); }
