@@ -3,12 +3,13 @@ export const CONFIG = {
   tickMs: 50, testCommands: true, aoiRadius: 22, pointsPerLevel: 5, maxLevel: 400, playerSpeed: 5,
   attackRange: 1.7, invSize: 45, startGold: 100, saveEveryMs: 60000, dropOwnMs: 5000, dropLifeMs: 10000,
 };
-export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings' | 'ring' | 'amulet';
-export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings', 'ring', 'amulet'];
-export const SLOT_NAMES: Record<Slot, string> = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', pants: 'Calças', boots: 'Botas', wings: 'Asas', ring: 'Anel', amulet: 'Amuleto' };
+export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings' | 'ring' | 'amulet' | 'pet';
+export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings', 'ring', 'amulet', 'pet'];
+export const SLOT_NAMES: Record<Slot, string> = { weapon: 'Arma', helm: 'Elmo', armor: 'Armadura', pants: 'Calças', boots: 'Botas', wings: 'Asas', ring: 'Anel', amulet: 'Amuleto', pet: 'Pet' };
+export interface PetBonus { atk?: number; abs?: number; def?: number; gold?: number; crit?: number; hp?: number }
 export interface ItemDef {
   key: string; name: string; kind: Slot | 'potion' | 'material' | 'jewel' | 'pack' | 'box'; lvl: number; price: number;
-  dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: WType; set?: string; cls?: string; wtier?: number;
+  dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: WType; set?: string; cls?: string; wtier?: number; pet?: PetBonus;
 }
 // Sets: cada peça equipada do mesmo set soma bônus (2 peças: defesa, 3: vida, 4: ataque %)
 export interface SetDef { cls?: string; key: string; name: string; of: string; lvl: number; color: string; trim: string; cape: string; power: number; price: number; bonus: { def: number; hp: number; atk: number } }
@@ -90,6 +91,20 @@ export const WING_TIER = [{ name: 'Noviças', lvl: 20, def: 15, hp: 100, atk: .1
   // asas de mundo alto (0.34): criadas a partir das Soberanas
   { name: 'Imperiais', lvl: 150, def: 320, hp: 2600, atk: .45, abs: .35, price: 15000000 }, { name: 'Divinas', lvl: 240, def: 650, hp: 5200, atk: .55, abs: .39, price: 60000000 }, { name: 'Eternas', lvl: 330, def: 1100, hp: 9000, atk: .66, abs: .43, price: 200000000 }];
 const WING_ITEMS: ItemDef[] = Object.entries(WING_THEME).flatMap(([c, t]) => WING_TIER.map((w, i) => ({ key: `wing_${c}_${i}`, name: `Asas ${w.name} ${t.name}`, kind: 'wings' as const, lvl: w.lvl, price: w.price, def: w.def, hp: w.hp, tint: t.c, blade: t.c2, cls: c, wtier: i })));
+// Pets: companheiros que seguem o jogador, dão bônus e recolhem os itens caídos por perto
+export const PET_LOOT_RADIUS = 4.5;
+export const PET_ITEMS: ItemDef[] = [
+  { key: 'pet_angel', name: 'Anjo Guardião', kind: 'pet', lvl: 1, price: 100000, tint: '#f4f1ff', blade: '#ffe08a', pet: { abs: .08, hp: 150 } },
+  { key: 'pet_imp', name: 'Diabinho', kind: 'pet', lvl: 40, price: 1000000, tint: '#d8323a', blade: '#ffcf3a', pet: { atk: .15 } },
+  { key: 'pet_unicorn', name: 'Unicórnio', kind: 'pet', lvl: 80, price: 5000000, tint: '#f6f4ff', blade: '#d58bff', pet: { def: .1, gold: .3, hp: 800 } },
+  { key: 'pet_fenrir', name: 'Fenrir', kind: 'pet', lvl: 150, price: 25000000, tint: '#3a3f55', blade: '#6ad0ff', pet: { atk: .22, crit: .03 } },
+  { key: 'pet_dragon', name: 'Dragão Ancestral', kind: 'pet', lvl: 260, price: 120000000, tint: '#c8402a', blade: '#ffd76a', pet: { atk: .28, abs: .06, hp: 4000 } },
+];
+export const PET_RECIPES: Record<string, { gold: number; mats: [string, number][] }> = {
+  pet_angel: { gold: 100000, mats: [['shard', 5]] }, pet_imp: { gold: 1000000, mats: [['magma_heart', 5]] }, pet_unicorn: { gold: 5000000, mats: [['plume', 5], ['ancient_scale', 3]] },
+  pet_fenrir: { gold: 25000000, mats: [['ancient_scale', 10], ['chaos_feather', 5]] }, pet_dragon: { gold: 120000000, mats: [['chaos_feather', 20], ['void_crystal', 5]] },
+};
+export const petText = (b: PetBonus) => [b.atk && `+${Math.round(b.atk * 100)}% ataque`, b.abs && `${Math.round(b.abs * 100)}% de absorção`, b.def && `+${Math.round(b.def * 100)}% defesa`, b.gold && `+${Math.round(b.gold * 100)}% moedas`, b.crit && `+${Math.round(b.crit * 100)}% crítico`, b.hp && `+${b.hp} vida`].filter(Boolean).join(' · ');
 // Receitas do Artífice: asas só existem por criação
 export const WING_RECIPES: { gold: number; mats: [string, number][] }[] = [{ gold: 30000, mats: [['shard', 10], ['plume', 1]] }, { gold: 250000, mats: [['plume', 3], ['magma_heart', 2]] }, { gold: 1500000, mats: [['plume', 5], ['magma_heart', 5], ['ancient_scale', 1]] },
   { gold: 15000000, mats: [['ancient_scale', 10], ['chaos_feather', 5]] }, { gold: 60000000, mats: [['ancient_scale', 20], ['chaos_feather', 15], ['void_crystal', 3]] }, { gold: 200000000, mats: [['chaos_feather', 30], ['void_crystal', 12], ['jewel_eclipse', 50]] }];
@@ -180,7 +195,7 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'rime_armor', name: 'Couraça de Escarcha', kind: 'armor', lvl: 12, price: 2400, def: 20, hp: 90, tint: '#5b9bd0' },
   { key: 'rime_pants', name: 'Grevas de Escarcha', kind: 'pants', lvl: 12, price: 1700, def: 14, hp: 50, tint: '#477fb0' },
   { key: 'rime_boots', name: 'Botas de Escarcha', kind: 'boots', lvl: 12, price: 1300, def: 8, hp: 30, tint: '#3c6c98' },
-] as ItemDef[]).concat(SET_ITEMS, WING_ITEMS, WEAPON_ITEMS, ACC_ITEMS).map(i => [i.key, i]));
+] as ItemDef[]).concat(SET_ITEMS, WING_ITEMS, WEAPON_ITEMS, ACC_ITEMS, PET_ITEMS).map(i => [i.key, i]));
 // Joias: faixa de melhoria, chance e quantos + perde ao falhar
 export const JEWELS: Record<string, { min: number; max: number; chance: number; fail: number }> = { jewel_aurora: { min: 0, max: 6, chance: 1, fail: 0 }, jewel_destiny: { min: 6, max: 9, chance: .6, fail: 1 }, jewel_eclipse: { min: 9, max: 15, chance: .4, fail: 2 } };
 /** Itens empilháveis juntam até 1000 unidades no mesmo espaço da bolsa. */
@@ -331,15 +346,15 @@ export const fullSetOf = (keys: (string | null | undefined)[]) => { const s = ke
 export function derive(b: Base, items: ItemInst[]) {
   let dmg = 0, def = 0, hp = 0; const w = classOf(b.cls).atk;
   for (const i of items) if (i.equip) { dmg += itemStat(i, 'dmg'); def += itemStat(i, 'def'); hp += itemStat(i, 'hp'); }
-  let wa = 0, wabs = 0; const O: Record<string, number> = {}; for (const i of items) if (i.equip) { const d = ITEMS[i.key]; if (d.kind === 'wings') { wa += WING_TIER[d.wtier!].atk; wabs += WING_TIER[d.wtier!].abs; } for (const o of i.opts ?? []) O[o] = (O[o] ?? 0) + 1; }
+  let wa = 0, wabs = 0, pdef = 0, pgold = 0, pcrit = 0; const O: Record<string, number> = {}; for (const i of items) if (i.equip) { const d = ITEMS[i.key]; if (d.kind === 'wings') { wa += WING_TIER[d.wtier!].atk; wabs += WING_TIER[d.wtier!].abs; } if (d.pet) { wa += d.pet.atk ?? 0; wabs += d.pet.abs ?? 0; pdef += d.pet.def ?? 0; pgold += d.pet.gold ?? 0; pcrit += d.pet.crit ?? 0; hp += d.pet.hp ?? 0; } for (const o of i.opts ?? []) O[o] = (O[o] ?? 0) + 1; }
   const q0 = (k: string) => O[k] ?? 0;
   const mt = b.mtree ?? {}, mv = (k: string) => mt[k] ?? 0;
   let pct = mv('atk') * .01; for (const [k, n] of Object.entries(setCounts(items))) { const q = SETS[k].bonus; if (n >= 2) def += q.def; if (n >= 3) hp += q.hp; if (n >= 4) pct += q.atk; }
   return {
     maxHp: Math.floor((70 + b.level * 3 + b.vit * 3 + hp) * (1 + q0('hp') * .04 + mv('hp') * .01)), maxMp: Math.floor((20 + b.level + b.ene * 2) * (1 + q0('mp') * .04)),
-    atk: Math.floor((b.str * w[0] + b.agi * w[1] + b.ene * w[2] + dmg) * (1 + pct + wa + q0('atk') * .06)), def: Math.floor((b.agi / 5 + def) * (1 + mv('def') * .01)),
-    attackMs: Math.max(280, (1000 - b.agi * 3) * (1 - q0('speed') * .07)), crit: Math.min(.6, .05 + b.agi * .0007 + q0('crit') * .08 + mv('crit') * .003), dodge: Math.min(.4, b.agi * .0008 + q0('dodge') * .03),
-    absorb: Math.min(.6, wabs + q0('absorb') * .04), reflect: q0('reflect') * .05, goldPct: q0('goldx') * .3, lifeK: q0('lifek') * .08, manaK: q0('manak') * .1,
+    atk: Math.floor((b.str * w[0] + b.agi * w[1] + b.ene * w[2] + dmg) * (1 + pct + wa + q0('atk') * .06)), def: Math.floor((b.agi / 5 + def) * (1 + mv('def') * .01 + pdef)),
+    attackMs: Math.max(280, (1000 - b.agi * 3) * (1 - q0('speed') * .07)), crit: Math.min(.6, .05 + b.agi * .0007 + q0('crit') * .08 + mv('crit') * .003 + pcrit), dodge: Math.min(.4, b.agi * .0008 + q0('dodge') * .03),
+    absorb: Math.min(.6, wabs + q0('absorb') * .04), reflect: q0('reflect') * .05, goldPct: q0('goldx') * .3 + pgold, lifeK: q0('lifek') * .08, manaK: q0('manak') * .1,
   };
 }
 export const rollDamage = (atk: number, def: number, rnd: number) => Math.max(1, Math.round((atk - def * .6) * (.85 + rnd * .3)));

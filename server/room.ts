@@ -1,4 +1,4 @@
-import { GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
 import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG } from '../shared/events';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
@@ -25,7 +25,7 @@ const MERGE_LOG = new Set(['loot', 'sell', 'use', 'buy']);
 /** O que nunca vai para o histórico (economiza gravações): moedas já ficam salvas no personagem, mover para o Baú não muda o dono. */
 const SKIP_LOG = new Set(['loot_gold', 'box_gold', 'quest_gold', 'test_gold', 'chest_in', 'chest_out']);
 /** Itens que valem registro: raridade Rara+, + ou opções, set, asas, acessórios, joias, pacotes e baús. Poções e equipamento comum não. */
-const worthLog = (key: unknown, it?: ItemInst) => { const d = ITEMS[key as string]; if (!d) return true; if (['wings', 'ring', 'amulet', 'jewel', 'pack', 'box'].includes(d.kind) || d.set) return true; if (d.kind === 'potion' || d.kind === 'material') return false; return !it || it.rarity >= 2 || (it.plus ?? 0) > 0 || !!it.opts?.length; };
+const worthLog = (key: unknown, it?: ItemInst) => { const d = ITEMS[key as string]; if (!d) return true; if (['wings', 'pet', 'ring', 'amulet', 'jewel', 'pack', 'box'].includes(d.kind) || d.set) return true; if (d.kind === 'potion' || d.kind === 'material') return false; return !it || it.rarity >= 2 || (it.plus ?? 0) > 0 || !!it.opts?.length; };
 function mergeLogs(logs: unknown[][], find: (id: unknown) => ItemInst | undefined = () => undefined): unknown[][] {
   const out: unknown[][] = [], by = new Map<string, unknown[]>();
   for (const l of logs) {
@@ -263,6 +263,7 @@ export class MapRoom {
       case 'dep': return this.chestDeposit(p, m.slot);
       case 'wd': return this.chestWithdraw(p, m.slot);
       case 'cw': return this.craftWings(p, m.tier);
+      case 'cp': return this.craftPet(p, m.key);
       case 'up': return this.upgrade(p, m.j, m.item);
       case 'ti': return this.tradeInvite(p, m.id);
       case 'ta': return this.tradeAccept(p);
@@ -381,7 +382,7 @@ export class MapRoom {
       // gear do nível do jogador (até 60 abaixo), dos mundos de alto nível
       box_mitico: { gold: [1000000, 4000000], picks: 2, lvl: [Math.max(120, p.level - 60), Math.max(120, p.level)], exc: .4, anc: .15, table: [[25, 'jewel_eclipse', 3], [55, 'gear', 1], [20, 'ancient_scale', 3]] },
     }, b = T[it.key]; if (!b) return;
-    const cls = classOf(p.cls), pool = Object.values(ITEMS).filter(d => SLOTS.includes(d.kind as Slot) && d.kind !== 'wings' && d.lvl >= b.lvl[0] && d.lvl <= b.lvl[1] && canWield(cls, d));
+    const cls = classOf(p.cls), pool = Object.values(ITEMS).filter(d => SLOTS.includes(d.kind as Slot) && d.kind !== 'wings' && d.kind !== 'pet' && d.lvl >= b.lvl[0] && d.lvl <= b.lvl[1] && canWield(cls, d));
     const prizes: { key: string; qty: number; rarity: number; opts: string[] }[] = [];
     for (let n = 0; n < b.picks; n++) {
       let r = Math.random() * 100, row = b.table[b.table.length - 1]; for (const t of b.table) { if (r < t[0]) { row = t; break; } r -= t[0]; }
@@ -779,7 +780,7 @@ export class MapRoom {
     for (const x of [a, b]) { this.send(x, { t: 'tr', m: null, msg: 'Troca concluída!' }); this.sendInv(x); }
   }
   private upgrade(p: Player, slot: unknown, id: unknown) {
-    const j = this.invAt(p, slot), rule = j && this.jewelRules[j.key], it = p.items.find(i => i.id === id); if (!j || !rule || !it || !SLOTS.includes(ITEMS[it.key].kind as Slot)) return;
+    const j = this.invAt(p, slot), rule = j && this.jewelRules[j.key], it = p.items.find(i => i.id === id); if (!j || !rule || !it || !SLOTS.includes(ITEMS[it.key].kind as Slot) || ITEMS[it.key].kind === 'pet') return;
     const cur = it.plus ?? 0; if (cur < rule.min || cur >= rule.max) return this.sys(p, `${ITEMS[j.key].name} serve para itens de +${rule.min} até +${rule.max - 1}.`);
     this.takeOne(p, j); const win = Math.random() < rule.chance, was = cur; it.plus = win ? cur + 1 : Math.max(rule.min, cur - rule.fail); p.dirtyItems.add(it.id); p.dirty = true; p.logs.push([win ? 'upgrade_ok' : 'upgrade_fail', it.id, it.key, it.plus, 0, Date.now()]);
     this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: win ? 1 : 0, v: it.plus }); this.sys(p, win ? `${ITEMS[it.key].name} agora é +${it.plus}!` : `A melhoria falhou: ${ITEMS[it.key].name} ${was === it.plus ? 'manteve' : 'caiu para'} +${it.plus}.`);
@@ -848,6 +849,18 @@ export class MapRoom {
   private spendMaster(p: Player, k: unknown) {
     if (typeof k !== 'string' || !Object.hasOwn(MASTER_NODES, k) || p.mpts < 1 || (p.mtree[k] ?? 0) >= MASTER_NODE_MAX) return;
     p.mtree[k] = (p.mtree[k] ?? 0) + 1; p.mpts--; p.dirty = true; p.meDirty = true;
+  }
+  private craftPet(p: Player, key: unknown) {
+    const r = typeof key === 'string' ? PET_RECIPES[key] : undefined; if (!r || !this.nearNpc(p, 'artifice')) return; const k = key as string, d = ITEMS[k];
+    if (p.level < d.lvl) return this.sys(p, `Requer nível ${d.lvl}.`);
+    const have = (q: string) => p.items.filter(i => i.key === q && !i.equip).reduce((a, i) => a + i.qty, 0);
+    if (p.gold < r.gold || r.mats.some(([q, n]) => have(q) < n)) return this.sys(p, 'Faltam materiais ou moedas.');
+    if (this.freeSlot(p) < 0) return this.sys(p, 'Inventário cheio.');
+    const now = Date.now();
+    for (const [q, n] of r.mats) for (let left = n; left > 0; left--) this.takeOne(p, p.items.find(i => i.key === q && !i.equip)!);
+    p.gold -= r.gold; p.logs.push(['craft_pay', null, k, 0, -r.gold, now]);
+    this.give(p, k, 1, 0, 'craft'); p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
+    this.sys(p, `${d.name} agora é seu companheiro! Equipe-o na bolsa (espaço Pet).`);
   }
   private craftWings(p: Player, tier: unknown) {
     const n = this.nearNpc(p, 'artifice'), r = WING_RECIPES[tier as number]; if (!n || !r || !Number.isInteger(tier)) return;
@@ -944,7 +957,7 @@ export class MapRoom {
     const [lo, hi] = m.def.gold, now = Date.now();
     const drop = (key: string | null, gold: number, rarity: number, opts: string[] = []) => { const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, opts, owner: owner.charId, party: owner.partyId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
     drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
-    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), lm = (1 + Math.max(0, m.def.level - 100) / 100) * (m.def.boss ? 2 : 1), anc = gear && k !== 'wings' && Math.random() < .003 * lm * this.cfg.exc, exc = gear && k !== 'wings' && Math.random() < .03 * lm * this.cfg.exc; if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 * lm ? 2 : Math.random() < Math.min(.6, .3 * lm) ? 1 : 0; drop(key, 0, r); }
+    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), lm = (1 + Math.max(0, m.def.level - 100) / 100) * (m.def.boss ? 2 : 1), anc = gear && k !== 'wings' && k !== 'pet' && Math.random() < .003 * lm * this.cfg.exc, exc = gear && k !== 'wings' && k !== 'pet' && Math.random() < .03 * lm * this.cfg.exc; if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 * lm ? 2 : Math.random() < Math.min(.6, .3 * lm) ? 1 : 0; drop(key, 0, r); }
     if (m.def.boss && !m.wb) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {
@@ -1044,7 +1057,8 @@ export class MapRoom {
         if (now >= p.nextAtk) { p.nextAtk = now + s.attackMs; this.fx.push({ k: 'swing', x: p.x, y: p.y, id: p.eid, tx: m.x, ty: m.y, b: classOf(p.cls).bolt }); this.hit(p, m, s.atk, s.crit); }
       }
     } else if (p.path) { this.follow(p, dst); p.dirty = true; }
-    for (const d of this.drops.values()) if (dist(d, p) <= 1.2 && (d.owner === p.charId || (d.party && d.party === p.partyId) || now > d.ownUntil)) {
+    const lootR = p.items.some(i => i.equip === 'pet') ? PET_LOOT_RADIUS : 1.2;
+    for (const d of this.drops.values()) if (dist(d, p) <= lootR && (d.owner === p.charId || (d.party && d.party === p.partyId) || now > d.ownUntil)) {
       if (d.key === null) { const g = Math.ceil(d.gold * (1 + p.streak * .05) * (1 + s.goldPct)); p.gold += g; p.logs.push(['loot_gold', null, null, 0, g, now]); p.dirty = true; p.meDirty = true; this.drops.delete(d.eid); this.bumpLoot(p, now); this.fx.push({ k: 'loot', x: p.x, y: p.y, id: p.eid, n: p.streak }); }
       else if (this.give(p, d.key, 1, d.rarity, 'loot', d.opts)) { p.dirty = true; this.drops.delete(d.eid); this.bumpLoot(p, now); this.fx.push({ k: 'loot', x: p.x, y: p.y, id: p.eid, n: p.streak }); this.sendInv(p); this.sys(p, `Obteve: ${ITEMS[d.key].name}`); }
       else if (now - p.lastInvFull > 5000) { p.lastInvFull = now; this.sys(p, 'Inventário cheio.'); }
@@ -1097,7 +1111,7 @@ export class MapRoom {
     const near = (o: Pt) => Math.abs(o.x - p.x) < R && Math.abs(o.y - p.y) < R;
     const note = (id: number, full: () => unknown) => { seen.add(id); if (!p.known.has(id)) { p.known.add(id); news.push(full()); } };
     for (const o of this.players.values()) if (near(o)) {
-      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; const gg = o.guildId ? this.guilds.get(o.guildId) : undefined; return { id: o.eid, k: 'p', ...(gg ? { gt: gg.tag, gc: gg.color } : {}), name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
+      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; const gg = o.guildId ? this.guilds.get(o.guildId) : undefined; return { id: o.eid, k: 'p', ...(gg ? { gt: gg.tag, gc: gg.color } : {}), name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), pet: by('pet'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
       e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
     for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => (m.wb ? { id: m.eid, k: 'm', mob: m.def.key, wb: 1 } : m.golden ? { id: m.eid, k: 'm', mob: m.def.key, g: 1 } : { id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }

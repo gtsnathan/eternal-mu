@@ -642,6 +642,7 @@ export function icon(key: string | null): Cv {
   else if (d.kind === 'armor') { r(g, 7, 6, 14, 18, t); r(g, 3, 6, 5, 11, dk); r(g, 20, 6, 5, 11, dk); r(g, 10, 4, 8, 4, '#1d2230'); r(g, 13, 10, 2, 11, l); }
   else if (d.kind === 'pants') { r(g, 7, 4, 14, 8, t); r(g, 7, 12, 6, 13, t); r(g, 15, 12, 6, 13, dk); r(g, 7, 4, 14, 2, l); }
   else { r(g, 6, 5, 7, 16, t); r(g, 6, 20, 12, 5, dk); r(g, 16, 8, 6, 12, dk); r(g, 16, 20, 10, 5, t); }
+  if (d?.kind === 'pet') { g.clearRect(0, 0, 28, 28); g.drawImage(petArt(d.key, 0), -1, -1); }
   if (d?.kind === 'wings') { const th = WING_THEME[d.cls!]; for (let x = 0; x < 13; x++) { const top = 5 + Math.round(x * .25), bot = 22 - Math.round(x * .55) + (x % 3); r(g, 14 + x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 13 - x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 14 + x, top, 1, 2, th.c2); r(g, 13 - x, top, 1, 2, th.c2); } r(g, 12, 7, 4, 15, shade(th.c, -45)); const tc = ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][d.wtier ?? 0]; if (tc) { r(g, 12, 10, 4, 4, tc); r(g, 13, 11, 2, 2, '#fff'); } if ((d.wtier ?? 0) >= 3) for (let i = 0; i < d.wtier! - 2; i++) { r(g, 3 + i * 3, 3, 2, 2, tc); r(g, 23 - i * 3, 3, 2, 2, tc); } }
   if (d?.set) {
     const S = SETS[d.set], tr = S.trim;
@@ -664,3 +665,48 @@ export function icon(key: string | null): Cv {
   }
   outline(c); iconCache.set(k, c); return c;
 }
+
+// ---------- pets ----------
+/** Desenho pequeno de cada pet (olhando para a direita), 2 quadros de animação. */
+function petArt(key: string, f: number): Cv {
+  const c = cv(30, 30), g = ctx(c), up = f ? -1 : 1;
+  const px = (pts: [number, number][], col: string) => { for (const [x, y] of pts) r(g, x, y, 1, 1, col); };
+  if (key === 'pet_angel') {
+    const wy = f ? 0 : 2; // asas batendo
+    for (let i = 0; i < 7; i++) { r(g, 4 + i, 9 + wy + Math.floor(i / 2), 3, 7 - Math.floor(i / 1.5), i % 2 ? '#e8ecff' : '#ffffff'); r(g, 19 + i - 3, 9 + wy + Math.floor((6 - i) / 2), 3, 7 - Math.floor((6 - i) / 1.5), i % 2 ? '#e8ecff' : '#ffffff'); }
+    ell(g, 15, 3, 4, 1, '#ffe08a'); r(g, 13, 3, 4, 1, '#fff7c8');
+    for (let y = 0; y < 10; y++) { const w = 2 + Math.floor(y * .5); r(g, 15 - w, 13 + y, w * 2, 1, y % 4 === 3 ? '#dfe4f7' : '#f7f8ff'); }
+    r(g, 13, 22, 4, 1, '#ffe08a'); ell(g, 15, 9, 3, 3, '#f6dcc0'); r(g, 12, 5, 7, 3, '#ffd76a'); r(g, 11, 7, 2, 4, '#ffd76a'); r(g, 16, 9, 1, 1, '#4a6aa8'); r(g, 14, 9, 1, 1, '#4a6aa8');
+  } else if (key === 'pet_imp') {
+    const wy = f ? -1 : 1;
+    for (let i = 0; i < 6; i++) { r(g, 3 + i, 8 + wy + i, 1, 7 - i, '#5a1420'); r(g, 21 + i, 8 + wy + (5 - i), 1, 2 + i, '#5a1420'); }
+    ell(g, 15, 17, 5, 5, '#c42a32'); ell(g, 15, 18, 3, 3, '#e0484e'); ell(g, 15, 10, 4, 4, '#d8323a');
+    px([[11, 5], [11, 6], [12, 6], [19, 5], [19, 6], [18, 6]], '#f1e3b8'); r(g, 14, 9, 1, 2, '#ffcf3a'); r(g, 17, 9, 1, 2, '#ffcf3a'); r(g, 14, 12, 4, 1, '#3a0a10'); px([[15, 13], [17, 13]], '#fff');
+    for (let i = 0; i < 6; i++) r(g, 8 - i, 21 + Math.round(Math.sin(i + f) * 1), 1, 1, '#8a1c24'); px([[2, 20], [1, 21], [2, 22], [3, 21]], '#ffcf3a');
+    r(g, 12, 22, 2, 3 + (f ? 0 : 1), '#8a1c24'); r(g, 17, 22, 2, 3 + (f ? 1 : 0), '#8a1c24');
+  } else if (key === 'pet_unicorn') {
+    ell(g, 13, 17, 8, 4, '#f6f4ff'); ell(g, 13, 18, 7, 2, '#e3e0f2');
+    for (const [x, s] of [[7, f], [10, 1 - f], [16, f], [19, 1 - f]]) { r(g, x, 20, 2, 5 - s, '#e3e0f2'); r(g, x, 25 - s, 2, 1, '#b6a88a'); }
+    r(g, 19, 10, 4, 7, '#f6f4ff'); ell(g, 23, 10, 3, 2, '#f6f4ff'); r(g, 25, 10, 2, 2, '#e3e0f2'); r(g, 23, 9, 1, 1, '#3a2a58');
+    for (let i = 0; i < 5; i++) r(g, 22 + Math.floor(i / 2), 7 - i, 1, 1, i % 2 ? '#ffe08a' : '#ffd040');
+    for (let i = 0; i < 7; i++) r(g, 18 - (i % 2), 8 + i, 2, 1, ['#d58bff', '#ff9ee6', '#8ad0ff'][i % 3]);
+    for (let i = 0; i < 6; i++) r(g, 4 - Math.floor(i / 2), 15 + i, 2, 1, ['#d58bff', '#ff9ee6', '#8ad0ff'][i % 3]);
+  } else if (key === 'pet_fenrir') {
+    ell(g, 13, 16, 8, 4, '#3a3f55'); ell(g, 13, 14, 7, 2, '#4a5070');
+    for (const [x, s] of [[7, f], [10, 1 - f], [16, f], [19, 1 - f]]) r(g, x, 18, 2, 6 - s, '#2c3044');
+    ell(g, 22, 11, 4, 3, '#3a3f55'); r(g, 24, 12, 4, 2, '#4a5070'); r(g, 27, 12, 1, 1, '#111'); px([[19, 7], [19, 8], [20, 8], [22, 7], [22, 8], [21, 8]], '#2c3044');
+    r(g, 23, 10, 2, 1, '#6ad0ff'); r(g, 23, 10, 1, 1, '#d8f6ff'); px([[25, 14], [26, 14]], '#e8eef8');
+    for (let i = 0; i < 6; i++) r(g, 5 - i, 12 - Math.floor(i / 2) + (f ? 0 : 1), 2, 2, i % 2 ? '#4a5070' : '#3a3f55');
+    for (let i = 0; i < 8; i++) r(g, 7 + i * 2, 12 - (i % 2), 1, 2, '#6ad0ff55');
+  } else { // dragão
+    const wy = f ? -2 : 1;
+    for (let i = 0; i < 8; i++) r(g, 9 + i, 4 + wy + Math.floor(Math.abs(i - 3) * .8), 1, 9 - Math.floor(Math.abs(i - 3) * .8), i % 2 ? '#ff8a3c' : '#e06a2a');
+    ell(g, 13, 17, 7, 4, '#c8402a'); ell(g, 13, 19, 5, 2, '#ffd76a');
+    for (let i = 0; i < 7; i++) r(g, 6 - i, 18 + Math.floor(i / 2) - (i > 4 ? 2 : 0), 2, 2, '#c8402a'); px([[0, 17], [0, 18], [1, 17]], '#ffd76a');
+    ell(g, 22, 11, 4, 3, '#c8402a'); r(g, 24, 12, 4, 2, '#d8503a'); r(g, 23, 10, 1, 1, '#ffef8a'); px([[20, 7], [21, 6], [22, 6], [23, 7]], '#ffd76a');
+    r(g, 9, 21, 2, 3 + f, '#a8301e'); r(g, 16, 21, 2, 4 - f, '#a8301e'); if (f) px([[29, 12], [29, 13], [28, 12]], '#ffb13d');
+  }
+  return c;
+}
+const petCache = new Map<string, Cv[][]>();
+export function petSprites(key: string): Cv[][] { let s = petCache.get(key); if (s) return s; s = [0, 1].map(i => { const c = petArt(key, i); return [c, flip(c)]; }); petCache.set(key, s); return s; }
