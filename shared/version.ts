@@ -1,0 +1,16 @@
+// Versão do jogo mostrada no site e no jogo. Ao lançar uma atualização: troque VERSION (e o package.json) e coloque um item novo no topo de CHANGELOG.
+export const VERSION = '0.33.1';
+export interface Release { v: string; date: string; title: string; items: string[] }
+export const CHANGELOG: Release[] = [
+  { v: '0.33.1', date: '13/11/2026', title: 'Versão no site', items: ['A versão atual aparece no site e no jogo.', 'Nova seção de Atualizações para acompanhar o desenvolvimento.'] },
+  { v: '0.33.0', date: '13/11/2026', title: 'Duelo entre jogadores', items: ['Desafie outro jogador para um duelo de até 2 minutos, inclusive na cidade.', 'Ninguém morre nem perde nada, e o mapa inteiro fica sabendo quem venceu.'] },
+  { v: '0.32.0', date: '13/11/2026', title: 'Invasão Dourada', items: ['A cada 30 minutos, 8 monstros dourados aparecem por 10 minutos.', 'Dão 6× mais XP, 8× mais moedas e muitos baús e joias.'] },
+  { v: '0.31.0', date: '13/11/2026', title: 'Missões e chefes', items: ['Capitã Lyra em Valoria e Solmira com 60 missões repetíveis.', 'Barra de vida grande para os chefes e um level up mais bonito.', 'Monstros de alto nível rebalanceados e servidor mais leve no 4G.'] },
+  { v: '0.30.2', date: '13/11/2026', title: 'Auto ataque e Auto coleta', items: ['⚔ Auto e ✋ Coleta agora são separados.', 'Itens no chão somem depois de 10 segundos.'] },
+  { v: '0.30.0', date: '11/11/2026', title: 'Itens de alto nível', items: ['72 armas e 20 sets novos, do nível 120 ao 340.', 'Quanto mais difícil o mundo, melhores os drops e maior a chance de Excelente e Ancestral.', 'Novo Baú Mítico.'] },
+  { v: '0.29.0', date: '11/11/2026', title: '8 mundos novos', items: ['Do Pântano Venenoso (120) ao Vazio Eterno (340), com 32 monstros e 8 chefes.', 'Pilhas de até 1000 itens e venda da pilha inteira.'] },
+  { v: '0.28.0', date: '11/11/2026', title: 'Master Reset', items: ['Com 25 Resets, faça o Master Reset e ganhe 5.000 pontos permanentes.'] },
+  { v: '0.27.0', date: '10/11/2026', title: 'Loot melhor', items: ['Anéis, amuletos, baús do tesouro e a raridade Ancestral.', 'Bolsa com 45 espaços, descarte de itens e layout novo para celular.'] },
+  { v: '0.26.0', date: '10/11/2026', title: 'Armas novas', items: ['Espadões, maças, lanças, cetros e bestas para todas as classes.'] },
+  { v: '0.25.0', date: '10/11/2026', title: 'Habilidades e guia', items: ['Uma habilidade nova por classe, como Espíritos Malignos e Lâmina Rúnica.', 'Jogadores online no site e guia de onde encontrar os monstros.'] },
+];

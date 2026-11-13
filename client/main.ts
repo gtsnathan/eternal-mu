@@ -1,4 +1,5 @@
 import { fmtRes, MR_RESETS, MR_GOLD, MR_POINTS, WTYPE_NAME, MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
+import { VERSION } from '../shared/version';
 import { quests } from '../shared/quests';
 import { travelList, trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
 import { goldSprites, pressSprite, chestSprite, WING_ROOT, wingSprites, gfx, hdCtx, hdOf, noHd, tintFrame, archSprite, crystalSprite, cv, Cv, edge, FRAME_H, FRAME_W, glowSprite, heroSprites, icon, skillIcon, tilePrio, Look, lookFromGear, mobSize, mobSprites, objSprite, tile } from './art';
@@ -85,7 +86,8 @@ let ac: AudioContext | null = null;
 function beep(f: number, ms: number, type: OscillatorType = 'square', vol = .03) { try { ac ??= new AudioContext(); if (ac.state === 'suspended') ac.resume(); const o = ac.createOscillator(), a = ac.createGain(); o.type = type; o.frequency.value = f; o.frequency.exponentialRampToValueAtTime(f * .6, ac.currentTime + ms / 1000); a.gain.value = vol; a.gain.exponentialRampToValueAtTime(.001, ac.currentTime + ms / 1000); o.connect(a).connect(ac.destination); o.start(); o.stop(ac.currentTime + ms / 1000); } catch { /* sem áudio */ } }
 
 function send(m: unknown) { if (ws?.readyState === 1) ws.send(JSON.stringify(m)); }
-function startGame(id: number) { charId = id; root.innerHTML = ''; menuOn = false; $('#hud').style.display = 'block'; running = true; manualClose = false; retries = 0; connect(true); if (!lastFrame) requestAnimationFrame(frame); }
+function startGame(id: number) { charId = id; root.innerHTML = ''; menuOn = false; $('#hud').style.display = 'block'; document.body.classList.add('ingame'); running = true; manualClose = false; retries = 0; connect(true); if (!lastFrame) requestAnimationFrame(frame); }
+$('#vtag').textContent = `Eternal MU v${VERSION}`; document.querySelectorAll('.ver').forEach(e => { e.textContent = `v${VERSION}`; });
 function over(s: string) { const o = $('#over'); o.textContent = s; o.style.display = s ? 'flex' : 'none'; }
 function connect(first = false) { if (!gfxInit) { gfxInit = true; applyGfx(); }
   clearTimeout(reconnectTimer); over(retries ? 'Reconectando…' : 'Entrando no mundo…');
@@ -102,7 +104,7 @@ function connect(first = false) { if (!gfxInit) { gfxInit = true; applyGfx(); }
     over('Reconectando…'); reconnectTimer = setTimeout(() => connect(), Math.min(5000, 400 * retries)) as unknown as number;
   };
 }
-function leave(msg = '') { manualClose = true; running = false; clearInterval(pingTimer); ws?.close(); ws = null; $('#hud').style.display = 'none'; over(''); closeWins(); canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height); lastFrame = 0; menuOn = true; requestAnimationFrame(menuFrame); ents.clear(); party = null; renderParty(); trade = null; renderTrade(); $('#invite').style.display = 'none'; $('#pmenu').style.display = 'none'; auto = false; $('#auto').style.borderColor = ''; showChars(msg); }
+function leave(msg = '') { document.body.classList.remove('ingame'); manualClose = true; running = false; clearInterval(pingTimer); ws?.close(); ws = null; $('#hud').style.display = 'none'; over(''); closeWins(); canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height); lastFrame = 0; menuOn = true; requestAnimationFrame(menuFrame); ents.clear(); party = null; renderParty(); trade = null; renderTrade(); $('#invite').style.display = 'none'; $('#pmenu').style.display = 'none'; auto = false; $('#auto').style.borderColor = ''; showChars(msg); }
 function setConn(ok: boolean) { const c = $('#conn'); c.textContent = ok ? `● ${rtt} ms` : '● off'; c.style.color = !ok ? '#ff6b6b' : rtt < 120 ? '#79e08a' : rtt < 250 ? '#f0cf65' : '#ff9b5e'; }
 function handle(m: any) {
   switch (m.t) {

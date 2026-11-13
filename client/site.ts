@@ -1,3 +1,4 @@
+import { VERSION, CHANGELOG } from '../shared/version';
 import { fmtRes, CLASSES, HAIR_COLORS, ITEMS, MOBS, SETS, WING_THEME } from '../shared/data';
 import { FRAME_H, FRAME_W, hdOf, heroSprites, lookFromGear, wingSprites, WING_ROOT } from './art';
 
@@ -56,6 +57,17 @@ function drawRank() {
   if (!list.length) { const tr = el('tr'), td = el('td', '', 'Nenhum herói ainda. Seja o primeiro!'); td.setAttribute('colspan', '6'); tr.append(td); b.append(tr); }
   const side = $('#ranks'); side.replaceChildren(); ranking.slice(0, 5).forEach((r, i) => { const row = el('li'); row.append(el('b', '', `${i + 1}. ${r.name}`), el('span', '', `${fmtRes(r.resets, r.mr)} · Nv ${r.level}`)); side.append(row); }); if (!ranking.length) side.append(el('li', '', 'Sem heróis ainda.'));
 }
+/** Versão no topo/rodapé e a lista de Atualizações na página inicial. */
+function drawUpdates(all = false) {
+  document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
+  const box = document.getElementById('updates'); if (!box) return; box.className = 'upd'; box.replaceChildren(el('h3', '', `Atualizações · versão atual ${VERSION}`));
+  for (const [n, r] of CHANGELOG.slice(0, all ? CHANGELOG.length : 4).entries()) {
+    const d = el('div', 'rel'), h = el('div'); h.append(el('span', n === 0 ? 'tag new' : 'tag', `v${r.v}`), el('b', '', r.title), el('small', '', ` · ${r.date}`));
+    const ul = el('ul'); for (const i of r.items) ul.append(el('li', '', i)); d.append(h, ul); box.append(d);
+  }
+  if (CHANGELOG.length > 4) { const b = el('button', '', all ? 'Mostrar menos' : `Ver todas as ${CHANGELOG.length} atualizações`); b.onclick = () => drawUpdates(!all); box.append(b); }
+}
+drawUpdates();
 async function loadPublic() {
   try { const s = await api('status'); $('#online').textContent = fmt(s.online); $('#accs').textContent = fmt(s.accounts); $('#chars').textContent = fmt(s.characters); $('#rx').textContent = `x${s.xp}`; $('#rd').textContent = `x${s.drop}`; $('#rg').textContent = `x${s.gold}`; $('#rr').textContent = s.resetLevel; document.querySelectorAll('.v-rl').forEach(e => e.textContent = s.resetLevel); document.querySelectorAll('.v-rg').forEach(e => e.textContent = fmt(s.resetGold)); document.querySelectorAll('.v-rp').forEach(e => e.textContent = fmt(s.resetPoints)); } catch { $('#online').textContent = '—'; }
   try { ranking = (await api('ranking')).ranking; drawRank(); } catch { /* sem conexão */ }
