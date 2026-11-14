@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#120f1f">
-<title>Eternal MU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"><link rel="alternate icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><title>Eternal MU</title>
 <style>
 :root{--bg:#120f1f;--pn:#1e1930;--pn2:#2a2342;--ln:#4d4268;--gold:#e9c46a;--tx:#ece6d8;--dim:#a79fb8;--hp:#d7384f;--mp:#3f7fe8;--xp:#e9c46a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -241,6 +241,7 @@ body:not(.touch) #chat{width:min(380px,calc(50vw - 362px))}
 body.boss #tframe{display:none!important}
 #duelbar{display:none;position:absolute;left:50%;top:calc(52px + env(safe-area-inset-top));transform:translateX(-50%);padding:5px 14px;border-radius:999px;background:#3a0c14e6;border:2px solid #ff4a6a;color:#ffd0d8;font-weight:700;font-size:13px;pointer-events:none;z-index:5;white-space:nowrap}
 .touch #duelbar{top:calc(270px + env(safe-area-inset-top));font-size:12px}
+#snd.off{opacity:.6;filter:grayscale(1)}
 </style>
 </head>
 <body>
@@ -254,7 +255,7 @@ body.boss #tframe{display:none!important}
   <div id="duelbar"></div>
   <div id="invite" class="p"><div id="invt"></div><div class="row"><button class="main" id="inva">Aceitar</button><button id="invd">Recusar</button></div></div>
   <div class="mini p"><canvas id="minimap" width="146" height="112"></canvas><div class="minfo"><span id="where"></span><span id="conn">●</span></div></div>
-  <div class="menu p"><button id="chatb" class="tonly" title="Chat">💬</button><button data-w="inv">Bolsa</button><button data-w="char" class="extra">Perfil</button><button data-w="map" class="extra">Mapa</button><button data-w="rank" class="extra">Rank</button><button data-w="guild" class="extra">Guilda</button><button id="auto" title="Auto ataque: ataca e usa habilidades sozinho">⚔<span class="lbl"> Auto</span></button><button id="autoloot" title="Auto coleta: anda até os itens e pega sozinho">✋<span class="lbl"> Coleta</span></button><button id="gfx" class="extra">Gráf: Auto</button><button id="exit" class="extra">Sair</button><button id="more" class="tonly" title="Mais">☰</button><span class="ver extra"></span></div>
+  <div class="menu p"><button id="chatb" class="tonly" title="Chat">💬</button><button data-w="inv">Bolsa</button><button data-w="char" class="extra">Perfil</button><button data-w="map" class="extra">Mapa</button><button data-w="rank" class="extra">Rank</button><button data-w="guild" class="extra">Guilda</button><button id="auto" title="Auto ataque: ataca e usa habilidades sozinho">⚔<span class="lbl"> Auto</span></button><button id="autoloot" title="Auto coleta: anda até os itens e pega sozinho">✋<span class="lbl"> Coleta</span></button><button id="snd" title="Som">🔊<span class="lbl"> Som</span></button><button id="gfx" class="extra">Gráf: Auto</button><button id="exit" class="extra">Sair</button><button id="more" class="tonly" title="Mais">☰</button><span class="ver extra"></span></div>
   <div id="chat" class="p"><div id="log"></div><form class="chatline" id="chatf"><button type="button" id="chan">Local</button><input id="chati" type="text" maxlength="160" placeholder="Enter para falar" autocomplete="off"></form></div>
   <div id="stick" class="p"><i></i></div>
   <div id="bar" class="p">

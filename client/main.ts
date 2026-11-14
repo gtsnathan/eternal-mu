@@ -85,7 +85,10 @@ const snow: { x: number; y: number; s: number; d: number }[] = Array.from({ leng
 const touch = matchMedia('(pointer:coarse)').matches; if (touch) document.body.classList.add('touch');
 
 let ac: AudioContext | null = null;
-function beep(f: number, ms: number, type: OscillatorType = 'square', vol = .03) { try { ac ??= new AudioContext(); if (ac.state === 'suspended') ac.resume(); const o = ac.createOscillator(), a = ac.createGain(); o.type = type; o.frequency.value = f; o.frequency.exponentialRampToValueAtTime(f * .6, ac.currentTime + ms / 1000); a.gain.value = vol; a.gain.exponentialRampToValueAtTime(.001, ac.currentTime + ms / 1000); o.connect(a).connect(ac.destination); o.start(); o.stop(ac.currentTime + ms / 1000); } catch { /* sem áudio */ } }
+let soundOn = (() => { try { return localStorage.getItem('emu_sound') !== '0'; } catch { return true; } })();
+function soundUi() { const b = $('#snd'); if (!b) return; b.classList.toggle('off', !soundOn); b.title = soundOn ? 'Som ligado (tecla N para desligar)' : 'Som desligado (tecla N para ligar)'; b.firstChild!.textContent = soundOn ? '🔊' : '🔇'; }
+function setSound(on: boolean) { soundOn = on; try { localStorage.setItem('emu_sound', on ? '1' : '0'); } catch { /* */ } soundUi(); if (!on) ac?.suspend().catch(() => { }); else beep(660, 120, 'triangle', .05); }
+function beep(f: number, ms: number, type: OscillatorType = 'square', vol = .03) { if (!soundOn) return; try { ac ??= new AudioContext(); if (ac.state === 'suspended') ac.resume(); const o = ac.createOscillator(), a = ac.createGain(); o.type = type; o.frequency.value = f; o.frequency.exponentialRampToValueAtTime(f * .6, ac.currentTime + ms / 1000); a.gain.value = vol; a.gain.exponentialRampToValueAtTime(.001, ac.currentTime + ms / 1000); o.connect(a).connect(ac.destination); o.start(); o.stop(ac.currentTime + ms / 1000); } catch { /* sem áudio */ } }
 
 function send(m: unknown) { if (ws?.readyState === 1) ws.send(JSON.stringify(m)); }
 function startGame(id: number) { charId = id; root.innerHTML = ''; menuOn = false; $('#hud').style.display = 'block'; document.body.classList.add('ingame'); running = true; manualClose = false; retries = 0; connect(true); if (!lastFrame) requestAnimationFrame(frame); }
@@ -387,7 +390,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Enter') { const i = $<HTMLInputElement>('#chati'); if (!tgtTyping()) { e.preventDefault(); i.focus(); } return; }
   if (e.key === 'Escape') { $('#chati').blur(); closeWins(); return; }
   if (e.repeat) return;
-  if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
+  if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === 'n') { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); } else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
 let chan: 'l' | 'g' | 'p' | 'u' = 'l';
@@ -457,6 +460,8 @@ $('#chati').addEventListener('blur', () => { if (touch) setTimeout(() => { if (d
 // Auto ataque e Auto coleta são separados: dá para ligar só um, os dois ou nenhum (fica lembrado neste aparelho)
 const autoUi = () => { for (const [id, on] of [['#auto', auto], ['#autoloot', autoLoot]] as [string, boolean][]) { $(id).style.borderColor = on ? 'var(--gold)' : ''; $(id).style.color = on ? 'var(--gold)' : ''; } try { localStorage.setItem('em_auto', JSON.stringify([auto, autoLoot])); } catch { /* sem armazenamento */ } };
 try { [auto, autoLoot] = JSON.parse(localStorage.getItem('em_auto') ?? '[false,false]'); } catch { /* sem armazenamento */ }
+$('#snd').onclick = () => { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); };
+soundUi();
 $('#auto').onclick = () => { auto = !auto; autoUi(); log(auto ? 'Auto ataque ligado.' : 'Auto ataque desligado.', 'sys'); };
 $('#autoloot').onclick = () => { autoLoot = !autoLoot; autoUi(); log(autoLoot ? 'Auto coleta ligada: os itens somem 10 s depois de cair.' : 'Auto coleta desligada.', 'sys'); };
 autoUi();
