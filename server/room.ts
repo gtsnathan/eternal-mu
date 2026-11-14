@@ -1,11 +1,12 @@
 import { adminItem, adminSet, goodFactor, excChance, ancChance, PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
+import { ACHIEVEMENTS, ACH, parseAch, type AchState } from '../shared/achievements';
 import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG } from '../shared/events';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; guildId?: number; gRank?: number; ginvite?: { gid: number; until: number } | null; duel?: { with: number; until: number } | null; duelFrom?: { from: number; until: number } | null; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; ach: AchState; achCol: boolean; guildId?: number; gRank?: number; ginvite?: { gid: number; until: number } | null; duel?: { with: number; until: number } | null; duelFrom?: { from: number; until: number } | null; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -50,7 +51,7 @@ export class MapRoom {
   private fx: (Pt & Record<string, unknown>)[] = [];
   private timed: { at: number; run: () => void }[] = []; private saveWarnAt = 0;
   /** Invasão Dourada: a cada 30 min (a primeira entre 5 e 15 min depois que alguém entra no mapa), 8 monstros dourados por 10 min. */
-  private nextInvasion = 0; private invasionEnd = 0;
+  private nextInvasion = 0; private invasionEnd = 0; private nextAchAll = 0;
   /** Guildas dos jogadores desta sala (cache; o banco é a fonte). */
   private guilds = new Map<number, { id: number; name: string; tag: string; color: number; leader: number; notice: string; m: { id: number; name: string; rank: number; lv: number; cls: string; res: number; mr: number }[] }>();
   /** Chefe Mundial: agenda pelo relógio (shared/events.ts). wbSlot = janela já tratada nesta sala. */
@@ -149,7 +150,7 @@ export class MapRoom {
     const all: ItemInst[] = its.results.map((i: any) => ({ id: i.id, key: i.item_key, qty: i.qty, slot: i.slot, equip: i.equip, rarity: i.rarity, plus: i.plus ?? 0, opts: (() => { try { return i.opts ? JSON.parse(i.opts) : []; } catch { return []; } })() }));
     const items = all.filter(i => i.equip || i.slot < 1000), chest = all.filter(i => !i.equip && i.slot >= 1000);
     const p: Player = {
-      accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, mr: c.master_resets ?? 0, quest: (() => { try { const q = JSON.parse(c.quest || 'null'); return q && quests()[q.id] ? { id: q.id, have: +q.have || 0 } : null; } catch { return null; } })(), questCol: 'quest' in c, savedQuest: '', ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
+      accountId: c.account_id, eid: this.nextId++, charId, ws, name: c.name, resets: c.resets ?? 0, mr: c.master_resets ?? 0, ach: parseAch(c.ach), achCol: c.ach !== undefined, quest: (() => { try { const q = JSON.parse(c.quest || 'null'); return q && quests()[q.id] ? { id: q.id, have: +q.have || 0 } : null; } catch { return null; } })(), questCol: 'quest' in c, savedQuest: '', ml: c.master_level ?? 0, mxp: c.master_xp ?? 0, mpts: c.master_points ?? 0, mtree: (() => { try { return c.master_tree ? JSON.parse(c.master_tree) : {}; } catch { return {}; } })(), buffAtk: 0, buffDef: 0, maxHpC: 1, streak: 0, streakUntil: 0, trade: null, tradeFrom: null, cls: c.class, partyId: 0, invite: null, hairColor: c.hair_color, hairStyle: c.hair_style, level: c.level, xp: c.xp, points: c.points, str: c.str, agi: c.agi, vit: c.vit, ene: c.ene, hp: c.hp, mp: c.mp, gold: c.gold,
       x: c.x, y: c.y, map: c.map, items, chest, ix: 0, iy: 0, path: null, target: 0, nextAtk: 0, nextRepath: 0, nextPotion: 0, cds: {}, deadUntil: 0, known: new Set(), delta, lastE: new Map(), idleSnaps: 0, newAt: new Map(), dbPos: new Map(all.map(i => [i.id, `${i.slot}|${i.equip ?? ''}`])), dirty: false, meDirty: true, dirtyItems: new Set(), delItems: new Set(), logs: [], qtyItems: new Set(), savedRow: '', savedRank: '', budget: 40, lastChat: 0, nextTrap: 0, nextRegen: 0, gone: false, lastInvFull: 0,
     };
     { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) p.dirty = true; } // junta joias, poções etc. em pilhas de até 1000
@@ -168,6 +169,7 @@ export class MapRoom {
     if (pm && !p.gone) { p.partyId = pm.party_id; await this.reloadParty(pm.party_id); }
     const gm = await db.prepare('SELECT guild_id FROM guild_members WHERE char_id=?').bind(charId).first<{ guild_id: number }>().catch(() => null);
     if (gm && !p.gone) { p.guildId = gm.guild_id; await this.reloadGuild(gm.guild_id); }
+    this.send(p, { t: 'achn', n: p.ach.u.length });
     for (const m of early) this.onMessage(p, m);
     if (!this.timer) { this.last = Date.now(); this.lastSave = this.last; this.timer = setInterval(() => this.safeTick(), CONFIG.tickMs); }
   }
@@ -181,7 +183,7 @@ export class MapRoom {
   private flush(p: Player) { return this.saveBatch([p]); }
   /** Colunas do personagem como texto, para comparar com o que já está no banco. */
   private rowOf(p: Player): [string, string] {
-    return [JSON.stringify([p.mxp, p.mpts, JSON.stringify(p.mtree), p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y)]), JSON.stringify([p.resets, p.ml, p.level, p.mr])];
+    return [JSON.stringify([p.mxp, p.mpts, JSON.stringify(p.mtree), p.xp, p.points, p.str, p.agi, p.vit, p.ene, Math.floor(p.hp), Math.floor(p.mp), p.gold, p.map, round(p.x), round(p.y), ...(p.achCol ? [JSON.stringify(p.ach)] : [])]), JSON.stringify([p.resets, p.ml, p.level, p.mr])];
   }
   /** Grava um ou mais personagens em uma única transação (trocas gravam os dois juntos). */
   private saveBatch(ps: Player[]): Promise<unknown> {
@@ -206,7 +208,7 @@ export class MapRoom {
       for (const id of p.qtyItems) { if (p.dirtyItems.has(id) || p.delItems.has(id) || !p.dbPos.has(id)) continue; const i = p.items.find(x => x.id === id) ?? p.chest.find(x => x.id === id); if (i) rest.push(db.prepare('UPDATE items SET qty=? WHERE id=? AND char_id=?').bind(i.qty, i.id, p.charId)); }
       // só grava o personagem se algo mudou desde a última gravação; nível/resets à parte para não mexer no índice do ranking à toa
       const [row, rank] = this.rowOf(p), oldRow = p.savedRow, oldRank = p.savedRank;
-      if (row !== oldRow) rest.push(db.prepare('UPDATE characters SET master_xp=?,master_points=?,master_tree=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=? WHERE id=?').bind(...JSON.parse(row), p.charId));
+      if (row !== oldRow) rest.push(db.prepare(`UPDATE characters SET master_xp=?,master_points=?,master_tree=?,xp=?,points=?,str=?,agi=?,vit=?,ene=?,hp=?,mp=?,gold=?,map=?,x=?,y=?${p.achCol ? ',ach=?' : ''} WHERE id=?`).bind(...JSON.parse(row), p.charId));
       if (rank !== oldRank) { const [rs, ml, lv, mr] = JSON.parse(rank), [, , , omr] = oldRank ? JSON.parse(oldRank) : []; rest.push(db.prepare('UPDATE characters SET resets=?,master_level=?,level=? WHERE id=?').bind(rs, ml, lv, p.charId)); if (mr !== (omr ?? 0)) rest.push(db.prepare('UPDATE characters SET master_resets=? WHERE id=?').bind(mr, p.charId)); }
       const qs = JSON.stringify(p.quest), oldQuest = p.savedQuest; if (p.questCol && qs !== oldQuest) rest.push(db.prepare('UPDATE characters SET quest=? WHERE id=?').bind(p.quest ? qs : '', p.charId)); p.savedQuest = qs;
       p.savedRow = row; p.savedRank = rank;
@@ -295,6 +297,9 @@ export class MapRoom {
       case 'pl': return this.enqueueParty(() => this.leaveParty(p.partyId, p.charId));
       case 'pk': return this.enqueueParty(() => this.kick(p, m.char));
       case 'pm': return this.enqueueParty(() => this.setMode(p));
+      case 'achq': return this.sendAch(p);
+      case 'achc': return this.achClaim(p, m.id);
+      case 'acht': { const a = ACH[m.id]; if (m.id === '' || (a?.title && p.ach.r.includes(a.id))) { p.ach.t = m.id || ''; p.dirty = true; this.forgetLook(p); this.sendAch(p); } return; }
       case 'gc': return this.enqueueParty(() => this.guildCreate(p, m.name, m.tag, m.color));
       case 'gi': return this.guildInvite(p, m.id);
       case 'ga': return this.enqueueParty(() => this.guildAccept(p));
@@ -451,6 +456,41 @@ export class MapRoom {
     const nm = `${it.qty > 1 ? it.qty.toLocaleString('pt-BR') + 'x ' : ''}${d.name}${it.plus ? ` +${it.plus}` : ''}${it.rarity ? ` (${RARITY[it.rarity].name})` : ''}`;
     this.sys(p, `🎁 Presente do administrador: ${nm}${note ? ` — ${String(note).slice(0, 80)}` : ''}`); return true;
   }
+  // ---------- Conquistas ----------
+  private achInc(p: Player, k: string, n = 1) { p.ach.c[k] = (p.ach.c[k] ?? 0) + n; p.dirty = true; }
+  private achValue(p: Player, stat: string): number {
+    const all = [...p.items, ...p.chest];
+    switch (stat) {
+      case 'lv': return p.level; case 'rs': return p.resets; case 'mr': return p.mr; case 'ml': return p.ml; case 'gold': return p.gold;
+      case 'pl': return Math.max(p.ach.c.pl ?? 0, ...all.map(i => i.plus ?? 0));
+      case 'wt': return Math.max(0, ...all.map(i => ITEMS[i.key]?.kind === 'wings' ? (ITEMS[i.key].wtier ?? 0) + 1 : 0));
+      case 'anc': return all.some(i => i.rarity === 4) ? 1 : 0;
+      case 'pet': return Math.max(0, ...all.map(i => ({ pet_angel: 1, pet_imp: 2, pet_unicorn: 3, pet_fenrir: 4, pet_dragon: 5 } as Record<string, number>)[i.key] ?? 0));
+      case 'gu': return p.guildId ? (p.gRank === 2 ? 2 : 1) : 0;
+      default: return p.ach.c[stat] ?? 0;
+    }
+  }
+  private achCheck(p: Player) {
+    if (p.gone || !p.achCol) return; // sem a coluna no banco (migração 0010 pendente) não dá para guardar: fica desligado
+    const vals = new Map<string, number>(); let got = false;
+    for (const a of ACHIEVEMENTS) {
+      if (p.ach.u.includes(a.id) || p.ach.r.includes(a.id)) continue;
+      const v = vals.get(a.stat) ?? this.achValue(p, a.stat); vals.set(a.stat, v); if (v < a.goal) continue;
+      p.ach.u.push(a.id); got = true; this.sys(p, `🏅 Conquista desbloqueada: ${a.name}! Abra Conquistas (tecla K ou menu ☰) para pegar a recompensa.`);
+    }
+    if (got) { p.dirty = true; this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.send(p, { t: 'achn', n: p.ach.u.length }); }
+  }
+  private sendAch(p: Player) { if (!p.achCol) return this.send(p, { t: 'ach', off: 1 }); const v: Record<string, number> = {}; for (const a of ACHIEVEMENTS) v[a.stat] ??= this.achValue(p, a.stat); this.send(p, { t: 'ach', s: p.ach, v }); }
+  private achClaim(p: Player, id: unknown) {
+    if (!p.achCol) return this.sys(p, 'As conquistas serão ativadas na próxima atualização do servidor.');
+    const a = ACH[id as string]; if (!a || !p.ach.u.includes(a.id)) return;
+    const need = (a.items ?? []).reduce((n, [k, q]) => n + this.slotsNeeded(p, k, q), 0); if (need > this.freeSlots(p)) return this.sys(p, `Libere ${need} espaço(s) na bolsa para receber a recompensa.`);
+    p.ach.u = p.ach.u.filter(x => x !== a.id); p.ach.r.push(a.id);
+    const g = Math.floor(a.gold * (this.cfg.gold || 1)); p.gold = Math.min(2e9, p.gold + g); if (g) p.logs.push(['ach_gold', null, a.id, 0, g, Date.now()]);
+    for (const [k, q] of a.items ?? []) this.give(p, k, q, 0, 'ach');
+    p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
+    this.sys(p, `🏅 Recompensa de "${a.name}" recebida${a.title ? ` · título "${a.title}" liberado` : ''}.`); this.send(p, { t: 'achn', n: p.ach.u.length }); this.sendAch(p);
+  }
   // ---------- Guildas ----------
   private guildSend(gid: number, msg: string) { for (const o of this.players.values()) if (o.guildId === gid) try { o.ws.send(msg); } catch { /* */ } }
   private guildBonus(p: Player) { if (!p.guildId) return 0; let n = 0; for (const o of this.players.values()) if (o !== p && o.guildId === p.guildId && !o.deadUntil && !o.gone) n++; return Math.min(GUILD_XP_MAX, n) * GUILD_XP; }
@@ -587,7 +627,7 @@ export class MapRoom {
       const xp = Math.floor(xpToNext(Math.min(p.level, CONFIG.maxLevel - 1)) * (.4 + Math.min(1.6, r.share * 4))), gold = Math.floor(b.gold[1] * (1 + r.share * 10) * (this.cfg.gold || 1));
       this.addXp(p, xp); p.gold += gold; p.logs.push(['wboss_gold', null, m.def.key, 0, gold, now]);
       const prizes: [string, number][] = i === 0 ? [[box, 3], [jewel, 5]] : i < 3 ? [[box, 2], [jewel, 3]] : i < 10 ? [[box, 1], [jewel, 1]] : [[box, 1]];
-      if (L >= 120) prizes.push(['chaos_feather', i === 0 ? 3 : 1]); if (L >= 210 && i < 3) prizes.push(['void_crystal', 1]);
+      this.achInc(p, 'w'); if (L >= 120) prizes.push(['chaos_feather', i === 0 ? 3 : 1]); if (L >= 210 && i < 3) prizes.push(['void_crystal', 1]);
       const got = [`${xp.toLocaleString('pt-BR')} XP`, `${gold.toLocaleString('pt-BR')} moedas`];
       for (const [k, q] of prizes) if (this.give(p, k, q, 0, 'wboss')) got.push(`${q > 1 ? q + 'x ' : ''}${ITEMS[k].name}`); else got.push(`(sem espaço para ${ITEMS[k].name})`);
       p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
@@ -616,7 +656,7 @@ export class MapRoom {
     if (o?.duel?.with === p.eid) { o.duel = null; if (o.target === p.eid) o.target = 0; }
     for (const a of [p, o]) if (a && !a.gone) this.send(a, { t: 'duel', with: 0 });
     if (!o) return;
-    if (winner) { const loser = winner === p ? o : p; for (const x of this.players.values()) this.sys(x, `🏆 ${winner.name} venceu o duelo contra ${loser.name}!`); this.fx.push({ k: 'lvl', x: winner.x, y: winner.y, id: winner.eid }); }
+    if (winner) { this.achInc(winner, 'd'); const loser = winner === p ? o : p; for (const x of this.players.values()) this.sys(x, `🏆 ${winner.name} venceu o duelo contra ${loser.name}!`); this.fx.push({ k: 'lvl', x: winner.x, y: winner.y, id: winner.eid }); }
     else for (const a of [p, o]) if (!a.gone) this.sys(a, `O duelo terminou empatado${why ? ` (${o === a ? p.name : o.name} ${why})` : ''}.`);
   }
   private pvpHit(p: Player, o: Player, atk: number, crit: number) {
@@ -640,7 +680,7 @@ export class MapRoom {
     p.quest = null; const g = Math.round(q.gold * (this.cfg.gold || 1)); p.gold += g; p.logs.push(['quest_gold', null, q.id, 0, g, Date.now()]);
     for (const [k, n] of q.items) this.give(p, k, n, 0, 'quest');
     this.addXp(p, q.xp); p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
-    this.sys(p, `✔ Missão concluída: +${q.xp.toLocaleString('pt-BR')} XP, +${g.toLocaleString('pt-BR')} moedas, ${q.items.map(([k, n]) => `${n > 1 ? n + 'x ' : ''}${ITEMS[k].name}`).join(', ')}.`);
+    this.achInc(p, 'q'); this.sys(p, `✔ Missão concluída: +${q.xp.toLocaleString('pt-BR')} XP, +${g.toLocaleString('pt-BR')} moedas, ${q.items.map(([k, n]) => `${n > 1 ? n + 'x ' : ''}${ITEMS[k].name}`).join(', ')}.`);
   }
   /** Conta o abate para quem matou e para o grupo dele que está por perto. */
   private questKill(m: Mob, owner: Player) {
@@ -811,7 +851,7 @@ export class MapRoom {
   private upgrade(p: Player, slot: unknown, id: unknown) {
     const j = this.invAt(p, slot), rule = j && this.jewelRules[j.key], it = p.items.find(i => i.id === id); if (!j || !rule || !it || !SLOTS.includes(ITEMS[it.key].kind as Slot) || ITEMS[it.key].kind === 'pet') return;
     const cur = it.plus ?? 0; if (cur < rule.min || cur >= rule.max) return this.sys(p, `${ITEMS[j.key].name} serve para itens de +${rule.min} até +${rule.max - 1}.`);
-    this.takeOne(p, j); const win = Math.random() < rule.chance, was = cur; it.plus = win ? cur + 1 : Math.max(rule.min, cur - rule.fail); p.dirtyItems.add(it.id); p.dirty = true; p.logs.push([win ? 'upgrade_ok' : 'upgrade_fail', it.id, it.key, it.plus, 0, Date.now()]);
+    this.takeOne(p, j); const win = Math.random() < rule.chance, was = cur; it.plus = win ? cur + 1 : Math.max(rule.min, cur - rule.fail); if (win && it.plus > (p.ach.c.pl ?? 0)) p.ach.c.pl = it.plus; p.dirtyItems.add(it.id); p.dirty = true; p.logs.push([win ? 'upgrade_ok' : 'upgrade_fail', it.id, it.key, it.plus, 0, Date.now()]);
     this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: win ? 1 : 0, v: it.plus }); this.sys(p, win ? `${ITEMS[it.key].name} agora é +${it.plus}!` : `A melhoria falhou: ${ITEMS[it.key].name} ${was === it.plus ? 'manteve' : 'caiu para'} +${it.plus}.`);
     this.afterGear(p);
   }
@@ -980,6 +1020,7 @@ export class MapRoom {
     this.fx.push({ k: 'die', x: m.x, y: m.y, id: m.eid });
     { const ks = this.stats(killer); if (ks.lifeK || ks.manaK) { killer.hp = Math.min(ks.maxHp, killer.hp + ks.maxHp * ks.lifeK); killer.mp = Math.min(ks.maxMp, killer.mp + ks.maxMp * ks.manaK); killer.meDirty = true; killer.dirty = true; } }
     if (m.wb) this.worldBossRewards(m);
+    { const own = this.byChar.get([...m.hitBy.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? killer.charId) ?? killer; this.achInc(own, 'k'); if (m.def.boss && !m.wb) this.achInc(own, 'b'); if (m.golden) this.achInc(own, 'g'); }
     let topChar = killer.charId, top = 0; for (const [c, d] of m.hitBy) if (d > top) { top = d; topChar = c; }
     const owner = this.byChar.get(topChar) ?? killer; m.hitBy.clear();
     this.shareXp(owner, m.def.xp, m); this.questKill(m, owner);
@@ -1027,6 +1068,7 @@ export class MapRoom {
     const now = Date.now(), dt = Math.min(.25, (now - this.last) / 1000); this.last = now;
     for (const p of this.players.values()) this.tickPlayer(p, dt, now);
     for (const m of this.mobs.values()) this.tickMob(m, dt, now);
+    if (now >= this.nextAchAll) { this.nextAchAll = now + 3000; for (const p of this.players.values()) this.achCheck(p); }
     this.tickInvasion(now); this.tickWorldBoss(now); this.tickDuels(now);
     if (this.timed.length) { const due = this.timed.filter(t => t.at <= now); if (due.length) { this.timed = this.timed.filter(t => t.at > now); for (const t of due) t.run(); } }
     this.separateMobs();
@@ -1140,7 +1182,7 @@ export class MapRoom {
     const near = (o: Pt) => Math.abs(o.x - p.x) < R && Math.abs(o.y - p.y) < R;
     const note = (id: number, full: () => unknown) => { seen.add(id); if (!p.known.has(id)) { p.known.add(id); news.push(full()); } };
     for (const o of this.players.values()) if (near(o)) {
-      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; const gg = o.guildId ? this.guilds.get(o.guildId) : undefined; return { id: o.eid, k: 'p', ...(gg ? { gt: gg.tag, gc: gg.color } : {}), name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), pet: by('pet'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
+      note(o.eid, () => { const by = (s: string) => o.items.find(i => i.equip === s)?.key ?? null; const gg = o.guildId ? this.guilds.get(o.guildId) : undefined, ti = o.ach.t ? ACH[o.ach.t]?.title : undefined; return { id: o.eid, k: 'p', ...(gg ? { gt: gg.tag, gc: gg.color } : {}), ...(ti ? { ti } : {}), name: o.name, cls: o.cls, lv: o.level, hc: o.hairColor, hs: o.hairStyle, res: o.resets, mr: o.mr, wings: by('wings'), plus: Math.floor(o.items.filter(i => i.equip && i.equip !== 'wings').reduce((a, i) => a + (i.plus ?? 0), 0) / 5), weapon: by('weapon'), pet: by('pet'), helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots') }; });
       e.push([o.eid, round(o.x), round(o.y), Math.ceil(o.hp / o.maxHpC * 100)]);
     }
     for (const m of this.mobs.values()) if (m.hp > 0 && near(m)) { note(m.eid, () => (m.wb ? { id: m.eid, k: 'm', mob: m.def.key, wb: 1 } : m.golden ? { id: m.eid, k: 'm', mob: m.def.key, g: 1 } : { id: m.eid, k: 'm', mob: m.def.key })); e.push([m.eid, round(m.x), round(m.y), Math.ceil(m.hp / m.def.hp * 100)]); }

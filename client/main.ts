@@ -1,3 +1,4 @@
+import { ACHIEVEMENTS, ACH_CATS, type AchState } from '../shared/achievements';
 import { PET_RECIPES, petText, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_COLORS, GUILD_RANKS, GUILD_XP, GUILD_XP_MAX, fmtRes, MR_RESETS, MR_GOLD, MR_POINTS, WTYPE_NAME, MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
 import { VERSION } from '../shared/version';
 import { quests } from '../shared/quests';
@@ -74,6 +75,7 @@ let ents = new Map<number, Ent>(), target = 0, auto = false, autoLoot = false, r
 let pred: { x: number; y: number; path: { x: number; y: number }[] | null; stop: number; tx: number; ty: number; hold: number } | null = null;
 type GuildInfo = { id: number; name: string; tag: string; color: number; leader: number; notice: string; me: number; m: { id: number; name: string; rank: number; lv: number; cls: string; res: number; mr: number }[] };
 let guild: GuildInfo | null = null;
+let achS: AchState | null = null, achV: Record<string, number> = {}, achOff = false;
 let myCls = CLASSES.dark_warrior, party: { m: { id: number; name: string }[]; leader: number; mode: number; me: number } | null = null, menuFor: Ent | null = null, bolts: { x: number; y: number; tx: number; ty: number; t: number; c: string }[] = [];
 let myLook: { hc: number; hs: number } = { hc: 0, hs: 0 }, Z = 2, camX = 0, camY = 0, pingTimer = 0, lastFrame = 0, reconnectTimer = 0;
 const cds: Record<number, { until: number; ms: number }> = {};
@@ -127,13 +129,15 @@ function handle(m: any) {
     case 'me': { const lv = me?.level; me = m; updateHud(); updateQuest(); if (lv !== undefined && lv !== m.level) { beep(660, 400, 'triangle', .06); setTimeout(() => beep(880, 300, 'triangle', .05), 120); } if (shop?.shop === 'missoes') renderShop(); break; }
     case 'inv': chest = m.chest ?? []; items = m.items; updateHud(); renderInv(); drawPortrait(); if (shop) renderShop(); break;
     case 's': snapshot(m); break;
-    case 'sys': log(m.m, 'sys'); if (String(m.m).startsWith('☠')) { const el = $('#toast'); el.textContent = String(m.m).split('! ')[0] + (String(m.m).includes('! ') ? '!' : ''); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(90, 500, 'sawtooth', .05); } break;
+    case 'sys': log(m.m, 'sys'); if (String(m.m).startsWith('☠') || String(m.m).startsWith('🏅 Conquista')) { const el = $('#toast'); el.textContent = String(m.m).split('! ')[0] + (String(m.m).includes('! ') ? '!' : ''); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(90, 500, 'sawtooth', .05); } break;
     case 'wbr': { const el = $('#wbrank'); if (!m.top?.length) { el.innerHTML = ''; el.style.display = 'none'; break; } el.style.display = 'block'; el.innerHTML = `<b>Dano no Chefe Mundial</b>${m.top.map((r: [string, number], i: number) => `<div><span>${i + 1}. ${esc(r[0])}</span><span>${r[1]}%</span></div>`).join('')}${m.me && m.me[0] > 5 ? `<div class=me><span>${m.me[0]}. Você</span><span>${m.me[1]}%</span></div>` : ''}`; break; }
     case 'c': log(`${m.ch === 'u' ? '[Guilda] ' : ''}<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : m.ch === 'u' ? 'gu' : '', true); break;
     case 'cd': cds[m.n] = { until: performance.now() + m.ms, ms: m.ms }; break;
     case 'kick': log(m.m, 'sys'); break;
     case 'party': party = m.m ? m : null; renderParty(); break;
     case 'guild': guild = m.g ? { ...m.g, me: m.me } : null; renderGuild(); if (shop?.shop === 'guild') renderShop(); break;
+    case 'ach': achOff = !!m.off; if (!m.off) { achS = m.s; achV = m.v; } renderAch(); break;
+    case 'achn': { const b = $('#achb'); b.dataset.n = m.n ? String(m.n) : ''; b.classList.toggle('glow', m.n > 0); $('#more').classList.toggle('dot', m.n > 0); break; }
     case 'ginv': inviteKind = 'g'; $('#invt').textContent = `${m.from} convidou você para a guilda «${m.tag}» ${m.name}.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
     case 'pinv': inviteKind = 'p'; $('#invt').textContent = `${m.from} convidou você para um grupo.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
     case 'dinv': inviteKind = 'd'; $('#invt').textContent = `${m.from} desafiou você para um duelo (2 minutos, ninguém morre).`; $('#invite').style.display = 'block'; beep(330, 250, 'sawtooth', .05); break;
@@ -211,9 +215,9 @@ function drawPortrait() { const c = $<HTMLCanvasElement>('#portrait'), x = c.get
 function myGear(): Look { const by = (s: string) => items.find(i => i.equip === s)?.key ?? null; return lookFromGear(myCls.name, HAIR_COLORS[myLook.hc], myLook.hs, { helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots'), weapon: by('weapon') }); }
 
 // ---------- janelas ----------
-const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); if (w === 'guild') renderGuild(); };
+const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); if (w === 'guild') renderGuild(); if (w === 'ach') { send({ t: 'achq' }); renderAch(); } };
 function closeWin(w: string) { $('#w-' + w).style.display = 'none'; if (w === 'shop') shop = null; }
-function closeWins() { ['inv', 'char', 'map', 'shop', 'rank', 'guild'].forEach(closeWin); }
+function closeWins() { ['inv', 'char', 'map', 'shop', 'rank', 'guild', 'ach'].forEach(closeWin); }
 async function renderRank() { const ob = $('#onlb'); ob.replaceChildren(); api('online').then(({ online }) => { if (!online.length) { const tr = document.createElement('tr'), td = document.createElement('td'); td.colSpan = 4; td.textContent = 'Ninguém online.'; tr.appendChild(td); ob.appendChild(tr); } for (const p of online) { const tr = document.createElement('tr'); for (const v of [p.name, p.cls, `${p.resets || p.mr ? `${fmtRes(p.resets, p.mr)} · ` : ''}${p.level}`, p.map]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } ob.appendChild(tr); } }).catch(() => { /* sem conexão */ });
   const b = $('#rankb'); b.replaceChildren(); try { const { ranking } = await api('ranking'); ranking.forEach((r: any, n: number) => { const tr = document.createElement('tr'); for (const v of [n + 1, r.name, r.class, fmtRes(r.resets, r.mr), r.ml, r.level]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } b.appendChild(tr); }); } catch { /* sem conexão */ } }
 const toggle = (w: string) => $('#w-' + w).style.display === 'block' ? closeWin(w) : openW(w);
@@ -390,7 +394,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Enter') { const i = $<HTMLInputElement>('#chati'); if (!tgtTyping()) { e.preventDefault(); i.focus(); } return; }
   if (e.key === 'Escape') { $('#chati').blur(); closeWins(); return; }
   if (e.repeat) return;
-  if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === 'n') { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); } else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
+  if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === 'k') toggle('ach'); else if (k === 'n') { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); } else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
 let chan: 'l' | 'g' | 'p' | 'u' = 'l';
@@ -415,6 +419,28 @@ function renderTrade() {
   const bag = $('#tbag'); bag.replaceChildren(); const sel = trade.mine.items.map((i: ItemInst) => i.id);
   for (const i of items.filter(x => !x.equip).sort((a, b2) => a.slot - b2.slot)) { if (sel.includes(i.id)) continue; bag.appendChild(makeCell(i, () => pushOffer([...sel, i.id]))); }
   const hostM = $('#tmine'); trade.mine.items.forEach((i: ItemInst, n: number) => { (hostM.children[n] as HTMLElement).onclick = () => pushOffer(sel.filter((x: string) => x !== i.id)); });
+}
+function renderAch() {
+  const W = $('#achp'); if (!W) return;
+  if (achOff) { W.innerHTML = '<div class="info">As conquistas serão ativadas na próxima atualização do servidor.</div>'; return; }
+  if (!achS) { W.innerHTML = '<div class="info">Carregando…</div>'; return; }
+  const S = achS, done = S.r.length, total = ACHIEVEMENTS.length; W.replaceChildren();
+  const head = document.createElement('div'); head.className = 'achhead';
+  const titles = ACHIEVEMENTS.filter(a => a.title && S.r.includes(a.id));
+  head.innerHTML = `<b>${done}/${total} conquistas</b><div class="achbar"><i style="width:${done / total * 100}%"></i></div>`;
+  const sel = document.createElement('select'); sel.innerHTML = `<option value="">Sem título</option>${titles.map(a => `<option value="${a.id}"${S.t === a.id ? ' selected' : ''}>${esc(a.title!)}</option>`).join('')}`; sel.disabled = !titles.length; sel.onchange = () => send({ t: 'acht', id: sel.value });
+  const lab = document.createElement('label'); lab.className = 'achtitle'; lab.append('Título acima do nome: ', sel); head.appendChild(lab); W.appendChild(head);
+  for (const cat of ACH_CATS) {
+    const h = document.createElement('h4'); h.className = 'shoph'; h.textContent = cat; W.appendChild(h);
+    for (const a of ACHIEVEMENTS.filter(x => x.cat === cat).sort((x, y) => (S.u.includes(y.id) ? 1 : 0) - (S.u.includes(x.id) ? 1 : 0))) {
+      const got = S.r.includes(a.id), ready = S.u.includes(a.id), v = Math.min(a.goal, achV[a.stat] ?? 0), row = document.createElement('div'); row.className = 'achrow' + (got ? ' got' : ready ? ' ready' : '');
+      const fmt = (n: number) => n >= 1e6 ? (n / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi' : n.toLocaleString('pt-BR');
+      const prize = [a.gold ? `${fmt(a.gold)} moedas` : '', ...(a.items ?? []).map(([k, q]) => `${q > 1 ? q + 'x ' : ''}${ITEMS[k].name}`), a.title ? `título "${a.title}"` : ''].filter(Boolean).join(' · ');
+      row.innerHTML = `<div class="achic">${got ? '✔' : ready ? '🏅' : '◇'}</div><div class="achtx"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><div class="achbar"><i style="width:${got || ready ? 100 : v / a.goal * 100}%"></i><span>${got || ready ? 'Concluída' : `${fmt(v)} / ${fmt(a.goal)}`}</span></div><small class="achpz">🎁 ${esc(prize)}</small></div>`;
+      if (ready) { const b = document.createElement('button'); b.className = 'main'; b.textContent = 'Pegar'; b.onclick = () => send({ t: 'achc', id: a.id }); row.appendChild(b); }
+      W.appendChild(row);
+    }
+  }
 }
 function renderGuild() {
   const W = $('#guildp'); if (!W) return; W.replaceChildren();
@@ -647,6 +673,7 @@ function frame(ts: number) {
     if (e.k === 's') continue;
     if (e.k === 'd') { label(e.x * 32, e.y * 32 - 22, e.info.key ? `${cmpItem({ key: e.info.key, rarity: e.info.rarity })?.arrow === '▲' ? '▲ ' : ''}${ITEMS[e.info.key].name}` : `${e.info.gold} moedas`, e.info.key ? (ITEMS[e.info.key].set ? '#ffd76a' : RARITY[e.info.rarity].color) : '#f0d27a'); continue; }
     const h = e.k === 'p' ? 50 : mobSize(e.info.mob) * (e.info.wb ? 1.4 : 1) + 10, X = Math.round(e.x * 32), Y = Math.round(e.y * 32) - h, boss = e.k === 'm' && MOBS[e.info.mob].boss, bw = boss ? 72 : 32;
+    if (e.k === 'p' && e.info.ti) label(X, Y - 19, `✦ ${e.info.ti} ✦`, '#ffd76a');
     if (e.k === 'p' || e.id === target || boss || e.info.g) label(X, Y - 6, e.k === 'p' ? `${e.info.gt ? `«${e.info.gt}» ` : ''}${e.info.res || e.info.mr ? `[${fmtRes(e.info.res, e.info.mr)}] ` : ''}${e.info.name}` : `${e.info.g ? '★ ' : e.info.wb ? '☠ ' : ''}${MOBS[e.info.mob].name}${e.info.g ? ' Dourado' : e.info.wb ? ' Desperto' : ''} Nv${MOBS[e.info.mob].level}`, e.id === target ? '#ffd24a' : e.k === 'p' ? '#fff' : e.info.g ? '#ffe08a' : e.info.wb ? '#ff6a4a' : '#ffb4a8');
     g.fillStyle = '#0a0814'; g.fillRect(X - bw / 2 - 1, Y - 3, bw + 2, 6); g.fillStyle = '#3a2f4a'; g.fillRect(X - bw / 2, Y - 2, bw, 4); { const w = Math.round(bw * e.hp / 100); g.fillStyle = e.k !== 'p' ? '#e0425a' : e.hp > 50 ? '#58d36a' : e.hp > 25 ? '#f0cf65' : '#ff6b6b'; g.fillRect(X - bw / 2, Y - 2, w, 4); g.fillStyle = '#ffffff66'; g.fillRect(X - bw / 2, Y - 2, w, 1); }
   }
