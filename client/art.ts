@@ -548,17 +548,35 @@ export function wingSprites(cls: string, tier: number): Cv[] {
   };
   const wing = (g: G) => {
     const dark = shade(t.c, -48), light = shade(t.c, 22);
-    if (t.style === 'bat' || t.style === 'bone') {
+    if (t.style === 'fairy') { // asas de fada: dois pares translúcidos, com veias e brilho
+      const part = (len: number, wid: number, a: number, spot: number) => { g.save(); g.rotate(a);
+        g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(len * .25, -wid * 1.15, len * .95, -wid * 1.05, len, -wid * .1); g.bezierCurveTo(len * 1.02, wid * .55, len * .4, wid * .62, 0, 0); g.closePath();
+        const gr = g.createLinearGradient(0, -wid, len, wid); gr.addColorStop(0, t.c); gr.addColorStop(.55, '#a8d8ff'); gr.addColorStop(1, t.c2); g.fillStyle = gr; g.globalAlpha = .58; g.fill(); g.globalAlpha = 1;
+        g.lineWidth = .9; g.strokeStyle = '#ffffffcc'; g.stroke();
+        for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(1.5, 0); g.quadraticCurveTo(len * .45, -wid * (.75 - k * .38), len * (.93 - k * .07), -wid * (.45 - k * .3)); g.lineWidth = .45; g.strokeStyle = '#ffffff99'; g.stroke(); }
+        g.beginPath(); g.arc(len * .7, -wid * .2, spot, 0, 6.3); g.fillStyle = t.c2; g.globalAlpha = .85; g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(len * .7, -wid * .2, spot * .45, 0, 6.3); g.fillStyle = '#fff'; g.fill();
+        g.restore(); };
+      if (tier >= 2) { g.save(); g.rotate(1.12); g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(L * .5, -2.5, L * .85, 1); g.quadraticCurveTo(L * .5, 3, 0, 0); g.fillStyle = t.c2; g.globalAlpha = .55; g.fill(); g.globalAlpha = 1; g.restore(); }
+      part(L * .74, L * .3, .62, 1.6 + tier * .3); part(L * 1.02, L * .44, -.82, 2.2 + tier * .4);
+      for (let i = 0; i < 4 + tier * 2; i++) { const a = -1.5 + i * .37, d = L * (.55 + (i * 37 % 40) / 100); g.fillStyle = i % 2 ? '#ffffff' : t.c2; g.fillRect(Math.cos(a) * d, Math.sin(a) * d, 1.2, 1.2); }
+      return;
+    }
+    if (t.style === 'bat' || t.style === 'bone' || t.style === 'dragon') {
       const n = 3 + tier, ang = (i: number) => -1.32 + i * (2.15 / (n - 1)), len = (i: number) => L * (1.05 - Math.abs(i / (n - 1) - .18) * .5), px = (i: number) => Math.cos(ang(i)) * len(i), py = (i: number) => Math.sin(ang(i)) * len(i);
       g.beginPath(); g.moveTo(0, 0); g.lineTo(px(0), py(0));
       for (let i = 0; i < n - 1; i++) { const mx = (px(i) + px(i + 1)) / 2 * .72, my = (py(i) + py(i + 1)) / 2 * .72; g.quadraticCurveTo(mx, my, px(i + 1), py(i + 1)); }
       g.closePath(); const gr = g.createRadialGradient(0, 0, 2, 0, 0, L); gr.addColorStop(0, t.style === 'bone' ? '#1c1230' : dark); gr.addColorStop(1, t.c); g.fillStyle = gr; g.globalAlpha = t.style === 'bone' ? .86 : .96; g.fill(); g.globalAlpha = 1;
-      const b = t.style === 'bone' ? t.c2 : shade(t.c, -70); g.lineCap = 'round';
+      const b = t.style === 'bone' ? t.c2 : t.style === 'dragon' ? shade(t.c, -40) : shade(t.c, -70); g.lineCap = 'round';
       for (let i = 0; i < n; i++) { g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(px(i) * .5 + 2, py(i) * .5 - 3, px(i), py(i)); g.lineWidth = i === 0 ? 2 : 1.1; g.strokeStyle = b; g.stroke(); g.beginPath(); g.arc(px(i), py(i), i === 0 ? 1.5 : .9, 0, 6.3); g.fillStyle = t.style === 'bone' ? '#f1ecd9' : t.c2; g.fill(); }
-      if (t.style === 'bat') { g.beginPath(); g.arc(px(0) * .62, py(0) * .62, 1.4, 0, 6.3); g.fillStyle = t.c2; g.fill(); }
+      if (t.style === 'bat' || t.style === 'dragon') { // garra no "polegar" da asa
+        const jx = px(0) * .62, jy = py(0) * .62; g.beginPath(); g.moveTo(jx - 1.4, jy + .5); g.quadraticCurveTo(jx + 1, jy - 4, jx + 3.2, jy - 3.4); g.lineTo(jx + 1.4, jy + .6); g.closePath(); g.fillStyle = t.style === 'dragon' ? '#f1e3b8' : '#e8d6c0'; g.fill(); }
+      if (t.style === 'dragon') { // espinhos no braço da asa e escamas
+        for (let k = 1; k <= 4 + tier; k++) { const u = k / (5 + tier), x = px(0) * u, y = py(0) * u, nx = Math.sin(ang(0)), ny = -Math.cos(ang(0)); g.beginPath(); g.moveTo(x - nx * .2 - Math.cos(ang(0)) * 1.4, y - ny * .2 - Math.sin(ang(0)) * 1.4); g.lineTo(x - nx * 3.4, y - ny * 3.4); g.lineTo(x + Math.cos(ang(0)) * 1.4, y + Math.sin(ang(0)) * 1.4); g.closePath(); g.fillStyle = t.c2; g.fill(); }
+        g.globalAlpha = .22; for (let i = 0; i < 26 + tier * 8; i++) { const a = ang(0) + (i * .618 % 1) * (ang(n - 1) - ang(0)) * .9, d = L * (.25 + (i * .381 % 1) * .55); g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, 1.3, 0, 3.14); g.strokeStyle = t.c2; g.lineWidth = .5; g.stroke(); } g.globalAlpha = 1;
+      }
       return;
     }
-    const pointed = t.style !== 'feather', rot = (a: number, f: () => void) => { g.save(); g.rotate(a); f(); g.restore(); };
+    const pointed = t.style !== 'feather' && t.style !== 'angel', rot = (a: number, f: () => void) => { g.save(); g.rotate(a); f(); g.restore(); };
     if (t.style === 'blade') { const n = 7 + tier * 2; for (let i = n - 1; i >= 0; i--) { const u = i / (n - 1); rot(-1.3 + u * 2.3, () => blade(g, L * (1 - Math.abs(u - .25) * .55), 3.6, dark, t.c2, shade(t.c, -70), true, t.c2)); } return; }
     const upper = 8 + tier * 3; for (let i = upper - 1; i >= 0; i--) { const u = i / (upper - 1); rot(-1.3 + u * 1.12, () => blade(g, L * (.84 + Math.sin(u * 3.14) * .2), 3.6, t.c, t.c2, dark, pointed, shade(t.c, 45))); }
     const lower = 6 + tier * 2; for (let i = lower - 1; i >= 0; i--) { const u = i / (lower - 1); rot(.0 + u * 1.12, () => blade(g, L * (.76 - u * .3), 3.5, t.c, t.c2, dark, pointed, shade(t.c, 45))); }
@@ -643,7 +661,13 @@ export function icon(key: string | null): Cv {
   else if (d.kind === 'pants') { r(g, 7, 4, 14, 8, t); r(g, 7, 12, 6, 13, t); r(g, 15, 12, 6, 13, dk); r(g, 7, 4, 14, 2, l); }
   else { r(g, 6, 5, 7, 16, t); r(g, 6, 20, 12, 5, dk); r(g, 16, 8, 6, 12, dk); r(g, 16, 20, 10, 5, t); }
   if (d?.kind === 'pet') { g.clearRect(0, 0, 28, 28); g.drawImage(petArt(d.key, 0), -1, -1); }
-  if (d?.kind === 'wings') { const th = WING_THEME[d.cls!]; for (let x = 0; x < 13; x++) { const top = 5 + Math.round(x * .25), bot = 22 - Math.round(x * .55) + (x % 3); r(g, 14 + x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 13 - x, top, 1, bot - top, x % 3 ? th.c : shade(th.c, -30)); r(g, 14 + x, top, 1, 2, th.c2); r(g, 13 - x, top, 1, 2, th.c2); } r(g, 12, 7, 4, 15, shade(th.c, -45)); const tc = ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][d.wtier ?? 0]; if (tc) { r(g, 12, 10, 4, 4, tc); r(g, 13, 11, 2, 2, '#fff'); } if ((d.wtier ?? 0) >= 3) for (let i = 0; i < d.wtier! - 2; i++) { r(g, 3 + i * 3, 3, 2, 2, tc); r(g, 23 - i * 3, 3, 2, 2, tc); } }
+  if (d?.kind === 'wings') { // miniatura das próprias asas, recortada no desenho
+    const w = wingSprites(d.cls!, d.wtier!)[2], tmp = cv(w.width, w.height), tg = ctx(tmp); tg.drawImage(w, 0, 0); const im = tg.getImageData(0, 0, w.width, w.height).data;
+    let x0 = w.width, y0 = w.height, x1 = 0, y1 = 0; for (let y = 0; y < w.height; y += 2) for (let x = 0; x < w.width; x += 2) if (im[(y * w.width + x) * 4 + 3] > 170) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const bw = Math.max(1, x1 - x0), bh = Math.max(1, y1 - y0), q = Math.min(27 / bw, 25 / bh); g.clearRect(0, 0, 28, 28); g.imageSmoothingEnabled = true; g.drawImage(w, x0, y0, bw, bh, (28 - bw * q) / 2, (28 - bh * q) / 2, bw * q, bh * q); g.imageSmoothingEnabled = false;
+    const tc = ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][d.wtier ?? 0]; if ((d.wtier ?? 0) >= 3) for (let i = 0; i < d.wtier! - 2; i++) r(g, 1 + i * 3, 1, 2, 2, tc);
+    iconCache.set(k, c); return c;
+  }
   if (d?.set) {
     const S = SETS[d.set], tr = S.trim;
     if (d.kind === 'helm') {

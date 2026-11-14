@@ -1,7 +1,8 @@
 // Versão do jogo mostrada no site e no jogo. Ao lançar uma atualização: troque VERSION (e o package.json) e coloque um item novo no topo de CHANGELOG.
-export const VERSION = '0.37.1';
+export const VERSION = '0.38.0';
 export interface Release { v: string; date: string; title: string; items: string[] }
 export const CHANGELOG: Release[] = [
+  { v: '0.38.0', date: '14/11/2026', title: 'Asas com a cara de cada classe', items: ['Dark Warrior: asas de morcego, com garras', 'Arcane Wizard: asas de anjo, de penas brancas', 'Mystic Archer: asas de fada, translúcidas, com dois pares e brilho', 'Spell Knight: asas de dragão, com espinhos e escamas', 'Shadow Summoner: asas de ossos do Abismo', 'Ícones das asas na bolsa agora mostram as próprias asas'] },
   { v: '0.37.1', date: '14/11/2026', title: 'Som e ícone', items: ['Botão 🔊 para ligar e desligar o som (ou tecla N); a escolha fica salva no aparelho', 'Novo ícone do site: espada alada em pixel art, também na tela inicial do celular'] },
   { v: '0.37.0', date: '13/11/2026', title: 'Pets', items: ['Novo espaço de equipamento: Pet', '5 pets criados com Alaric (Artífice): Anjo Guardião, Diabinho, Unicórnio, Fenrir e Dragão Ancestral', 'Cada pet dá um bônus próprio: ataque, absorção, defesa, moedas, crítico ou vida', 'Com um pet equipado, os itens são recolhidos num raio bem maior', 'O pet segue o personagem pelo mapa, voando ou andando ao lado'] },
   { v: '0.36.0', date: '13/11/2026', title: 'Guildas', items: ['Funde sua guilda com Bertrand, o Mestre das Guildas (Valoria e Solmira): nome, sigla e cor', 'Até 30 membros, com mestre, até 3 assistentes, aviso da guilda e passagem de liderança', 'Sigla da guilda aparece antes do nome do personagem', 'Canal Guilda no chat, funciona em qualquer mapa', 'Bônus de XP de +5% por colega de guilda caçando no mesmo mapa (até +20%)', 'Ranking de guildas no site'] },
