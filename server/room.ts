@@ -1,4 +1,4 @@
-import { PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { adminItem, adminSet, goodFactor, excChance, ancChance, PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
 import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG } from '../shared/events';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
@@ -64,7 +64,26 @@ export class MapRoom {
     const route = new URL(req.url).pathname;
     if (route === '/settings') { this.applyCfg(cleanSettings(await req.json())); this.cfgReady = Promise.resolve(); return new Response('{}'); }
     if (route === '/news') { const b: any = await req.json(); this.send_all(JSON.stringify({ t: 'news', m: b.m })); return new Response('{}'); }
-    if (route === '/kick') { const b: any = await req.json(); for (const p of [...this.players.values()]) if (p.accountId === b.account) { this.send(p, { t: 'kick', m: 'Conta suspensa.' }); try { p.ws.close(4000, 'banned'); } catch { /* */ } this.leave(p); } return new Response('{}'); }
+    if (route === '/kick') { const b: any = await req.json(); for (const p of [...this.players.values()]) if (p.accountId === b.account) { this.send(p, { t: 'kick', m: b.m || 'Conta suspensa.' }); try { p.ws.close(4000, 'banned'); } catch { /* */ } this.leave(p); } return new Response('{}'); }
+    if (route === '/admin') { // painel admin: só age se o personagem estiver nesta sala
+      const b: any = await req.json(), ok = (x: object) => new Response(JSON.stringify({ handled: 1, ...x }));
+      if (b.op === 'giftall') { const spec = adminItem(b.item); let n = 0; for (const p of this.players.values()) { let got = false; if (typeof spec !== 'string') got = this.adminGive(p, spec, b.note); if (b.gold > 0) { p.gold = Math.min(2e9, p.gold + Math.floor(b.gold)); p.dirty = true; p.meDirty = true; p.logs.push(['admin_gold', null, null, 0, Math.floor(b.gold), Date.now()]); this.sys(p, `🎁 Presente do administrador: ${Math.floor(b.gold).toLocaleString('pt-BR')} moedas!`); got = true; } if (got) n++; } return new Response(JSON.stringify({ n })); }
+      const p = this.byChar.get(b.char); if (!p) return new Response('{}');
+      if (b.op === 'info') return ok({ char: { id: p.charId, name: p.name, cls: p.cls, level: p.level, resets: p.resets, mr: p.mr, ml: p.ml, points: p.points, mpts: p.mpts, str: p.str, agi: p.agi, vit: p.vit, ene: p.ene, gold: p.gold, map: this.mapId, online: 1 }, items: [...p.items, ...p.chest] });
+      if (b.op === 'set') {
+        const set = adminSet(b.set); if (typeof set === 'string') return ok({ error: set });
+        const q = p as any; for (const [k, v] of Object.entries(set)) q[k] = v;
+        if (set.level !== undefined) p.xp = 0;
+        if (b.addGold) p.gold = Math.max(0, Math.min(2e9, p.gold + Math.floor(Number(b.addGold) || 0)));
+        p.dirty = true; p.meDirty = true; this.forgetLook(p); await this.flush(p); this.sys(p, 'O administrador atualizou o seu personagem.'); return ok({});
+      }
+      if (b.op === 'give') { const spec = adminItem(b.item); if (typeof spec === 'string') return ok({ error: spec }); if (!this.adminGive(p, spec, b.note)) return ok({ error: `A bolsa de ${p.name} está cheia.` }); await this.flush(p); return ok({}); }
+      if (b.op === 'take') {
+        for (const list of [p.items, p.chest]) { const i = list.findIndex(x => x.id === b.id); if (i < 0) continue; const [it] = list.splice(i, 1); p.dirtyItems.delete(it.id); p.qtyItems.delete(it.id); p.delItems.add(it.id); p.logs.push(['admin_take', it.id, it.key, it.qty, 0, Date.now()]); if (it.equip) this.forgetLook(p); p.dirty = true; p.meDirty = true; this.sendInv(p); await this.flush(p); return ok({}); }
+        return ok({ error: 'Item não encontrado.' });
+      }
+      return ok({ error: 'Operação desconhecida.' });
+    }
     if (route === '/player') { const b: any = await req.json(), p = this.byChar.get(b.char); if (!p) return new Response('{}'); if (b.level > p.level) p.points += (b.level - p.level) * CONFIG.pointsPerLevel; p.level = b.level; p.xp = 0; p.gold = b.gold; p.dirty = true; p.meDirty = true; for (const o of this.players.values()) o.known.delete(p.eid); await this.flush(p); return new Response('{"handled":true}'); }
     if (route === '/dropchar') { // personagem sendo excluído: tira do mapa e espera a última gravação terminar
       const b: any = await req.json(), p = this.byChar.get(b.char);
@@ -100,7 +119,7 @@ export class MapRoom {
     for (const k of Object.keys(MOBS)) {
       const base = MOBS[k], o = c.mobs[k] ?? {}, d = this.defs[k], old = d.hp;
       d.hp = Math.max(1, Math.round((o.hp ?? base.hp) * c.hp)); d.dmg = Math.round((o.dmg ?? base.dmg) * c.dmg); d.def = o.def ?? base.def; d.xp = Math.round((o.xp ?? base.xp) * c.xp); d.respawnMs = Math.round((o.respawnMs ?? base.respawnMs) * c.respawn);
-      d.gold = [Math.round(base.gold[0] * c.gold), Math.round(base.gold[1] * c.gold)]; d.drops = base.drops.map(([i, ch]) => [i, Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop))]);
+      d.gold = [Math.round(base.gold[0] * c.gold), Math.round(base.gold[1] * c.gold)]; d.drops = base.drops.map(([i, ch]) => [i, Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop) * goodFactor(i, c.good))]);
       if (old !== d.hp) for (const m of this.mobs.values()) if (m.def === d && m.hp > 0) m.hp = Math.max(1, Math.ceil(m.hp / old * d.hp));
     }
     for (const k of Object.keys(JEWELS)) this.jewelRules[k].chance = c.jewels[k] ?? JEWELS[k].chance;
@@ -387,7 +406,7 @@ export class MapRoom {
     for (let n = 0; n < b.picks; n++) {
       let r = Math.random() * 100, row = b.table[b.table.length - 1]; for (const t of b.table) { if (r < t[0]) { row = t; break; } r -= t[0]; }
       if (row[1] !== 'gear' || !pool.length) { prizes.push({ key: row[1] === 'gear' ? 'jewel_aurora' : row[1], qty: row[2], rarity: 0, opts: [] }); continue; }
-      const d = pool[Math.floor(Math.random() * pool.length)], q = Math.random(), anc = q < b.anc, exc = !anc && q < b.anc + b.exc;
+      const d = pool[Math.floor(Math.random() * pool.length)], q = Math.random(), anc = q < b.anc * .6 * this.cfg.good, exc = !anc && q < (b.anc + b.exc) * .6 * this.cfg.good;
       const ops = [...(d.kind === 'weapon' || d.kind === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5);
       prizes.push({ key: d.key, qty: 1, rarity: anc ? 4 : exc ? 3 : Math.random() < .15 ? 2 : Math.random() < .35 ? 1 : 0, opts: anc ? ops.slice(0, Math.random() < .3 ? 3 : 2) : exc ? ops.slice(0, Math.random() < .3 ? 2 : 1) : [] });
     }
@@ -421,6 +440,16 @@ export class MapRoom {
     }
     for (const p of this.players.values()) this.sys(p, `⚜ INVASÃO DOURADA em ${this.map.name}! 8 monstros dourados apareceram por 10 minutos: muito mais XP, moedas, baús e joias.`);
     for (const id of MAP_IDS) if (id !== this.mapId) this.env.MAP_ROOM.get(this.env.MAP_ROOM.idFromName(id + ':e'), { locationHint: 'enam' }).fetch(new Request('https://room/news', { method: 'POST', body: JSON.stringify({ m: `⚜ Invasão Dourada começou em ${this.map.name} (10 minutos)!` }) })).catch(() => null);
+  }
+  /** Entrega um item criado pelo admin (com raridade, melhoria e opções). false se não couber na bolsa. */
+  private adminGive(p: Player, it: { key: string; qty: number; rarity: number; plus: number; opts: string[] }, note?: string) {
+    const d = ITEMS[it.key], stack = isStack(d), need = stack ? this.slotsNeeded(p, it.key, it.qty) : it.qty; if (need > this.freeSlots(p)) return false;
+    const before = new Set(p.items.map(i => i.id));
+    if (stack) this.give(p, it.key, it.qty, 0, 'admin'); else for (let n = 0; n < it.qty; n++) this.give(p, it.key, 1, it.rarity, 'admin', [...it.opts]);
+    for (const i of p.items) if (!before.has(i.id) && it.plus) i.plus = it.plus;
+    p.dirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
+    const nm = `${it.qty > 1 ? it.qty.toLocaleString('pt-BR') + 'x ' : ''}${d.name}${it.plus ? ` +${it.plus}` : ''}${it.rarity ? ` (${RARITY[it.rarity].name})` : ''}`;
+    this.sys(p, `🎁 Presente do administrador: ${nm}${note ? ` — ${String(note).slice(0, 80)}` : ''}`); return true;
   }
   // ---------- Guildas ----------
   private guildSend(gid: number, msg: string) { for (const o of this.players.values()) if (o.guildId === gid) try { o.ws.send(msg); } catch { /* */ } }
@@ -957,7 +986,7 @@ export class MapRoom {
     const [lo, hi] = m.def.gold, now = Date.now();
     const drop = (key: string | null, gold: number, rarity: number, opts: string[] = []) => { const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, opts, owner: owner.charId, party: owner.partyId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
     drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
-    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), lm = (1 + Math.max(0, m.def.level - 100) / 100) * (m.def.boss ? 2 : 1), anc = gear && k !== 'wings' && k !== 'pet' && Math.random() < .003 * lm * this.cfg.exc, exc = gear && k !== 'wings' && k !== 'pet' && Math.random() < .03 * lm * this.cfg.exc; if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .08 * lm ? 2 : Math.random() < Math.min(.6, .3 * lm) ? 1 : 0; drop(key, 0, r); }
+    for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), lm = (1 + Math.max(0, m.def.level - 100) / 100) * (m.def.boss ? 2 : 1), il = ITEMS[key].lvl, anc = gear && k !== 'wings' && k !== 'pet' && Math.random() < ancChance(il, lm, this.cfg.exc), exc = gear && k !== 'wings' && k !== 'pet' && Math.random() < excChance(il, lm, this.cfg.exc); if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .05 * lm / (1 + il / 200) ? 2 : Math.random() < Math.min(.5, .22 * lm) ? 1 : 0; drop(key, 0, r); }
     if (m.def.boss && !m.wb) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
   private addXp(p: Player, xp: number) {

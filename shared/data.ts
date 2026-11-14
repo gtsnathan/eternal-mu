@@ -359,15 +359,36 @@ export function derive(b: Base, items: ItemInst[]) {
 }
 export const rollDamage = (atk: number, def: number, rnd: number) => Math.max(1, Math.round((atk - def * .6) * (.85 + rnd * .3)));
 
+// ---------- raridade das quedas ----------
+/** Quanto melhor o item, menor a chance de cair: multiplicador (0 a 1) aplicado à chance de cada item na tabela do monstro.
+ *  `good` vem do painel admin: 1 = padrão, 0.5 = itens bons caem metade, 2 = o dobro (nunca passa da chance original). */
+const GOOD_FIXED: Record<string, number> = {
+  jewel_aurora: .8, jewel_destiny: .6, jewel_eclipse: .45, box_bronze: 1, box_prata: .8, box_ouro: .6, box_rei: .5, box_mitico: .4,
+  plume: .7, magma_heart: .7, ancient_scale: .65, chaos_feather: .6, void_crystal: .5,
+};
+export function goodFactor(key: string, good = 1): number {
+  const d = ITEMS[key]; if (!d) return 1;
+  let f = GOOD_FIXED[key];
+  if (f === undefined) {
+    if (!SLOTS.includes(d.kind as Slot)) return 1; // poções, fragmentos e afins: sem mudança
+    f = Math.min(1, 1.5 / (1 + d.lvl / 60)); // nível 30: 1 · 86: 0,62 · 150: 0,43 · 250: 0,29 · 340: 0,23
+    if (d.set) f *= .7; if (d.kind === 'ring' || d.kind === 'amulet') f *= .6;
+  }
+  return Math.min(1, f * good);
+}
+/** Chance de um item caído virar Excelente/Ancestral, já com o peso do nível do item (quanto mais alto, mais raro). */
+export const excChance = (lvl: number, lm: number, exc: number) => .025 * lm * exc / (1 + lvl / 250);
+export const ancChance = (lvl: number, lm: number, exc: number) => .0022 * lm * exc / (1 + lvl / 250);
+
 // ---------- configurações editáveis no painel /admin ----------
 export interface MobOverride { hp?: number; dmg?: number; def?: number; xp?: number; respawnMs?: number; drop?: number }
-export interface Settings { resetLevel: number; resetPoints: number; resetGold: number; exc: number; xp: number; gold: number; drop: number; jewel: number; hp: number; dmg: number; respawn: number; test: boolean; jewels: Record<string, number>; mobs: Record<string, MobOverride> }
-export const DEFAULT_SETTINGS: Settings = { resetLevel: 400, resetPoints: 500, resetGold: 1000000, exc: 1, xp: 1, gold: 1, drop: 1, jewel: 1, hp: 1, dmg: 1, respawn: 1, test: CONFIG.testCommands, jewels: {}, mobs: {} };
+export interface Settings { resetLevel: number; resetPoints: number; resetGold: number; good: number; exc: number; xp: number; gold: number; drop: number; jewel: number; hp: number; dmg: number; respawn: number; test: boolean; jewels: Record<string, number>; mobs: Record<string, MobOverride> }
+export const DEFAULT_SETTINGS: Settings = { resetLevel: 400, resetPoints: 500, resetGold: 1000000, good: 1, exc: 1, xp: 1, gold: 1, drop: 1, jewel: 1, hp: 1, dmg: 1, respawn: 1, test: CONFIG.testCommands, jewels: {}, mobs: {} };
 const clampN = (v: unknown, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null; };
 /** Aceita só campos conhecidos e dentro de limites seguros. */
 export function cleanSettings(x: any): Settings {
   const s: Settings = { ...DEFAULT_SETTINGS, jewels: {}, mobs: {} };
-  for (const k of ['exc', 'xp', 'gold', 'drop', 'jewel', 'hp', 'dmg', 'respawn'] as const) s[k] = clampN(x?.[k], k === 'respawn' || k === 'hp' ? .05 : 0, 1000) ?? 1;
+  for (const k of ['good', 'exc', 'xp', 'gold', 'drop', 'jewel', 'hp', 'dmg', 'respawn'] as const) s[k] = clampN(x?.[k], k === 'respawn' || k === 'hp' ? .05 : 0, 1000) ?? 1;
   s.test = x?.test === true;
   s.resetLevel = Math.round(clampN(x?.resetLevel, 2, CONFIG.maxLevel) ?? 400); s.resetPoints = Math.round(clampN(x?.resetPoints, 0, 100000) ?? 500); s.resetGold = Math.round(clampN(x?.resetGold, 0, 2e9) ?? 1000000);
   for (const k of Object.keys(JEWELS)) { const v = clampN(x?.jewels?.[k], 0, 1); if (v !== null && x?.jewels?.[k] !== '' && x?.jewels?.[k] != null) s.jewels[k] = v; }
@@ -383,3 +404,28 @@ export const GUILD_RANKS = ['Membro', 'Assistente', 'Mestre'];
 export const cleanGuildName = (s: unknown) => typeof s === 'string' ? s.trim().replace(/\s+/g, ' ') : '';
 export const validGuildName = (s: string) => /^[\p{L}\p{N} ]{3,16}$/u.test(s);
 export const validGuildTag = (s: string) => /^[A-Za-z0-9]{2,4}$/.test(s);
+
+// ---------- painel admin: criar itens e editar personagens ----------
+export interface AdminItem { key: string; qty: number; rarity: number; plus: number; opts: string[] }
+/** Valida um item criado pelo admin. Devolve o item pronto ou uma mensagem de erro. */
+export function adminItem(x: any): AdminItem | string {
+  const d = ITEMS[x?.key]; if (!d) return 'Item não encontrado.';
+  const stack = isStack(d), qty = Math.floor(Number(x.qty ?? 1));
+  if (!Number.isFinite(qty) || qty < 1 || qty > (stack ? 45000 : 20)) return stack ? 'Quantidade: de 1 a 45.000.' : 'Quantidade: de 1 a 20 (cada unidade ocupa um espaço).';
+  const gear = SLOTS.includes(d.kind as Slot), rare = gear && d.kind !== 'wings' && d.kind !== 'pet';
+  const rarity = rare ? Math.floor(Number(x.rarity ?? 0)) : 0; if (!(rarity >= 0 && rarity <= 4)) return 'Raridade inválida.';
+  const plus = gear && d.kind !== 'pet' ? Math.floor(Number(x.plus ?? 0)) : 0; if (!(plus >= 0 && plus <= 15)) return 'Nível de melhoria: de +0 a +15.';
+  const pool = d.kind === 'weapon' || d.kind === 'ring' ? EXC_WEAPON : EXC_ARMOR, opts = rarity >= 3 && Array.isArray(x.opts) ? [...new Set(x.opts.filter((o: unknown) => pool.includes(o as string)) as string[])] : [];
+  if (opts.length > 3) return 'No máximo 3 opções excelentes.';
+  return { key: d.key, qty, rarity, plus, opts };
+}
+export const ADMIN_FIELDS: Record<string, [string, number, number]> = { // campo → [coluna no banco, mínimo, máximo]
+  level: ['level', 1, CONFIG.maxLevel], resets: ['resets', 0, 10000], mr: ['master_resets', 0, 1000], ml: ['master_level', 0, MASTER_MAX], points: ['points', 0, 10000000], mpts: ['master_points', 0, 100000],
+  str: ['str', 1, 1000000], agi: ['agi', 1, 1000000], vit: ['vit', 1, 1000000], ene: ['ene', 1, 1000000], gold: ['gold', 0, 2000000000],
+};
+/** Valida as mudanças de um personagem feitas pelo admin (só campos conhecidos, dentro dos limites). */
+export function adminSet(x: any): Record<string, number> | string {
+  const out: Record<string, number> = {}; if (!x || typeof x !== 'object') return 'Nada para mudar.';
+  for (const [k, [, lo, hi]] of Object.entries(ADMIN_FIELDS)) { if (x[k] === undefined || x[k] === '' || x[k] === null) continue; const n = Math.floor(Number(x[k])); if (!Number.isFinite(n) || n < lo || n > hi) return `Valor inválido em ${k} (de ${lo} a ${hi}).`; out[k] = n; }
+  return out;
+}

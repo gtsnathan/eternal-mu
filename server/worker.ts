@@ -1,4 +1,4 @@
-import { ITEMS, cleanSettings, DEFAULT_SETTINGS, JEWELS, MOBS, CLASSES, CONFIG, derive, HAIR_COLORS, HAIR_STYLES } from '../shared/data';
+import { adminItem, adminSet, ADMIN_FIELDS, EXC_TEXT, goodFactor, isStack, STACK_MAX, SLOTS, EXC_WEAPON, EXC_ARMOR, RARITY, ITEMS, cleanSettings, DEFAULT_SETTINGS, JEWELS, MOBS, CLASSES, CONFIG, derive, HAIR_COLORS, HAIR_STYLES } from '../shared/data';
 import { getMap, MAP_IDS, travelList } from '../shared/world';
 export { MapRoom } from './room';
 
@@ -71,9 +71,9 @@ async function admin(req: Request, env: Env, path: string, b: any, adminId: numb
   const db = env.DB, audit = (action: string, detail: unknown) => db.prepare('INSERT INTO admin_log(admin_id,action,detail,at) VALUES(?,?,?,?)').bind(adminId, action, JSON.stringify(detail).slice(0, 2000), Date.now()).run();
   if (path === '/api/admin/config' && req.method === 'GET') {
     const r = await db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>();
-    return json({ settings: r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, defaults: { mobs: Object.values(MOBS).map(m => ({ key: m.key, name: m.name, level: m.level, hp: m.hp, dmg: m.dmg, def: m.def, xp: m.xp, respawnMs: m.respawnMs })), jewels: Object.fromEntries(Object.entries(JEWELS).map(([k, v]) => [k, v.chance])) } });
+    return json({ settings: r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, defaults: { mobs: Object.values(MOBS).map(m => ({ key: m.key, name: m.name, level: m.level, hp: m.hp, dmg: m.dmg, def: m.def, xp: m.xp, respawnMs: m.respawnMs })), jewels: Object.fromEntries(Object.entries(JEWELS).map(([k, v]) => [k, v.chance])), items: Object.values(ITEMS).map(d => ({ k: d.key, n: d.name, kind: d.kind, lvl: d.lvl, st: isStack(d) ? 1 : 0, ex: SLOTS.includes(d.kind as any) && d.kind !== 'wings' && d.kind !== 'pet' ? (d.kind === 'weapon' || d.kind === 'ring' ? 'w' : 'a') : '', pl: SLOTS.includes(d.kind as any) && d.kind !== 'pet' ? 1 : 0 })), opts: EXC_TEXT, rarity: RARITY.map(r => r.name), classes: Object.fromEntries(Object.values(CLASSES).map(c => [c.key, c.name])) } });
   }
-  if (req.method !== 'POST' && !(path === '/api/admin/players' || path === '/api/admin/log')) return err('Método inválido.', 405);
+  if (req.method !== 'POST' && !(path === '/api/admin/players' || path === '/api/admin/log' || path === '/api/admin/char')) return err('Método inválido.', 405);
   if (path === '/api/admin/config') {
     const s = cleanSettings(b.settings), now = Date.now();
     await db.prepare("INSERT INTO settings(key,value,updated_at) VALUES('game',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at").bind(JSON.stringify(s), now).run();
@@ -91,6 +91,58 @@ async function admin(req: Request, env: Env, path: string, b: any, adminId: numb
     if (!done.some(d => d.handled)) await db.prepare('UPDATE characters SET gold=?, level=? WHERE id=?').bind(gold, level, id).run();
     await audit('player', { id, gold, level }); return json({ ok: 1 });
   }
+  // ----- editor de personagem: se estiver online, a sala do mapa aplica na hora; senão, vai direto ao banco -----
+  const inRoom = async (body: object) => (await toRooms(env, '/admin', body)).find(r => r?.handled) as any;
+  if (path === '/api/admin/char' && req.method === 'GET') {
+    const id = Number(new URL(req.url).searchParams.get('id')); if (!Number.isInteger(id)) return err('Personagem inválido.');
+    const live = await inRoom({ op: 'info', char: id }); if (live) return json({ char: live.char, items: live.items });
+    const c = await db.prepare('SELECT c.id,c.name,c.class cls,c.level,c.resets,c.master_resets mr,c.master_level ml,c.points,c.master_points mpts,c.str,c.agi,c.vit,c.ene,c.gold,c.map,a.username FROM characters c JOIN accounts a ON a.id=c.account_id WHERE c.id=?').bind(id).first(); if (!c) return err('Personagem não encontrado.');
+    const its = (await db.prepare('SELECT id,item_key key,qty,slot,equip,rarity,plus,opts FROM items WHERE char_id=? ORDER BY equip IS NULL, slot').bind(id).all()).results.map((i: any) => ({ ...i, opts: (() => { try { return i.opts ? JSON.parse(i.opts) : []; } catch { return []; } })() }));
+    return json({ char: { ...c, online: 0 }, items: its });
+  }
+  if (path === '/api/admin/char') {
+    const id = Number(b.charId); if (!Number.isInteger(id)) return err('Personagem inválido.');
+    const set = adminSet(b.set); if (typeof set === 'string') return err(set); const add = Math.floor(Number(b.addGold) || 0); if (Math.abs(add) > 2e9) return err('Valor de moedas inválido.');
+    if (!Object.keys(set).length && !add) return err('Nada para mudar.');
+    const live = await inRoom({ op: 'set', char: id, set, addGold: add }); if (live?.error) return err(live.error);
+    if (!live) {
+      let add2 = add; if (set.gold !== undefined && add) { set.gold = Math.max(0, Math.min(2e9, set.gold + add)); add2 = 0; }
+      const cols = Object.entries(set).map(([k]) => `${ADMIN_FIELDS[k][0]}=?`), vals = Object.values(set);
+      if (set.level !== undefined) cols.push('xp=0'); if (add2) { cols.push('gold=MAX(0,MIN(2000000000,gold+?))'); vals.push(add2); }
+      const r = await db.prepare(`UPDATE characters SET ${cols.join(',')} WHERE id=?`).bind(...vals, id).run(); if (!r.meta.changes) return err('Personagem não encontrado.');
+    }
+    await audit('char', { id, set, addGold: add, online: !!live }); return json({ ok: 1, online: !!live });
+  }
+  if (path === '/api/admin/give') {
+    const id = Number(b.charId); if (!Number.isInteger(id)) return err('Personagem inválido.');
+    const spec = adminItem(b.item); if (typeof spec === 'string') return err(spec);
+    const note = typeof b.note === 'string' ? b.note.slice(0, 80) : '';
+    const live = await inRoom({ op: 'give', char: id, item: spec, note }); if (live?.error) return err(live.error);
+    if (!live) { // offline: grava nos espaços livres da bolsa
+      if (!await db.prepare('SELECT 1 FROM characters WHERE id=?').bind(id).first()) return err('Personagem não encontrado.');
+      const used = new Set((await db.prepare('SELECT slot FROM items WHERE char_id=? AND equip IS NULL AND slot<1000').bind(id).all()).results.map((r: any) => r.slot));
+      const free: number[] = []; for (let sl = 0; sl < CONFIG.invSize; sl++) if (!used.has(sl)) free.push(sl);
+      const stack = isStack(ITEMS[spec.key]), parts: number[] = []; if (stack) for (let left = spec.qty; left > 0; left -= STACK_MAX) parts.push(Math.min(STACK_MAX, left)); else for (let n = 0; n < spec.qty; n++) parts.push(1);
+      if (parts.length > free.length) return err(`A bolsa não tem espaço: precisa de ${parts.length}, há ${free.length} livre(s).`);
+      const now = Date.now(), opts = spec.opts.length ? JSON.stringify(spec.opts) : null;
+      await db.batch(parts.flatMap((q, i) => { const iid = crypto.randomUUID(); return [db.prepare('INSERT INTO items(id,char_id,item_key,qty,slot,equip,rarity,plus,opts) VALUES(?,?,?,?,?,NULL,?,?,?)').bind(iid, id, spec.key, q, free[i], spec.rarity, spec.plus, opts), db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,0,?)').bind(id, 'admin', iid, spec.key, q, now)]; }));
+    }
+    await audit('give', { id, ...spec, online: !!live }); return json({ ok: 1, online: !!live });
+  }
+  if (path === '/api/admin/take') {
+    const id = Number(b.charId), iid = String(b.itemId ?? ''); if (!Number.isInteger(id) || !iid) return err('Dados inválidos.');
+    const live = await inRoom({ op: 'take', char: id, id: iid }); if (live?.error) return err(live.error);
+    if (!live) { const it = await db.prepare('SELECT item_key,qty FROM items WHERE id=? AND char_id=?').bind(iid, id).first<{ item_key: string; qty: number }>(); if (!it) return err('Item não encontrado.'); await db.batch([db.prepare('DELETE FROM items WHERE id=? AND char_id=?').bind(iid, id), db.prepare('INSERT INTO item_log(char_id,action,item_id,item_key,qty,gold_delta,at) VALUES(?,?,?,?,?,0,?)').bind(id, 'admin_take', iid, it.item_key, it.qty, Date.now())]); }
+    await audit('take', { id, item: iid, online: !!live }); return json({ ok: 1 });
+  }
+  if (path === '/api/admin/giftall') {
+    const gold = Math.floor(Number(b.gold) || 0); if (gold < 0 || gold > 1e9) return err('Moedas: de 0 a 1 bilhão.');
+    let item: any = null; if (b.item?.key) { const sp = adminItem(b.item); if (typeof sp === 'string') return err(sp); item = sp; }
+    if (!item && !gold) return err('Escolha um item ou um valor em moedas.');
+    const n = (await toRooms(env, '/admin', { op: 'giftall', item, gold, note: typeof b.note === 'string' ? b.note.slice(0, 80) : '' })).reduce((a, r) => a + (r?.n ?? 0), 0);
+    await audit('giftall', { item, gold, n }); return json({ ok: 1, n });
+  }
+  if (path === '/api/admin/kick') { const id = Number(b.accountId); if (!Number.isInteger(id)) return err('Conta inválida.'); await toRooms(env, '/kick', { account: id, m: 'Você foi desconectado pelo administrador.' }); await audit('kick', { id }); return json({ ok: 1 }); }
   if (path === '/api/admin/ban') {
     const id = Number(b.accountId), ban = b.banned === true ? 1 : 0; if (!Number.isInteger(id)) return err('Conta inválida.');
     if (id === adminId) return err('Você não pode suspender a própria conta.');
@@ -155,7 +207,7 @@ async function api(req: Request, env: Env, path: string): Promise<Response> {
   }
   if (path === '/api/guide' && req.method === 'GET') {
     const r = await db.prepare("SELECT value FROM settings WHERE key='game'").first<{ value: string }>(), c = r ? cleanSettings(JSON.parse(r.value)) : DEFAULT_SETTINGS, v = getMap('valoria');
-    return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { id, name: m.name, req: travelList().find(p => p.to === id)?.lvl || 1, w: m.w, h: m.h, spawn: m.spawn, grid: guideGrid(id), mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { key: k, name: d.name, level: d.level, boss: !!d.boss, hp: d.hp, areas: m.zones.filter(z => z.mob === k).map(z => ({ x: z.cx, y: z.cy, r: z.r, n: z.n })), drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });
+    return json({ rates: { xp: c.xp, gold: c.gold, drop: c.drop }, maps: MAP_IDS.filter(id => getMap(id).zones.length).map(id => { const m = getMap(id); return { id, name: m.name, req: travelList().find(p => p.to === id)?.lvl || 1, w: m.w, h: m.h, spawn: m.spawn, grid: guideGrid(id), mobs: [...new Set(m.zones.map(z => z.mob))].map(k => { const d = MOBS[k], o = c.mobs[k] ?? {}; return { key: k, name: d.name, level: d.level, boss: !!d.boss, hp: d.hp, areas: m.zones.filter(z => z.mob === k).map(z => ({ x: z.cx, y: z.cy, r: z.r, n: z.n })), drops: d.drops.map(([i, ch]) => ({ name: ITEMS[i].name, set: ITEMS[i].set ?? null, ch: Math.min(1, goodFactor(i, c.good) * ch * (o.drop ?? 1) * (i.startsWith('jewel_') ? c.jewel : c.drop)) })) }; }) }; }) });
   }
   const me = await auth(req, env);
   if (!me) return err('Sessão expirada.', 401);
