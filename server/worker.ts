@@ -81,8 +81,16 @@ async function admin(req: Request, env: Env, path: string, b: any, adminId: numb
   }
   if (path === '/api/admin/players') {
     const q = (new URL(req.url).searchParams.get('q') ?? '').replace(/[%_\\]/g, '').slice(0, 30);
-    const { results } = await db.prepare(`SELECT c.id,c.name,c.class,c.level,c.gold,c.map,a.id AS account_id,a.username,a.banned,a.is_admin FROM characters c JOIN accounts a ON a.id=c.account_id WHERE c.name LIKE ? OR a.username LIKE ? ORDER BY c.level DESC LIMIT 50`).bind(`%${q}%`, `%${q}%`).all();
-    return json({ players: results });
+    const sp = new URL(req.url).searchParams, lim = Math.min(200, Math.max(10, Number(sp.get('limit')) || 50));
+    const { results } = await db.prepare(`SELECT c.id,c.name,c.class,c.level,c.resets,c.gold,c.map,a.id AS account_id,a.username,a.banned,a.is_admin FROM characters c JOIN accounts a ON a.id=c.account_id WHERE c.name LIKE ? OR a.username LIKE ? ORDER BY c.level DESC LIMIT ?`).bind(`%${q}%`, `%${q}%`, lim).all();
+    statusCache.at = 0; const on = new Map((await onlineNow(env)).list.map(o => [o.name.toLowerCase(), o.map])); // lista fresca para o admin
+    const list = (results as any[]).map(r => ({ ...r, online: on.has(String(r.name).toLowerCase()) ? 1 : 0, where: on.get(String(r.name).toLowerCase()) ?? '' }));
+    if (sp.get('online') === '1') { // só quem está online agora (busca pelos nomes, não pelo limite da lista)
+      const names = [...on.keys()].filter(n => !q || n.includes(q.toLowerCase())), out: any[] = [];
+      for (let i = 0; i < names.length; i += 90) { const ch = names.slice(i, i + 90); const r = await db.prepare(`SELECT c.id,c.name,c.class,c.level,c.resets,c.gold,c.map,a.id AS account_id,a.username,a.banned,a.is_admin FROM characters c JOIN accounts a ON a.id=c.account_id WHERE lower(c.name) IN (${ch.map(() => '?').join(',')})`).bind(...ch).all(); out.push(...(r.results as any[]).map(x => ({ ...x, online: 1, where: on.get(String(x.name).toLowerCase()) ?? '' }))); }
+      return json({ players: out.sort((x, y) => y.level - x.level) });
+    }
+    return json({ players: list.sort((x, y) => y.online - x.online) });
   }
   if (path === '/api/admin/player') {
     const id = Number(b.charId), gold = Number(b.gold), level = Number(b.level);
