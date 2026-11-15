@@ -119,7 +119,7 @@ function setConn(ok: boolean) { const c = $('#conn'); c.textContent = ok ? `● 
 function handle(m: any) {
   switch (m.t) {
     case 'w': {
-      for (const k of Object.keys(m.jc ?? {})) JEWELS[k].chance = m.jc[k]; send({ t: 'lo', on: autoLoot }); $('#arenabar').style.display = 'none'; you = m.you; myName = m.name; myCls = classOf(m.cls); myCls.skills.forEach(s => { const b = $(`[data-sk="${s.n}"] b`), ic = hdOf(skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a'))); b.replaceChildren(ic); b.parentElement!.title = s.lvl ? `${s.name} (nível ${s.lvl})` : s.name; }); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
+      for (const k of Object.keys(m.jc ?? {})) JEWELS[k].chance = m.jc[k]; send({ t: 'lo', on: autoLoot }); $('#arenabar').style.display = 'none'; you = m.you; myName = m.name; myCls = classOf(m.cls); loadSlots(); drawSkillBar(); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
       if (map?.id !== m.map) { map = getMap(m.map); bakeMini(); log(`— ${map.name} —`, 'sys'); }
       camX = m.x; camY = m.y; retries = 0; over(''); clearInterval(pingTimer); pingTimer = setInterval(() => send({ t: 'ping', c: performance.now() }), 3000) as unknown as number; send({ t: 'ping', c: performance.now() });
       lastInput = ''; syncInput(); break;
@@ -183,6 +183,10 @@ function effect(f: any) {
     case 'curse': rings.push({ x: f.x, y: f.y, r: 1.3, t: 0, max: .6, c: f.b }); burst(f.x, f.y - .4, 16, f.b, 2); beep(160, 260, 'triangle', .05); break;
     case 'summon': rings.push({ x: f.x, y: f.y, r: 1.6, t: 0, max: .45, c: '#c9a4ff' }); burst(f.x, f.y, 22, '#c9a4ff', 4); beep(300, 240, 'sine', .05); break;
     case 'bite': if (e) { faceTo(e, f.tx, f.ty); e.atkUntil = now + 220; } break;
+    case 'meteor': { if (e) e.atkUntil = now + 300; beep(90, 600, 'sawtooth', .05); const N = 10; for (let k = 0; k <= N; k++) setTimeout(() => { if (!running) return; const u = k / N, x = f.x + 2.2 * (1 - u), y = f.y - 7 * (1 - u); for (let i = 0; i < 4; i++) parts.push({ x: x + (Math.random() - .5) * .5, y: y + (Math.random() - .5) * .5, vx: (Math.random() - .5) * .6, vy: -.4, life: 0, max: .45, c: i ? f.b : '#fff6d0', s: i ? 4 : 6 }); if (k === N) { rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: .45, c: f.b }, { x: f.x, y: f.y, r: f.r * .6, t: 0, max: .3, c: '#ffffff' }); burst(f.x, f.y, 40, f.b, 7); if (Math.hypot(f.x - (ents.get(you)?.x ?? 0), f.y - (ents.get(you)?.y ?? 0)) < 12) { shakeUntil = now + 700; shakeAmp = 4; } } }, k * 50); break; }
+    case 'pnova': { if (e) e.atkUntil = now + f.d; beep(220, f.d, 'triangle', .04); const N = Math.round(f.d / 40); for (let k = 0; k < N; k++) setTimeout(() => { if (!running) return; const c = ents.get(f.id) ?? f, u = k / N; for (let i = 0; i < 4; i++) { const an = Math.random() * 6.283, R = f.r * (1 - u) + .4; parts.push({ x: c.x + Math.cos(an) * R, y: c.y + Math.sin(an) * R * .7 - .4, vx: -Math.cos(an) * R * 2, vy: -Math.sin(an) * R * 1.4, life: 0, max: .35, c: i % 2 ? f.b : '#ffffff', s: 3 }); } }, k * 40); setTimeout(() => { if (running) beep(80, 400, 'sawtooth', .06); }, f.d); break; }
+    case 'twister': { if (e) { faceTo(e, f.tx, f.ty); e.atkUntil = now + 300; } beep(160, f.d, 'triangle', .04); const N = Math.round(f.d / 35); for (let k = 0; k <= N; k++) setTimeout(() => { if (!running) return; const u = k / N, x = f.x + (f.tx - f.x) * u, y = f.y + (f.ty - f.y) * u; for (let i = 0; i < 6; i++) { const h = Math.random() * 1.8, an = k * .9 + i * 1.05, R = .25 + h * .45; parts.push({ x: x + Math.cos(an) * R, y: y - h + Math.sin(an) * R * .3, vx: -Math.sin(an) * 2.4, vy: -.8, life: 0, max: .32, c: i % 3 ? f.b : '#ffffff', s: i % 3 ? 3 : 4 }); } }, k * 35); break; }
+    case 'tele': { for (const [x, y] of [[f.fx, f.fy], [f.x, f.y]]) { rings.push({ x, y, r: 1.2, t: 0, max: .35, c: f.b }); burst(x, y - .5, 22, f.b, 4); } const me2 = ents.get(f.id); if (me2) { me2.x = f.x; me2.y = f.y; me2.snaps = []; if (f.id === you) pred = null; } beep(900, 160, 'sine', .05); break; }
     case 'spin': if (e) e.atkUntil = now + 300; rings.push({ x: f.x, y: f.y, r: f.r, t: 0, max: .35, c: '#ffe08a' }); burst(f.x, f.y, 26, '#ffd76a', 6); beep(320, 180, 'sawtooth', .04); break;
     case 'dash': for (let i = 0; i < 14; i++) { const u = i / 14; parts.push({ x: f.fx + (f.x - f.fx) * u, y: f.fy + (f.y - f.fy) * u, vx: 0, vy: 0, life: 0, max: .4, c: '#ffcf6a', s: 5 }); } beep(200, 160, 'sawtooth', .04); break;
     case 'die': if (e?.k === 'm') ghosts.push({ c: mobSprites(e.info.mob)[0][e.dir === 3 ? 1 : 0], x: f.x, y: f.y, t: 0 }); burst(f.x, f.y - .3, 26, '#d8f4ff', 5); beep(110, 260); break;
@@ -210,7 +214,7 @@ function effect(f: any) {
 function updateHud() {
   if (!me) return; const pct = (a: number, b: number) => `${Math.max(0, Math.min(100, a / Math.max(1, b) * 100))}%`;
   { const c = $('#lootc'); if (me.loot) { c.style.display = 'block'; c.textContent = `Coleta ×${me.loot} · +${me.loot * 5}% XP e moedas`; lootHidden = false; } else if (!lootHidden) { c.style.display = 'none'; lootHidden = true; } }
-  myCls.skills.forEach(s => $(`[data-sk="${s.n}"]`).classList.toggle('lock', me!.level < (s.lvl ?? 1)));
+  if (slotsAuto) { const d = defaultSlots(); if (d.join() !== slotMap.join()) slotMap = d; } drawSkillBar(); if ($('#w-skills')?.style.display === 'block') renderSkills();
   $<HTMLElement>('#orbh i').style.height = pct(me.hp, me.maxHp); $<HTMLElement>('#orbm i').style.height = pct(me.mp, me.maxMp); $('#orbh em').textContent = String(me.hp); $('#orbm em').textContent = String(me.mp);
   $('#nm').innerHTML = `${esc(myName)} <span>Nv ${me.level}</span>`; $('#hpb').style.width = pct(me.hp, me.maxHp); $('#mpb').style.width = pct(me.mp, me.maxMp); $('#hpt').textContent = `${me.hp}/${me.maxHp}`; $('#mpt').textContent = `${me.mp}/${me.maxMp}`; $('#xp i').style.width = pct(me.xp, me.xpNext); $('#xpt').textContent = me.level >= CONFIG.maxLevel && me.resets > 0 ? `Master Level ${me.ml} · ${(me.mxp / me.mxpNext * 100).toFixed(2).replace('.', ',')}%` : `XP ${(me.xp / Math.max(1, me.xpNext) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% · ${me.xp.toLocaleString('pt-BR')} / ${me.xpNext.toLocaleString('pt-BR')}`;
   document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const f = b.dataset.pot === 'pot_hp' ? 'heal' : 'mana'; b.querySelector('s')!.textContent = String(items.filter(i => !i.equip && (ITEMS[i.key][f] ?? 0) > 0).reduce((a, i) => a + i.qty, 0)); });
@@ -222,9 +226,9 @@ function drawPortrait() { const c = $<HTMLCanvasElement>('#portrait'), x = c.get
 function myGear(): Look { const by = (s: string) => items.find(i => i.equip === s)?.key ?? null; return lookFromGear(myCls.name, HAIR_COLORS[myLook.hc], myLook.hs, { helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots'), weapon: by('weapon') }); }
 
 // ---------- janelas ----------
-const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); if (w === 'guild') renderGuild(); if (w === 'ach') { send({ t: 'achq' }); send({ t: 'dq' }); renderAch(); } };
+const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); if (w === 'guild') renderGuild(); if (w === 'skills') renderSkills(); if (w === 'ach') { send({ t: 'achq' }); send({ t: 'dq' }); renderAch(); } };
 function closeWin(w: string) { $('#w-' + w).style.display = 'none'; if (w === 'shop') shop = null; }
-function closeWins() { ['inv', 'char', 'map', 'shop', 'rank', 'guild', 'ach'].forEach(closeWin); }
+function closeWins() { ['inv', 'char', 'map', 'shop', 'rank', 'guild', 'ach', 'skills'].forEach(closeWin); }
 async function renderRank() { const ob = $('#onlb'); ob.replaceChildren(); api('online').then(({ online }) => { if (!online.length) { const tr = document.createElement('tr'), td = document.createElement('td'); td.colSpan = 4; td.textContent = 'Ninguém online.'; tr.appendChild(td); ob.appendChild(tr); } for (const p of online) { const tr = document.createElement('tr'); for (const v of [p.name, p.cls, `${p.resets || p.mr ? `${fmtRes(p.resets, p.mr)} · ` : ''}${p.level}`, p.map]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } ob.appendChild(tr); } }).catch(() => { /* sem conexão */ });
   const b = $('#rankb'); b.replaceChildren(); try { const { ranking } = await api('ranking'); ranking.forEach((r: any, n: number) => { const tr = document.createElement('tr'); for (const v of [n + 1, r.name, r.class, fmtRes(r.resets, r.mr), r.ml, r.level]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } b.appendChild(tr); }); } catch { /* sem conexão */ } }
 const toggle = (w: string) => $('#w-' + w).style.display === 'block' ? closeWin(w) : openW(w);
@@ -389,14 +393,33 @@ function syncInput() { let x = joy.x, y = joy.y; const l = Math.hypot(x, y); if 
 function nearestMob(r: number) { const a = ents.get(you); if (!a) return null; let b: Ent | null = null, bd = r; for (const e of ents.values()) if (e.k === 'm') { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; b = e; } } return b; }
 function startPred(x: number, y: number, stop = 0) { const a = ents.get(you); if (!a || !map || me?.dead) return; const path = findPath(map, a.x, a.y, x, y); if (path) pred = { x: a.x, y: a.y, path, stop, tx: x, ty: y, hold: performance.now() + 700 }; }
 function attack(e: Ent) { target = e.id; send({ t: 'a', id: e.id }); const a = ents.get(you); if (!a) return; if (Math.hypot(a.x - e.x, a.y - e.y) <= myCls.range) { faceTo(a, e.x, e.y); a.atkUntil = performance.now() + 180; pred = null; } else startPred(e.x, e.y, myCls.range - .05); }
+/** Barra de habilidades: os 7 espaços guardam o número da habilidade (livro de habilidades, tecla H). */
+let slotMap: number[] = [0, 1, 2, 3, 4, 5, 6, 7], slotsAuto = true; // automático até o jogador montar a barra no livro
+const slotKey = () => `em_sk_${myCls.key}_${charId}`;
+function defaultSlots(): number[] { // utilitárias desbloqueadas primeiro (até 2) e depois os ataques mais fortes
+  const lv = me?.level ?? 1, ok = myCls.skills.filter(s => lv >= (s.lvl ?? 1)), util = ok.filter(s => ['buff', 'heal', 'summon', 'teleport'].includes(s.kind)).slice(-2), atk = ok.filter(s => !util.includes(s)).sort((a, b) => b.mult - a.mult);
+  const pick = [...atk.slice(0, 7 - util.length), ...util]; for (const s of myCls.skills) if (pick.length < 7 && !pick.includes(s)) pick.push(s);
+  return [0, ...pick.slice(0, 7).map(s => s.n)];
+}
+function loadSlots() { try { const v = JSON.parse(localStorage.getItem(slotKey()) ?? 'null'); if (Array.isArray(v) && v.length === 8 && v.slice(1).every((n: number) => myCls.skills.some(s => s.n === n))) { slotMap = v; slotsAuto = false; return; } } catch { /* */ } slotsAuto = true; slotMap = defaultSlots(); }
+function saveSlots() { slotsAuto = false; try { localStorage.setItem(slotKey(), JSON.stringify(slotMap)); } catch { /* */ } }
+function drawSkillBar() {
+  for (let slot = 1; slot <= 7; slot++) { const s = myCls.skills.find(x => x.n === slotMap[slot]); const btn = $(`[data-sk="${slot}"]`); if (!btn) continue; const b = btn.querySelector('b')!; if (!s) { b.replaceChildren(); continue; }
+    b.replaceChildren(hdOf(skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a')))); btn.title = `${s.name}${s.lvl ? ` (nível ${s.lvl})` : ''} · ${s.mana} mana`; btn.classList.toggle('lock', (me?.level ?? 1) < (s.lvl ?? 1)); }
+}
 let holdAtk = false, holdSkill = false, skillAt = 0, queued: { n: number; until: number } | null = null, warnAt = 0;
 function warn(s: string) { const a = ents.get(you), n = performance.now(); if (a && n > warnAt) { warnAt = n + 900; texts.push({ x: a.x, y: a.y - 1.1, s, c: '#ffb0a0', t: 0, big: false }); } }
 function skill(n: number, quiet = false) {
-  const sk = myCls.skills.find(s => s.n === n)!, now = performance.now(), a = ents.get(you); if (!a || !me) return;
+  const sk = myCls.skills.find(s => s.n === n), now = performance.now(), a = ents.get(you); if (!sk || !a || !me) return;
   if (me.level < (sk.lvl ?? 1)) { if (!quiet) warn(`Nível ${sk.lvl}`); return; }
   if ((cds[n]?.until ?? 0) > now) return;
   if (me.mp < sk.mana) { warn('Sem mana'); return; }
-  const needs = sk.kind !== 'spin' && sk.kind !== 'spirits' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal'; let t = ents.get(target);
+  if (sk.kind === 'teleport') { // destino: o cursor (computador) ou à frente / perto do alvo (celular)
+    let x: number, y: number; const tt = ents.get(target);
+    if (!touch) ({ x, y } = toWorld(curX, curY)); else if (tt && tt.k === 'm') { x = tt.x; y = tt.y; } else { const d = [[0, 1], [0, -1], [1, 0], [-1, 0]][a.dir] ?? [0, 1]; x = a.x + d[0] * (sk.range ?? 7); y = a.y + d[1] * (sk.range ?? 7); }
+    send({ t: 'k', n, id: 0, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 }); return;
+  }
+  const needs = !['spin', 'spirits', 'summon', 'buff', 'heal', 'nova'].includes(sk.kind); let t = ents.get(target);
   if (needs && duelWith && target === duelWith && t) { if (Math.hypot(t.x - a.x, t.y - a.y) > Math.max(sk.range ?? 0, sk.radius ?? 0, 2.5)) { attack(t); return; } send({ t: 'k', n, id: t.id }); return; }
   if (needs && (!t || t.k !== 'm')) { const nm = nearestMob(Math.max(sk.range ?? 8, 8)); if (!nm) { if (!quiet) warn('Sem alvo'); return; } attack(nm); t = nm; }
   if (needs && t && Math.hypot(t.x - a.x, t.y - a.y) > (sk.range ?? 8)) { queued = { n, until: now + 4000 }; attack(t); return; }
@@ -415,7 +438,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Enter') { const i = $<HTMLInputElement>('#chati'); if (!tgtTyping()) { e.preventDefault(); i.focus(); } return; }
   if (e.key === 'Escape') { $('#chati').blur(); closeWins(); return; }
   if (e.repeat) return;
-  if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === 'k') toggle('ach'); else if (k === 'n') { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); } else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
+  if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === 'k') toggle('ach'); else if (k === 'h') toggle('skills'); else if (k === 'n') { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); } else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
 let chan: 'l' | 'g' | 'p' | 'u' = 'l';
@@ -440,6 +463,24 @@ function renderTrade() {
   const bag = $('#tbag'); bag.replaceChildren(); const sel = trade.mine.items.map((i: ItemInst) => i.id);
   for (const i of items.filter(x => !x.equip).sort((a, b2) => a.slot - b2.slot)) { if (sel.includes(i.id)) continue; bag.appendChild(makeCell(i, () => pushOffer([...sel, i.id]))); }
   const hostM = $('#tmine'); trade.mine.items.forEach((i: ItemInst, n: number) => { (hostM.children[n] as HTMLElement).onclick = () => pushOffer(sel.filter((x: string) => x !== i.id)); });
+}
+let pickSlotFor = 0;
+function renderSkills() {
+  const W = $('#skillp'); if (!W || !me) return; W.replaceChildren();
+  const tip = document.createElement('div'); tip.className = 'info'; tip.innerHTML = pickSlotFor ? `<b>Escolha o espaço (1 a 7)</b> para <b>${esc(myCls.skills.find(s => s.n === pickSlotFor)!.name)}</b>.` : `<small>Toque em <b>Usar</b> numa habilidade e depois no número do espaço da barra. No computador, teclas 1 a 7 escolhem a habilidade e o botão direito do mouse usa.</small>`; W.appendChild(tip);
+  const bar = document.createElement('div'); bar.className = 'skbar';
+  for (let slot = 1; slot <= 7; slot++) { const s = myCls.skills.find(x => x.n === slotMap[slot]), b = document.createElement('button'); b.className = 'skslot' + (pickSlotFor ? ' pick' : ''); b.innerHTML = `<u>${slot}</u>`; if (s) b.appendChild(hdOf(skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a')))); b.title = s?.name ?? '';
+    b.onclick = () => { if (!pickSlotFor) return; const old = slotMap.indexOf(pickSlotFor); if (old > 0) slotMap[old] = slotMap[slot]; slotMap[slot] = pickSlotFor; pickSlotFor = 0; saveSlots(); drawSkillBar(); renderSkills(); }; bar.appendChild(b); }
+  W.appendChild(bar);
+  const kindTxt: Record<string, string> = { spin: 'Área ao redor', dash: 'Avanço', splash: 'Explosão no alvo', multi: 'Vários alvos', summon: 'Invocação', curse: 'Maldição', buff: 'Bônus', heal: 'Cura', drain: 'Roubo de vida', spirits: 'Área contínua', cone: 'Leque à frente', chain: 'Corrente', wave: 'Linha reta', meteor: 'Cai do céu', nova: 'Explosão carregada', twister: 'Tornado em linha', teleport: 'Movimento' };
+  for (const s of myCls.skills) {
+    const lock = me.level < (s.lvl ?? 1), at = slotMap.indexOf(s.n), row = document.createElement('div'); row.className = 'skrow' + (lock ? ' lock' : '') + (pickSlotFor === s.n ? ' sel' : '');
+    row.appendChild(hdOf(skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a'))));
+    const tx = document.createElement('div'); tx.className = 'sktx'; tx.innerHTML = `<b>${esc(s.name)}${at > 0 ? ` <span class="sk-n">[${at}]</span>` : ''}</b><small>${esc(s.desc ?? '')}</small><small class="skmeta">${kindTxt[s.kind] ?? s.kind}${s.mult ? ` · dano ×${s.mult}` : ''} · ${s.mana} mana · recarga ${(s.cd / 1000).toLocaleString('pt-BR')} s${lock ? ` · <b style="color:#ff9b8e">nível ${s.lvl}</b>` : ''}</small>`; row.appendChild(tx);
+    const b = document.createElement('button'); b.textContent = pickSlotFor === s.n ? 'Cancelar' : 'Usar'; b.disabled = lock; b.onclick = () => { pickSlotFor = pickSlotFor === s.n ? 0 : s.n; renderSkills(); }; row.appendChild(b);
+    W.appendChild(row);
+  }
+  const rs = document.createElement('button'); rs.textContent = 'Organizar automaticamente'; rs.style.marginTop = '8px'; rs.onclick = () => { slotMap = defaultSlots(); try { localStorage.removeItem(slotKey()); } catch { /* */ } slotsAuto = true; drawSkillBar(); renderSkills(); }; W.appendChild(rs);
 }
 function renderAch() {
   const W = $('#achp'); if (!W) return;
@@ -530,7 +571,7 @@ $('#auto').onclick = () => { auto = !auto; autoUi(); log(auto ? 'Auto ataque lig
 $('#autoloot').onclick = () => { autoLoot = !autoLoot; autoUi(); send({ t: 'lo', on: autoLoot }); log(autoLoot ? 'Coleta ligada: pega os itens sozinho (os itens somem 30 s depois de cair).' : 'Coleta desligada: não pega nada sozinho, só ataca. Para pegar um item, clique nele.', 'sys'); };
 autoUi();
 $('#atk').onclick = () => { const m = nearestMob(12); if (m) attack(m); };
-document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => b.onclick = () => touch ? skill(+b.dataset.sk!) : selectSkill(+b.dataset.sk!));
+document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => b.onclick = () => touch ? skill(slotMap[+b.dataset.sk!]) : selectSkill(+b.dataset.sk!));
 document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => b.onclick = () => potion(b.dataset.pot!));
 const stick = $('#stick'), knob = stick.querySelector('i') as HTMLElement; let stickId = -1;
 const moveStick = (e: PointerEvent) => { const b = stick.getBoundingClientRect(); let x = (e.clientX - b.left - b.width / 2) / 50, y = (e.clientY - b.top - b.height / 2) / 50; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } knob.style.transform = `translate(${x * 40}px,${y * 40}px)`; joy = l < .18 ? { x: 0, y: 0 } : { x, y }; syncInput(); };
@@ -554,7 +595,7 @@ canvas.addEventListener('pointerdown', e => {
   if (!map || !running) return;
   curX = e.clientX; curY = e.clientY;
   const { x: wx, y: wy } = toWorld(e.clientX, e.clientY);
-  if (e.button === 2) { const m = mobAt(wx, wy); if (m) target = m.id; skill(activeSkill); if (e.pointerType === 'mouse') holdSkill = true; return; } // botão direito: habilidade selecionada
+  if (e.button === 2) { const m = mobAt(wx, wy); if (m) target = m.id; skill(slotMap[activeSkill]); if (e.pointerType === 'mouse') holdSkill = true; return; } // botão direito: habilidade selecionada
   if (e.button !== 0) return;
   $('#pmenu').style.display = 'none';
   const best = mobAt(wx, wy);
@@ -641,7 +682,7 @@ function frame(ts: number) {
   viewX = ox; viewY = oy;
   if (a) {
     if (holdAtk && !target) { const w = toWorld(curX, curY), m = mobAt(w.x, w.y) ?? nearestMob(7); if (m) attack(m); }
-    if (holdSkill && ts > skillAt) { skillAt = ts + 180; const w = toWorld(curX, curY), m = mobAt(w.x, w.y); if (m) target = m.id; skill(activeSkill, true); }
+    if (holdSkill && ts > skillAt) { skillAt = ts + 180; const w = toWorld(curX, curY), m = mobAt(w.x, w.y); if (m) target = m.id; skill(slotMap[activeSkill], true); }
     if (queued) { const q = queued, sk = myCls.skills.find(s => s.n === q.n)!, t = ents.get(target); if (ts > q.until || !t) queued = null; else if (Math.hypot(t.x - a.x, t.y - a.y) <= (sk.range ?? 8)) { queued = null; send({ t: 'k', n: q.n, id: t.id }); } }
   }
   if (holding && ts > holdAt) { holdAt = ts + 200; const w = toWorld(curX, curY); target = 0; pendingNpc = null; send({ t: 'g', x: w.x, y: w.y }); startPred(w.x, w.y); }
@@ -745,7 +786,7 @@ function frame(ts: number) {
   } }
   const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : map.id === 'infernal' || map.id === 'vulcao' || map.id === 'caos' ? '#40080888' : map.id === 'vazio' || map.id === 'abismo' ? '#1a0a4080' : map.id === 'pantano' ? '#0a2a1070' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   if (me?.dead) { g.fillStyle = '#50000066'; g.fillRect(0, 0, W, H); }
-  for (const n of [1, 2, 3, 4, 5, 6]) { const c = cds[n], el = cdEl[n] ??= document.querySelector(`[data-sk="${n}"] .cd`) as HTMLElement, h = c && c.until > ts ? `${Math.ceil((c.until - ts) / c.ms * 20) * 5}%` : '0'; if (cdVal[n] !== h) { cdVal[n] = h; el.style.height = h; } }
+  for (const n of [1, 2, 3, 4, 5, 6, 7]) { const c = cds[slotMap[n]], el = cdEl[n] ??= document.querySelector(`[data-sk="${n}"] .cd`) as HTMLElement, h = c && c.until > ts ? `${Math.ceil((c.until - ts) / c.ms * 20) * 5}%` : '0'; if (cdVal[n] !== h) { cdVal[n] = h; el.style.height = h; } }
   if (ts > miniAt) { miniAt = ts + 200; renderMini(); { const te = ents.get(target), tf = $('#tframe'); if (te?.k === 'm') { const d = MOBS[te.info.mob]; tf.style.display = 'block'; $('#tfn').textContent = `${d.name} · Nv ${d.level}`; $('#tfb').style.width = `${te.hp}%`; } else if (tf.style.display !== 'none') tf.style.display = 'none'; } if (party) document.querySelectorAll<HTMLElement>('.pm').forEach(r => { const e = [...ents.values()].find(x => x.k === 'p' && x.info.name === r.dataset.n), b = r.querySelector('i') as HTMLElement; b.style.width = `${e ? e.hp : 0}%`; r.style.opacity = e ? '1' : '.55'; }); }
 }
 function ell2(x: number, y: number, rx: number, ry: number) { g.beginPath(); g.ellipse(Math.round(x), Math.round(y), Math.max(.1, rx), Math.max(.1, ry), 0, 0, 6.3); g.fill(); }
@@ -887,8 +928,8 @@ function autoPlay(a: Ent, ts: number) {
   for (const s of [...myCls.skills].reverse()) {
     if (!ready(s)) continue;
     if (s.kind === 'buff' || s.kind === 'summon') { if (dist < 9) return cast(s, 0); continue; }
-    if (s.kind === 'heal') continue;
-    if (s.kind === 'spin' || s.kind === 'spirits' ? dist <= s.radius! - .2 : dist <= (s.range ?? 8) - .2) return cast(s, t.id);
+    if (s.kind === 'heal' || s.kind === 'teleport') continue;
+    if (s.kind === 'spin' || s.kind === 'spirits' || s.kind === 'nova' ? dist <= s.radius! - .2 : dist <= (s.range ?? 8) - .2) return cast(s, t.id);
   }
 }
 function drawNpc(n: Npc) { if (n.id === 'prensa') { shadow(n.x * 32, n.y * 32 + 4, 28, 9); g.drawImage(pressSprite(), Math.round(n.x * 32) - 26, Math.round(n.y * 32) - 56); return; } if (n.id === 'bau') { shadow(n.x * 32, n.y * 32 + 4, 24, 8); g.drawImage(chestSprite(), Math.round(n.x * 32) - 22, Math.round(n.y * 32) - 34); return; } if (n.id === 'artifice') { const w = wingSprites('arcane_wizard', 1)[Math.floor(performance.now() / 135) % 6], fw = w.width / 2; g.imageSmoothingEnabled = true; g.drawImage(w, Math.round(n.x * 32 - fw / 2), Math.round(n.y * 32) - 27 - WING_ROOT, fw, w.height / 2); g.imageSmoothingEnabled = false; } shadow(n.x * 32, n.y * 32 + 2, 15, 6); g.drawImage(heroSprites(npcLooks[n.look])[0][0], Math.round(n.x * 32 - FRAME_W / 2), Math.round(n.y * 32 - FRAME_H + 6)); }

@@ -265,7 +265,7 @@ export class MapRoom {
       case 'dui': return this.duelInvite(p, m.id);
       case 'dua': return this.duelAccept(p);
       case 'dud': { const f = p.duelFrom && this.players.get(p.duelFrom.from); p.duelFrom = null; if (f) this.sys(f, `${p.name} recusou o duelo.`); return; }
-      case 'k': return this.skill(p, m.n, m.id, now);
+      case 'k': return this.skill(p, m.n, m.id, now, m.x, m.y);
       case 'u': return this.usePotion(p, m.slot, now);
       case 'e': return this.equip(p, m.slot);
       case 'qa': return this.questAccept(p, m.npc, m.id);
@@ -624,7 +624,7 @@ export class MapRoom {
     if (!rows.length) { this.guilds.delete(gid); return; }
     const g = { id: gid, name: rows[0].g_name, tag: rows[0].tag, color: rows[0].color, leader: rows[0].leader_char, notice: rows[0].notice, m: rows.map(r => ({ id: r.char_id, name: r.name, rank: r.rank, lv: r.level, cls: r.class, res: r.resets, mr: r.master_resets })) };
     const old = this.guilds.get(gid); this.guilds.set(gid, g);
-    for (const r of g.m) { const o = this.byChar.get(r.id); if (!o) continue; const was = o.guildId; o.guildId = gid; o.gRank = r.rank; this.send(o, { t: 'guild', g, me: o.charId }); if (was !== gid || !old || old.tag !== g.tag || old.color !== g.color) this.forgetLook(o); }
+    for (const r of g.m) { const o = this.byChar.get(r.id); if (!o) continue; const was = o.guildId; o.guildId = gid; o.gRank = r.rank; this.send(o, { t: 'guild', g, me: o.charId }); this.forgetLook(o); void was; void old; } // sempre reenvia a aparência: a sigla aparece na hora para todos (inclusive para quem acabou de entrar)
   }
   /** Faz todo mundo receber de novo a aparência do jogador (para atualizar a etiqueta da guilda). */
   private forgetLook(o: Player) { for (const q of this.players.values()) q.known.delete(o.eid); }
@@ -847,17 +847,24 @@ export class MapRoom {
   }
 
   // ---------- combate ----------
-  private skill(p: Player, n: unknown, id: unknown, now: number) {
+  private skill(p: Player, n: unknown, id: unknown, now: number, tx?: unknown, ty?: unknown) {
     const sk = classOf(p.cls).skills.find(x => x.n === n); if (sk && p.level < (sk.lvl ?? 1)) return this.sys(p, `Disponível no nível ${sk.lvl}.`);
-    if (!sk || (this.map.safe && sk.kind !== 'buff' && sk.kind !== 'heal' && !this.duelFoe(p, id)) || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
-    const foe = this.duelFoe(p, id), harm = !['buff', 'heal', 'summon'].includes(sk.kind);
+    if (!sk || (this.map.safe && sk.kind !== 'buff' && sk.kind !== 'heal' && sk.kind !== 'teleport' && !this.duelFoe(p, id)) || now < (p.cds[sk.n] ?? 0) || p.mp < sk.mana) return;
+    const foe = this.duelFoe(p, id), harm = !['buff', 'heal', 'summon', 'teleport'].includes(sk.kind);
     if (foe && harm && now >= (p.cds[sk.n] ?? 0) && p.mp >= sk.mana && dist(foe, p) <= Math.max(sk.range ?? 0, sk.radius ?? 0, 2.5)) { // duelo: a habilidade acerta o oponente (dano de PvP reduzido)
       const st = this.stats(p); p.mp -= sk.mana; p.cds[sk.n] = now + sk.cd; p.nextAtk = now + st.attackMs; p.meDirty = true; this.send(p, { t: 'cd', n: sk.n, ms: sk.cd });
       this.fx.push({ k: 'bolt', x: p.x, y: p.y, id: p.eid, tx: foe.x, ty: foe.y, b: sk.color ?? classOf(p.cls).bolt ?? '#ffd76a' }); this.pvpHit(p, foe, st.atk * Math.min(sk.mult ?? 1, 3), st.crit); return;
     }
     if (this.map.safe && foe) return;
-    const s = this.stats(p), m = this.mobs.get(id as number), targeted = sk.kind !== 'spin' && sk.kind !== 'spirits' && sk.kind !== 'summon' && sk.kind !== 'buff' && sk.kind !== 'heal';
+    const s = this.stats(p), m = this.mobs.get(id as number), targeted = !['spin', 'spirits', 'summon', 'buff', 'heal', 'nova', 'teleport'].includes(sk.kind);
     if (targeted && (!m || m.hp <= 0 || dist(m, p) > sk.range!)) return;
+    let dest: Pt | null = null;
+    if (sk.kind === 'teleport') { // destino: ponto escolhido (ou perto do alvo), até o alcance; procura o lugar livre mais próximo
+      let x = Number(tx), y = Number(ty); if (!Number.isFinite(x) || !Number.isFinite(y)) { if (!m) return; x = m.x; y = m.y; }
+      const d = Math.hypot(x - p.x, y - p.y), L = sk.range ?? 7; if (d > L) { x = p.x + (x - p.x) / d * L; y = p.y + (y - p.y) / d * L; }
+      for (let r = 0; r < 3 && !dest; r += .5) for (let a = 0; a < 6.28 && !dest; a += r ? .6 : 7) { const q = { x: x + Math.cos(a) * r, y: y + Math.sin(a) * r }; if (!blocked(this.map, q.x, q.y)) dest = q; }
+      if (!dest) return;
+    }
     p.mp -= sk.mana; p.cds[sk.n] = now + sk.cd; p.nextAtk = now + s.attackMs;
     const atk = s.atk * sk.mult, around = (c: Pt, r: number) => [...this.mobs.values()].filter(x => x.hp > 0 && dist(x, c) <= r);
     switch (sk.kind) {
@@ -870,7 +877,22 @@ export class MapRoom {
       }
       case 'splash':
         this.fx.push({ k: 'bolt', x: p.x, y: p.y, id: p.eid, tx: m!.x, ty: m!.y, b: sk.color }, { k: 'boom', x: m!.x, y: m!.y, r: sk.radius, b: sk.color });
-        for (const x of around(m!, sk.radius!)) this.hit(p, x, atk, s.crit); break;
+        for (const x of around(m!, sk.radius!)) { if (sk.slow) x.slowUntil = now + sk.slow; if (sk.curse) x.curseUntil = now + sk.curse; this.hit(p, x, atk, s.crit); } break;
+      case 'meteor': { // cai do céu sobre o ponto do alvo depois de um instante
+        const at = { x: m!.x, y: m!.y }; this.fx.push({ k: 'meteor', x: round(at.x), y: round(at.y), id: p.eid, r: sk.radius, b: sk.color });
+        this.later(now + 550, () => { if (p.gone) return; for (const x of around(at, sk.radius!)) { if (sk.slow) x.slowUntil = Date.now() + sk.slow; this.hit(p, x, atk, s.crit); } }); break;
+      }
+      case 'nova': { // concentra energia e explode ao redor de onde o personagem estiver
+        this.fx.push({ k: 'pnova', x: p.x, y: p.y, id: p.eid, r: sk.radius, b: sk.color, d: 600 });
+        this.later(now + 600, () => { if (p.gone || p.deadUntil) return; this.fx.push({ k: 'boom', x: p.x, y: p.y, r: sk.radius, b: sk.color }); for (const x of around(p, sk.radius!)) this.hit(p, x, atk, s.crit); }); break;
+      }
+      case 'twister': { // tornado que anda em linha e atinge várias vezes no caminho
+        const d = dist(m!, p) || 1, ux = (m!.x - p.x) / d, uy = (m!.y - p.y) / d, L = sk.range!, n = sk.count ?? 4, x0 = p.x, y0 = p.y;
+        this.fx.push({ k: 'twister', x: x0, y: y0, id: p.eid, tx: round(x0 + ux * L), ty: round(y0 + uy * L), b: sk.color, d: n * 260 });
+        for (let i = 0; i < n; i++) this.later(now + i * 260, () => { if (p.gone) return; const c = { x: x0 + ux * L * (i + 1) / n, y: y0 + uy * L * (i + 1) / n }; for (const x of around(c, sk.radius! + L / n / 2)) this.hit(p, x, atk, s.crit); });
+        break;
+      }
+      case 'teleport': { const from = { x: p.x, y: p.y }; p.x = dest!.x; p.y = dest!.y; p.path = null; p.target = 0; this.fx.push({ k: 'tele', x: round(p.x), y: round(p.y), fx: round(from.x), fy: round(from.y), id: p.eid, b: sk.color }); break; }
       case 'multi': {
         const list = around(m!, sk.radius!).sort((a, b) => dist(a, m!) - dist(b, m!)).slice(0, sk.count);
         for (const x of list) { this.fx.push({ k: 'bolt', x: p.x, y: p.y, id: p.eid, tx: x.x, ty: x.y, b: sk.color }); if (sk.curse) x.curseUntil = now + sk.curse; this.hit(p, x, atk, s.crit); } break;

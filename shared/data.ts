@@ -296,8 +296,8 @@ for (const m of Object.values(MOBS)) {
   else if (L >= 30) m.drops.push(['box_prata', .01], ['box_bronze', .006]);
   else m.drops.push(['box_bronze', .012]);
 }
-export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse' | 'buff' | 'heal' | 'drain' | 'spirits' | 'cone' | 'chain' | 'wave';
-export interface Skill { lvl?: number; slow?: number; buff?: 'atk' | 'def'; heal?: number; curse?: number; n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number; arc?: number }
+export type SkillKind = 'spin' | 'dash' | 'splash' | 'multi' | 'summon' | 'curse' | 'buff' | 'heal' | 'drain' | 'spirits' | 'cone' | 'chain' | 'wave' | 'meteor' | 'nova' | 'twister' | 'teleport';
+export interface Skill { desc?: string; lvl?: number; slow?: number; buff?: 'atk' | 'def'; heal?: number; curse?: number; n: number; name: string; kind: SkillKind; mana: number; cd: number; mult: number; radius?: number; range?: number; count?: number; pet?: string; color?: string; ms?: number; arc?: number }
 export interface ClassDef {
   key: string; name: string; desc: string; base: { str: number; agi: number; vit: number; ene: number }; range: number; magic: boolean;
   atk: [number, number, number]; color: string; pants: string; weapon: string; weapons: string[]; bolt: string | null; skills: Skill[];
@@ -305,25 +305,80 @@ export interface ClassDef {
 // atk = pesos de Força, Agilidade e Energia no ataque
 export const CLASSES: Record<string, ClassDef> = {
   dark_warrior: { key: 'dark_warrior', name: 'Dark Warrior', desc: 'Corpo a corpo, muita resistência.', base: { str: 28, agi: 20, vit: 25, ene: 10 }, range: 1.7, magic: false, atk: [.333, 0, 0], color: '#4d5873', pants: '#373b52', weapon: 'short_sword', weapons: ['sword', 'axe', 'mace', 'spear', 'gsword'], bolt: null, skills: [
-    { n: 1, name: 'Golpe Circular', kind: 'spin', mana: 12, cd: 4000, mult: 1.3, radius: 2.4 }, { n: 2, name: 'Investida', kind: 'dash', mana: 18, cd: 7000, mult: 2, range: 7 },
-    { n: 3, lvl: 10, name: 'Grito de Guerra', kind: 'buff', buff: 'atk', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#ff8a5c' }, { n: 4, lvl: 25, name: 'Terremoto', kind: 'spin', mana: 40, cd: 12000, mult: 2.4, radius: 3.8 }, { n: 5, lvl: 60, name: 'Ira do Titã', kind: 'spin', mana: 60, cd: 15000, mult: 3.4, radius: 4.8, color: '#ff8a3c' }, { n: 6, lvl: 120, name: 'Lâmina do Apocalipse', kind: 'dash', mana: 90, cd: 18000, mult: 5.6, range: 10 },
-    { n: 7, lvl: 40, name: 'Golpe Cortante', kind: 'cone', mana: 30, cd: 5000, mult: 2.6, radius: 3.4, range: 3.4, arc: 130, color: '#ffe3a0' }] },
+    { n: 1, name: 'Golpe Descendente', desc: 'Golpe forte de cima para baixo em quem está à frente.', kind: 'cone', mana: 8, cd: 2500, mult: 1.6, radius: 2.4, arc: 70, color: '#ffe3a0' },
+    { n: 2, name: 'Investida', desc: 'Avança até o alvo e golpeia.', kind: 'dash', mana: 14, cd: 6000, mult: 2, range: 7 },
+    { n: 3, lvl: 8, name: 'Golpe Ascendente', desc: 'Golpe de baixo para cima que atinge o alvo e quem está colado nele.', kind: 'splash', mana: 14, cd: 4000, mult: 2, radius: 1.5, range: 2.6, color: '#ffb35a' },
+    { n: 4, lvl: 12, name: 'Ciclone', desc: 'Gira a arma e atinge todos ao redor.', kind: 'spin', mana: 16, cd: 4500, mult: 1.5, radius: 2.5 },
+    { n: 5, lvl: 15, name: 'Vitalidade Ampliada', desc: 'Aumenta a defesa por 15 s.', kind: 'buff', buff: 'def', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#7dffa1' },
+    { n: 6, lvl: 20, name: 'Grito de Guerra', desc: 'Aumenta o ataque por 15 s.', kind: 'buff', buff: 'atk', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#ff8a5c' },
+    { n: 7, lvl: 25, name: 'Corte Giratório', desc: 'Giro amplo que corta todos em volta.', kind: 'spin', mana: 32, cd: 8000, mult: 2.3, radius: 3.4, color: '#ffd76a' },
+    { n: 8, lvl: 40, name: 'Golpe Furioso', desc: 'Golpeia o chão com fúria: o solo explode ao redor após um instante.', kind: 'nova', mana: 45, cd: 11000, mult: 3, radius: 4.2, color: '#ff8a3c' },
+    { n: 9, lvl: 60, name: 'Estocada Mortal', desc: 'Estocada que atravessa todos em linha reta.', kind: 'wave', mana: 50, cd: 9000, mult: 3.6, radius: 1, range: 5, color: '#ffe3a0' },
+    { n: 10, lvl: 90, name: 'Golpe Devastador', desc: 'Corte em leque largo e muito forte.', kind: 'cone', mana: 65, cd: 12000, mult: 4.2, radius: 4.4, arc: 170, color: '#ff6a4a' },
+    { n: 11, lvl: 130, name: 'Ira do Titã', desc: 'Giro devastador de grande alcance.', kind: 'spin', mana: 80, cd: 15000, mult: 4.6, radius: 4.8, color: '#ff8a3c' },
+    { n: 12, lvl: 180, name: 'Lâmina do Apocalipse', desc: 'Investida brutal contra um alvo distante.', kind: 'dash', mana: 100, cd: 18000, mult: 6.2, range: 10 },
+    { n: 13, lvl: 260, name: 'Fissura Sísmica', desc: 'Parte o chão: explosão enorme ao redor depois de concentrar a força.', kind: 'nova', mana: 140, cd: 24000, mult: 7, radius: 6, color: '#ff5a2c' }] },
   arcane_wizard: { key: 'arcane_wizard', name: 'Arcane Wizard', desc: 'Magia à distância, dano alto, pouca defesa.', base: { str: 18, agi: 18, vit: 15, ene: 32 }, range: 7, magic: true, atk: [0, 0, .4], color: '#3f4fa8', pants: '#2d3778', weapon: 'app_staff', weapons: ['staff', 'scepter'], bolt: '#8fd0ff', skills: [
-    { n: 1, name: 'Bola de Fogo', kind: 'splash', mana: 10, cd: 3000, mult: 1.5, radius: 2, range: 8, color: '#ff8a3c' }, { n: 2, name: 'Tempestade de Raios', kind: 'multi', mana: 20, cd: 8000, mult: 1.4, radius: 4, count: 5, range: 8, color: '#f6f07a' },
-    { n: 3, lvl: 10, name: 'Nova Gélida', kind: 'spin', mana: 22, cd: 9000, mult: 1.2, radius: 3.6, slow: 5000, color: '#7fe3ff' }, { n: 4, lvl: 25, name: 'Meteoro', kind: 'splash', mana: 45, cd: 12000, mult: 3.2, radius: 3.2, range: 9, color: '#ff5a2c' }, { n: 5, lvl: 60, name: 'Corrente de Relâmpagos', kind: 'multi', mana: 65, cd: 14000, mult: 2.8, radius: 6, count: 8, range: 10, color: '#a8e4ff' }, { n: 6, lvl: 120, name: 'Cataclismo', kind: 'splash', mana: 110, cd: 20000, mult: 5.4, radius: 5, range: 10, color: '#ff3c7a' },
-    { n: 7, lvl: 40, name: 'Espíritos Malignos', kind: 'spirits', mana: 50, cd: 10000, mult: .85, radius: 4.6, count: 4, color: '#9fe8ff' }] },
+    { n: 1, name: 'Esfera de Energia', desc: 'Esfera mágica rápida e barata.', kind: 'splash', mana: 4, cd: 1200, mult: 1.2, radius: .8, range: 8, color: '#8fe8ff' },
+    { n: 2, name: 'Bola de Fogo', desc: 'Bola de fogo que explode no alvo.', kind: 'splash', mana: 10, cd: 3000, mult: 1.6, radius: 1.8, range: 8, color: '#ff8a3c' },
+    { n: 3, lvl: 5, name: 'Onda de Poder', desc: 'Onda de energia que atravessa os inimigos em linha.', kind: 'wave', mana: 12, cd: 3500, mult: 1.6, radius: .8, range: 8, color: '#c6a8ff' },
+    { n: 4, lvl: 8, name: 'Relâmpago', desc: 'Raio que salta para 2 inimigos próximos.', kind: 'multi', mana: 14, cd: 4000, mult: 1.8, radius: 2.5, count: 2, range: 8, color: '#f6f07a' },
+    { n: 5, lvl: 10, name: 'Teletransporte', desc: 'Some e reaparece no ponto escolhido (até 7 tiles).', kind: 'teleport', mana: 18, cd: 4000, mult: 0, range: 7, color: '#9fe8ff' },
+    { n: 6, lvl: 18, name: 'Meteorito', desc: 'Uma pedra em chamas cai do céu sobre o alvo.', kind: 'meteor', mana: 26, cd: 7000, mult: 2.6, radius: 2.4, range: 9, color: '#ff6a2c' },
+    { n: 7, lvl: 22, name: 'Gelo', desc: 'Congela o alvo e quem está perto, deixando-os lentos.', kind: 'splash', mana: 22, cd: 6000, mult: 2, radius: 1.8, range: 8, slow: 5000, color: '#7fe3ff' },
+    { n: 8, lvl: 26, name: 'Veneno', desc: 'Envenena até 3 inimigos, que passam a receber mais dano.', kind: 'multi', mana: 24, cd: 7000, mult: 1.6, radius: 3, count: 3, range: 8, curse: 6000, color: '#9dff6b' },
+    { n: 9, lvl: 30, name: 'Barreira de Alma', desc: 'Escudo mágico: aumenta a defesa por 15 s.', kind: 'buff', buff: 'def', mana: 30, cd: 25000, mult: 0, ms: 15000, color: '#8fd0ff' },
+    { n: 10, lvl: 34, name: 'Chamas', desc: 'Coluna de fogo que queima uma área grande.', kind: 'splash', mana: 34, cd: 8000, mult: 2.8, radius: 3, range: 9, color: '#ff5a2c' },
+    { n: 11, lvl: 38, name: 'Tornado', desc: 'Um tornado avança em linha e atinge várias vezes.', kind: 'twister', mana: 36, cd: 9000, mult: 1.2, radius: 1.4, range: 9, count: 5, color: '#cfe8ff' },
+    { n: 12, lvl: 45, name: 'Espíritos Malignos', desc: 'Espíritos giram ao redor e atingem tudo várias vezes.', kind: 'spirits', mana: 50, cd: 10000, mult: .9, radius: 4.6, count: 4, color: '#9fe8ff' },
+    { n: 13, lvl: 60, name: 'Fogo do Inferno', desc: 'Concentra o fogo e explode tudo ao redor.', kind: 'nova', mana: 60, cd: 12000, mult: 3.4, radius: 4.5, color: '#ff3c2a' },
+    { n: 14, lvl: 80, name: 'Raio Aquático', desc: 'Raio de água concentrada que atravessa tudo em linha.', kind: 'wave', mana: 70, cd: 12000, mult: 4.2, radius: 1.2, range: 10, color: '#59c8ff' },
+    { n: 15, lvl: 110, name: 'Inferno', desc: 'Anel de fogo enorme ao redor do mago.', kind: 'nova', mana: 90, cd: 15000, mult: 4.6, radius: 5.5, color: '#ff6a2c' },
+    { n: 16, lvl: 150, name: 'Tempestade de Gelo', desc: 'Granizo cai sobre uma área grande e congela os inimigos.', kind: 'meteor', mana: 110, cd: 17000, mult: 5, radius: 4, range: 10, slow: 6000, color: '#a8e8ff' },
+    { n: 17, lvl: 220, name: 'Nova', desc: 'Junta energia por um instante e libera uma explosão gigante.', kind: 'nova', mana: 150, cd: 22000, mult: 7, radius: 6.5, color: '#ffd76a' },
+    { n: 18, lvl: 260, name: 'Cometa', desc: 'Um cometa cai do céu com força devastadora.', kind: 'meteor', mana: 160, cd: 24000, mult: 7.4, radius: 3.4, range: 11, color: '#ff3c7a' }] },
   mystic_archer: { key: 'mystic_archer', name: 'Mystic Archer', desc: 'Arqueira veloz com um espírito auxiliar.', base: { str: 20, agi: 34, vit: 18, ene: 12 }, range: 8, magic: false, atk: [0, .34, 0], color: '#4f7a45', pants: '#3a5a33', weapon: 'oak_bow', weapons: ['bow', 'crossbow'], bolt: '#f1e3b8', skills: [
-    { n: 1, name: 'Flecha Tripla', kind: 'multi', mana: 10, cd: 4000, mult: 1.2, radius: 3.5, count: 3, range: 9, color: '#f1e3b8' }, { n: 2, name: 'Espírito da Mata', kind: 'summon', mana: 22, cd: 12000, mult: .7, pet: 'wisp', ms: 30000 },
-    { n: 3, lvl: 10, name: 'Cura da Mata', kind: 'heal', heal: .35, mana: 28, cd: 14000, mult: 0, color: '#7dffa1' }, { n: 4, lvl: 25, name: 'Chuva de Flechas', kind: 'splash', mana: 38, cd: 11000, mult: 2.4, radius: 3.6, range: 10, color: '#f1e3b8' }, { n: 5, lvl: 60, name: 'Salva Perfurante', kind: 'multi', mana: 55, cd: 13000, mult: 2.7, radius: 6, count: 7, range: 11, color: '#6ae0ff' }, { n: 6, lvl: 120, name: 'Chuva Estelar', kind: 'splash', mana: 95, cd: 19000, mult: 5, radius: 5.2, range: 11, color: '#ffe08a' },
-    { n: 7, lvl: 40, name: 'Flecha Perfurante', kind: 'wave', mana: 34, cd: 8000, mult: 2.5, radius: .9, range: 10, color: '#f1e3b8' }] },
+    { n: 1, name: 'Flecha Tripla', desc: 'Três flechas em três inimigos.', kind: 'multi', mana: 10, cd: 4000, mult: 1.2, radius: 3.5, count: 3, range: 9, color: '#f1e3b8' },
+    { n: 2, name: 'Espírito da Mata', desc: 'Invoca um espírito que luta ao seu lado por 30 s.', kind: 'summon', mana: 22, cd: 12000, mult: .7, pet: 'wisp', ms: 30000 },
+    { n: 3, lvl: 5, name: 'Cura', desc: 'Recupera 35% da vida.', kind: 'heal', heal: .35, mana: 28, cd: 14000, mult: 0, color: '#7dffa1' },
+    { n: 4, lvl: 12, name: 'Flecha Perfurante', desc: 'Flecha que atravessa todos em linha reta.', kind: 'wave', mana: 20, cd: 6000, mult: 2.2, radius: .9, range: 10, color: '#f1e3b8' },
+    { n: 5, lvl: 15, name: 'Defesa Ampliada', desc: 'Aumenta a defesa por 15 s.', kind: 'buff', buff: 'def', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#8fd0ff' },
+    { n: 6, lvl: 20, name: 'Dano Ampliado', desc: 'Aumenta o ataque por 15 s.', kind: 'buff', buff: 'atk', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#ffb35a' },
+    { n: 7, lvl: 25, name: 'Flecha de Gelo', desc: 'Flecha congelante: dano e lentidão.', kind: 'splash', mana: 22, cd: 6000, mult: 2, radius: 1.3, range: 10, slow: 6000, color: '#a8e8ff' },
+    { n: 8, lvl: 30, name: 'Chuva de Flechas', desc: 'Flechas caem do céu sobre uma área.', kind: 'meteor', mana: 34, cd: 9000, mult: 2.4, radius: 3.4, range: 10, color: '#f1e3b8' },
+    { n: 9, lvl: 45, name: 'Multidisparo', desc: 'Leque de flechas à frente.', kind: 'cone', mana: 40, cd: 8000, mult: 2.8, radius: 8, arc: 60, color: '#f1e3b8' },
+    { n: 10, lvl: 70, name: 'Salva Perfurante', desc: 'Sete flechas em sete inimigos.', kind: 'multi', mana: 55, cd: 12000, mult: 3, radius: 6, count: 7, range: 11, color: '#6ae0ff' },
+    { n: 11, lvl: 110, name: 'Tornado de Flechas', desc: 'Um redemoinho de flechas avança em linha.', kind: 'twister', mana: 70, cd: 14000, mult: 1.8, radius: 1.6, range: 10, count: 5, color: '#d6ffa8' },
+    { n: 12, lvl: 160, name: 'Chuva Estelar', desc: 'Estrelas caem do céu sobre uma área enorme.', kind: 'meteor', mana: 110, cd: 19000, mult: 5.6, radius: 5.2, range: 11, color: '#ffe08a' },
+    { n: 13, lvl: 240, name: 'Flecha Celestial', desc: 'Flecha divina que atravessa tudo com força total.', kind: 'wave', mana: 140, cd: 22000, mult: 7, radius: 1.4, range: 12, color: '#fff3c0' }] },
   spell_knight: { key: 'spell_knight', name: 'Spell Knight', desc: 'Híbrido de força e energia.', base: { str: 26, agi: 24, vit: 20, ene: 22 }, range: 1.7, magic: false, atk: [.2, 0, .18], color: '#7a3f5e', pants: '#552c43', weapon: 'short_sword', weapons: ['sword', 'axe', 'mace', 'gsword'], bolt: null, skills: [
-    { n: 1, name: 'Lâmina Arcana', kind: 'splash', mana: 12, cd: 3500, mult: 1.6, radius: 2, range: 2.6, color: '#d58cff' }, { n: 2, name: 'Explosão Rúnica', kind: 'spin', mana: 20, cd: 7000, mult: 1.7, radius: 3 },
-    { n: 3, lvl: 10, name: 'Escudo Rúnico', kind: 'buff', buff: 'def', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#c9a4ff' }, { n: 4, lvl: 25, name: 'Corte Dimensional', kind: 'dash', mana: 40, cd: 11000, mult: 3.2, range: 8 }, { n: 5, lvl: 60, name: 'Tormenta Arcana', kind: 'spin', mana: 60, cd: 14000, mult: 3.2, radius: 4.6, color: '#d58cff' }, { n: 6, lvl: 120, name: 'Julgamento Rúnico', kind: 'splash', mana: 95, cd: 18000, mult: 5.2, radius: 4.4, range: 7, color: '#ffd76a' },
-    { n: 7, lvl: 40, name: 'Lâmina Rúnica', kind: 'wave', mana: 38, cd: 8000, mult: 2.8, radius: 1.1, range: 7, color: '#d58cff' }] },
+    { n: 1, name: 'Lâmina Arcana', desc: 'Corte mágico que atravessa quem está à frente.', kind: 'wave', mana: 10, cd: 3000, mult: 1.6, radius: 1.3, range: 3.5, color: '#d58cff' },
+    { n: 2, name: 'Bola de Fogo', desc: 'Bola de fogo que explode no alvo.', kind: 'splash', mana: 10, cd: 3000, mult: 1.5, radius: 1.8, range: 8, color: '#ff8a3c' },
+    { n: 3, lvl: 10, name: 'Corte Flamejante', desc: 'Corte em leque com fogo: os atingidos recebem mais dano.', kind: 'cone', mana: 18, cd: 5000, mult: 2, radius: 3, arc: 140, color: '#ff8a3c' },
+    { n: 4, lvl: 12, name: 'Escudo Rúnico', desc: 'Aumenta a defesa por 15 s.', kind: 'buff', buff: 'def', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#c9a4ff' },
+    { n: 5, lvl: 15, name: 'Relâmpago', desc: 'Raio que salta para 2 inimigos próximos.', kind: 'multi', mana: 14, cd: 4000, mult: 1.8, radius: 2.5, count: 2, range: 8, color: '#f6f07a' },
+    { n: 6, lvl: 25, name: 'Corte Dimensional', desc: 'Avança até o alvo e golpeia.', kind: 'dash', mana: 30, cd: 9000, mult: 3, range: 8 },
+    { n: 7, lvl: 30, name: 'Meteorito', desc: 'Uma pedra em chamas cai do céu sobre o alvo.', kind: 'meteor', mana: 30, cd: 8000, mult: 2.8, radius: 2.4, range: 9, color: '#ff6a2c' },
+    { n: 8, lvl: 45, name: 'Golpe Flamejante', desc: 'Golpe de fogo em meio círculo à frente.', kind: 'cone', mana: 45, cd: 9000, mult: 3.2, radius: 3.8, arc: 180, color: '#ff5a2c' },
+    { n: 9, lvl: 55, name: 'Tornado', desc: 'Um tornado avança em linha e atinge várias vezes.', kind: 'twister', mana: 45, cd: 10000, mult: 1.4, radius: 1.4, range: 9, count: 5, color: '#cfe8ff' },
+    { n: 10, lvl: 70, name: 'Espíritos Malignos', desc: 'Espíritos giram ao redor e atingem tudo várias vezes.', kind: 'spirits', mana: 60, cd: 11000, mult: 1, radius: 4.6, count: 4, color: '#d58cff' },
+    { n: 11, lvl: 90, name: 'Corte Espiral', desc: 'Giro de lâminas mágicas ao redor.', kind: 'spin', mana: 70, cd: 12000, mult: 3.8, radius: 4.6, color: '#d58cff' },
+    { n: 12, lvl: 150, name: 'Tempestade Gigante', desc: 'Concentra energia e libera uma tempestade ao redor.', kind: 'nova', mana: 110, cd: 18000, mult: 5.6, radius: 6, color: '#c58bff' },
+    { n: 13, lvl: 220, name: 'Julgamento Rúnico', desc: 'Runas explodem sobre o alvo com força total.', kind: 'meteor', mana: 140, cd: 22000, mult: 6.8, radius: 4.4, range: 9, color: '#ffd76a' }] },
   shadow_summoner: { key: 'shadow_summoner', name: 'Shadow Summoner', desc: 'Invoca sombras e amaldiçoa inimigos.', base: { str: 16, agi: 20, vit: 18, ene: 34 }, range: 6.5, magic: true, atk: [0, 0, .34], color: '#4a2f6b', pants: '#33214a', weapon: 'app_staff', weapons: ['staff', 'scepter'], bolt: '#b06bff', skills: [
-    { n: 1, name: 'Invocar Sombra', kind: 'summon', mana: 22, cd: 10000, mult: 1, pet: 'shade', ms: 35000 }, { n: 2, name: 'Maldição', kind: 'curse', mana: 14, cd: 6000, mult: .8, range: 8, ms: 8000, color: '#b06bff' },
-    { n: 3, lvl: 10, name: 'Dreno Vital', kind: 'drain', heal: .5, mana: 18, cd: 7000, mult: 1.6, range: 8, color: '#ff5a7a' }, { n: 4, lvl: 25, name: 'Praga Sombria', kind: 'multi', curse: 8000, mana: 42, cd: 13000, mult: 2.2, radius: 4.5, count: 6, range: 9, color: '#9dff6b' }, { n: 5, lvl: 60, name: 'Legião de Almas', kind: 'multi', curse: 10000, mana: 65, cd: 15000, mult: 2.9, radius: 6, count: 8, range: 10, color: '#c77dff' }, { n: 6, lvl: 120, name: 'Colheita da Morte', kind: 'drain', heal: .8, mana: 100, cd: 20000, mult: 5, range: 10, color: '#ff3c5a' },
-    { n: 7, lvl: 40, name: 'Correntes Sombrias', kind: 'chain', mana: 40, cd: 9000, mult: 2.4, radius: 4, count: 6, range: 8, slow: 3000, color: '#b06bff' }] },
+    { n: 1, name: 'Invocar Sombra', desc: 'Invoca uma sombra que luta ao seu lado por 35 s.', kind: 'summon', mana: 22, cd: 10000, mult: 1, pet: 'shade', ms: 35000 },
+    { n: 2, name: 'Fraqueza', desc: 'Amaldiçoa o alvo: ele recebe mais dano.', kind: 'curse', mana: 12, cd: 5000, mult: .8, range: 8, ms: 8000, color: '#b06bff' },
+    { n: 3, lvl: 8, name: 'Dreno Vital', desc: 'Rouba vida do alvo.', kind: 'drain', heal: .5, mana: 18, cd: 6000, mult: 1.6, range: 8, color: '#ff5a7a' },
+    { n: 4, lvl: 15, name: 'Corrente de Relâmpagos', desc: 'Raio que pula de inimigo em inimigo.', kind: 'chain', mana: 26, cd: 7000, mult: 2, radius: 4, count: 5, range: 8, color: '#a8e4ff' },
+    { n: 5, lvl: 20, name: 'Sono', desc: 'Faz os inimigos ao redor ficarem lentos e sonolentos.', kind: 'spin', mana: 24, cd: 12000, mult: .4, radius: 4, slow: 7000, color: '#c9a4ff' },
+    { n: 6, lvl: 25, name: 'Fúria Sombria', desc: 'Aumenta o ataque por 15 s.', kind: 'buff', buff: 'atk', mana: 25, cd: 25000, mult: 0, ms: 15000, color: '#ff5a7a' },
+    { n: 7, lvl: 32, name: 'Praga Sombria', desc: 'Contamina até 6 inimigos.', kind: 'multi', curse: 8000, mana: 40, cd: 11000, mult: 2.2, radius: 4.5, count: 6, range: 9, color: '#9dff6b' },
+    { n: 8, lvl: 45, name: 'Choque Relampejante', desc: 'Junta energia e solta um choque ao redor.', kind: 'nova', mana: 48, cd: 11000, mult: 3, radius: 4.2, color: '#a8e4ff' },
+    { n: 9, lvl: 55, name: 'Correntes Sombrias', desc: 'Correntes que prendem e deixam lentos vários inimigos.', kind: 'chain', mana: 50, cd: 10000, mult: 2.6, radius: 4, count: 6, range: 8, slow: 3000, color: '#b06bff' },
+    { n: 10, lvl: 75, name: 'Tempestade Rubra', desc: 'Uma tempestade vermelha cai sobre o alvo.', kind: 'meteor', mana: 65, cd: 12000, mult: 3.8, radius: 3.8, range: 10, color: '#ff3c5a' },
+    { n: 11, lvl: 100, name: 'Legião de Almas', desc: 'Almas atacam até 8 inimigos.', kind: 'multi', curse: 10000, mana: 75, cd: 14000, mult: 3.2, radius: 6, count: 8, range: 10, color: '#c77dff' },
+    { n: 12, lvl: 150, name: 'Réquiem', desc: 'Canto fúnebre que explode ao redor depois de um instante.', kind: 'nova', mana: 110, cd: 18000, mult: 5.4, radius: 5.5, color: '#c58bff' },
+    { n: 13, lvl: 220, name: 'Colheita da Morte', desc: 'Rouba muita vida de um alvo.', kind: 'drain', heal: .8, mana: 130, cd: 20000, mult: 6.4, range: 10, color: '#ff3c5a' }] },
 };
 export const classOf = (name?: string): ClassDef => Object.values(CLASSES).find(c => c.name === name) ?? CLASSES.dark_warrior;
 export const canWield = (c: ClassDef, d: ItemDef) => d.kind === 'wings' ? d.cls === c.key : d.set ? SETS[d.set].cls === c.key : d.kind !== 'weapon' || c.weapons.includes(d.wtype!);
