@@ -75,7 +75,8 @@ let ents = new Map<number, Ent>(), target = 0, auto = false, autoLoot = false, r
 let pred: { x: number; y: number; path: { x: number; y: number }[] | null; stop: number; tx: number; ty: number; hold: number } | null = null;
 type GuildInfo = { id: number; name: string; tag: string; color: number; leader: number; notice: string; me: number; m: { id: number; name: string; rank: number; lv: number; cls: string; res: number; mr: number }[] };
 let guild: GuildInfo | null = null;
-let achS: AchState | null = null, achV: Record<string, number> = {}, achOff = false;
+let achS: AchState | null = null, achV: Record<string, number> = {}, achOff = false, achN = 0, dailyN = 0, daily: any = null;
+const achBadge = () => { const n = achN + dailyN, b = $('#achb'); b.dataset.n = n ? String(n) : ''; b.classList.toggle('glow', n > 0); $('#more').classList.toggle('dot', n > 0); };
 let myCls = CLASSES.dark_warrior, party: { m: { id: number; name: string }[]; leader: number; mode: number; me: number } | null = null, menuFor: Ent | null = null, bolts: { x: number; y: number; tx: number; ty: number; t: number; c: string }[] = [];
 let myLook: { hc: number; hs: number } = { hc: 0, hs: 0 }, Z = 2, camX = 0, camY = 0, pingTimer = 0, lastFrame = 0, reconnectTimer = 0;
 const cds: Record<number, { until: number; ms: number }> = {};
@@ -129,7 +130,7 @@ function handle(m: any) {
     case 'me': { const lv = me?.level; me = m; updateHud(); updateQuest(); if (lv !== undefined && lv !== m.level) { beep(660, 400, 'triangle', .06); setTimeout(() => beep(880, 300, 'triangle', .05), 120); } if (shop?.shop === 'missoes') renderShop(); break; }
     case 'inv': chest = m.chest ?? []; items = m.items; updateHud(); renderInv(); drawPortrait(); if (shop) renderShop(); break;
     case 's': snapshot(m); break;
-    case 'sys': log(m.m, 'sys'); if (String(m.m).startsWith('☠') || String(m.m).startsWith('🏅 Conquista')) { const el = $('#toast'); el.textContent = String(m.m).split('! ')[0] + (String(m.m).includes('! ') ? '!' : ''); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(90, 500, 'sawtooth', .05); } break;
+    case 'sys': log(m.m, 'sys'); if (String(m.m).startsWith('☠') || String(m.m).startsWith('🏅 Conquista') || String(m.m).startsWith('📅 Missão do dia concluída')) { const el = $('#toast'); el.textContent = String(m.m).split('! ')[0] + (String(m.m).includes('! ') ? '!' : ''); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(90, 500, 'sawtooth', .05); } break;
     case 'wbr': { const el = $('#wbrank'); if (!m.top?.length) { el.innerHTML = ''; el.style.display = 'none'; break; } el.style.display = 'block'; el.innerHTML = `<b>Dano no Chefe Mundial</b>${m.top.map((r: [string, number], i: number) => `<div><span>${i + 1}. ${esc(r[0])}</span><span>${r[1]}%</span></div>`).join('')}${m.me && m.me[0] > 5 ? `<div class=me><span>${m.me[0]}. Você</span><span>${m.me[1]}%</span></div>` : ''}`; break; }
     case 'c': log(`${m.ch === 'u' ? '[Guilda] ' : ''}<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : m.ch === 'u' ? 'gu' : '', true); break;
     case 'cd': cds[m.n] = { until: performance.now() + m.ms, ms: m.ms }; break;
@@ -137,7 +138,9 @@ function handle(m: any) {
     case 'party': party = m.m ? m : null; renderParty(); break;
     case 'guild': guild = m.g ? { ...m.g, me: m.me } : null; renderGuild(); if (shop?.shop === 'guild') renderShop(); break;
     case 'ach': achOff = !!m.off; if (!m.off) { achS = m.s; achV = m.v; } renderAch(); break;
-    case 'achn': { const b = $('#achb'); b.dataset.n = m.n ? String(m.n) : ''; b.classList.toggle('glow', m.n > 0); $('#more').classList.toggle('dot', m.n > 0); break; }
+    case 'achn': achN = m.n; achBadge(); break;
+    case 'dn': dailyN = m.n; achBadge(); break;
+    case 'daily': daily = m.off ? null : m; renderAch(); break;
     case 'ginv': inviteKind = 'g'; $('#invt').textContent = `${m.from} convidou você para a guilda «${m.tag}» ${m.name}.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
     case 'pinv': inviteKind = 'p'; $('#invt').textContent = `${m.from} convidou você para um grupo.`; $('#invite').style.display = 'block'; beep(700, 150, 'triangle', .05); break;
     case 'dinv': inviteKind = 'd'; $('#invt').textContent = `${m.from} desafiou você para um duelo (2 minutos, ninguém morre).`; $('#invite').style.display = 'block'; beep(330, 250, 'sawtooth', .05); break;
@@ -215,7 +218,7 @@ function drawPortrait() { const c = $<HTMLCanvasElement>('#portrait'), x = c.get
 function myGear(): Look { const by = (s: string) => items.find(i => i.equip === s)?.key ?? null; return lookFromGear(myCls.name, HAIR_COLORS[myLook.hc], myLook.hs, { helm: by('helm'), armor: by('armor'), pants: by('pants'), boots: by('boots'), weapon: by('weapon') }); }
 
 // ---------- janelas ----------
-const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); if (w === 'guild') renderGuild(); if (w === 'ach') { send({ t: 'achq' }); renderAch(); } };
+const openW = (w: string) => { if (window.innerWidth < 720) closeWins(); $('#w-' + w).style.display = 'block'; if (w === 'inv') renderInv(); if (w === 'char') renderChar(); if (w === 'map') renderBig(); if (w === 'rank') renderRank(); if (w === 'guild') renderGuild(); if (w === 'ach') { send({ t: 'achq' }); send({ t: 'dq' }); renderAch(); } };
 function closeWin(w: string) { $('#w-' + w).style.display = 'none'; if (w === 'shop') shop = null; }
 function closeWins() { ['inv', 'char', 'map', 'shop', 'rank', 'guild', 'ach'].forEach(closeWin); }
 async function renderRank() { const ob = $('#onlb'); ob.replaceChildren(); api('online').then(({ online }) => { if (!online.length) { const tr = document.createElement('tr'), td = document.createElement('td'); td.colSpan = 4; td.textContent = 'Ninguém online.'; tr.appendChild(td); ob.appendChild(tr); } for (const p of online) { const tr = document.createElement('tr'); for (const v of [p.name, p.cls, `${p.resets || p.mr ? `${fmtRes(p.resets, p.mr)} · ` : ''}${p.level}`, p.map]) { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); } ob.appendChild(tr); } }).catch(() => { /* sem conexão */ });
@@ -425,6 +428,23 @@ function renderAch() {
   if (achOff) { W.innerHTML = '<div class="info">As conquistas serão ativadas na próxima atualização do servidor.</div>'; return; }
   if (!achS) { W.innerHTML = '<div class="info">Carregando…</div>'; return; }
   const S = achS, done = S.r.length, total = ACHIEVEMENTS.length; W.replaceChildren();
+  if (daily) { // Diário: recompensa de login e missões do dia
+    const D = daily, fmt = (n: number) => n >= 1e6 ? (n / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi' : n.toLocaleString('pt-BR'), itemTxt = (it: [string, number][]) => it.map(([k, q]) => `${q > 1 ? q + 'x ' : ''}${ITEMS[k].name}`).join(', ');
+    const h = document.createElement('h4'); h.className = 'shoph'; h.textContent = '📅 Diário · renova à meia-noite (Brasília)'; W.appendChild(h);
+    const cal = document.createElement('div'); cal.className = 'dcal';
+    D.login.forEach((r: { gold: number; items: [string, number][] }, i: number) => { const day = i + 1, got = D.claimed ? day <= D.streak : day < D.streak, now = !D.claimed && day === D.streak, c = document.createElement('div'); c.className = 'dday' + (got ? ' got' : '') + (now ? ' now' : '') + (day === 7 ? ' big' : ''); c.title = `${fmt(r.gold)} moedas, ${itemTxt(r.items)}`; const ic = cv(56, 56); ic.getContext('2d')!.drawImage(hdOf(icon(r.items[0][0])), 0, 0); c.innerHTML = `<b>Dia ${day}</b>`; c.appendChild(ic); const sm = document.createElement('small'); sm.textContent = got ? '✔' : fmt(r.gold); c.appendChild(sm); cal.appendChild(c); });
+    W.appendChild(cal);
+    const lr = document.createElement('div'); lr.className = 'drow';
+    if (D.claimed) lr.innerHTML = `<span>Recompensa de hoje recebida (dia ${D.streak} de 7). Volte amanhã para continuar a sequência!</span>`;
+    else { const r = D.login[D.streak - 1]; lr.innerHTML = `<span><b>Dia ${D.streak} de 7:</b> ${fmt(r.gold)} moedas, ${esc(itemTxt(r.items))}${D.streak === 1 ? '<br><small>Entre todo dia para chegar ao Dia 7 (Baú Mítico). Faltou um dia, volta ao Dia 1.</small>' : ''}</span>`; const b = document.createElement('button'); b.className = 'main'; b.textContent = 'Pegar'; b.onclick = () => send({ t: 'dc' }); lr.appendChild(b); }
+    W.appendChild(lr);
+    for (const [i, t] of (D.tasks as { name: string; have: number; goal: number; done: boolean; claimed: boolean; gold: number; item: [string, number] }[]).entries()) {
+      const row = document.createElement('div'); row.className = 'achrow' + (t.claimed ? ' got' : t.done ? ' ready' : '');
+      row.innerHTML = `<div class="achic">${t.claimed ? '✔' : t.done ? '📅' : '◇'}</div><div class="achtx"><b>${esc(t.name)}</b><div class="achbar"><i style="width:${t.have / t.goal * 100}%"></i><span>${t.claimed ? 'Recebida' : `${t.have} / ${t.goal}`}</span></div><small class="achpz">🎁 ${fmt(t.gold)} moedas · ${esc(itemTxt([t.item]))}</small></div>`;
+      if (t.done && !t.claimed) { const b = document.createElement('button'); b.className = 'main'; b.textContent = 'Pegar'; b.onclick = () => send({ t: 'dm', i }); row.appendChild(b); }
+      W.appendChild(row);
+    }
+  }
   const head = document.createElement('div'); head.className = 'achhead';
   const titles = ACHIEVEMENTS.filter(a => a.title && S.r.includes(a.id));
   head.innerHTML = `<b>${done}/${total} conquistas</b><div class="achbar"><i style="width:${done / total * 100}%"></i></div>`;

@@ -51,3 +51,26 @@ export function parseAch(s: unknown): AchState {
   try { const o = JSON.parse(String(s || '{}')); return { c: o.c && typeof o.c === 'object' ? o.c : {}, u: Array.isArray(o.u) ? o.u.filter((x: string) => ACH[x]) : [], r: Array.isArray(o.r) ? o.r.filter((x: string) => ACH[x]) : [], t: ACH[o.t]?.title ? o.t : '' }; }
   catch { return { c: {}, u: [], r: [], t: '' }; }
 }
+
+// ---------- Diário: recompensa de login (7 dias seguidos) e 3 missões do dia ----------
+/** Dia corrido no horário de Brasília (UTC-3): muda à meia-noite de Brasília. */
+export const dayNum = (now: number) => Math.floor((now - 3 * 3600000) / 864e5);
+export const LOGIN_REWARDS: { gold: number; items: [string, number][] }[] = [
+  { gold: 30000, items: [['pot_hp2', 20], ['pot_mp2', 20]] }, { gold: 60000, items: [['jewel_aurora', 3]] }, { gold: 100000, items: [['jewel_destiny', 2]] },
+  { gold: 150000, items: [['box_ouro', 1]] }, { gold: 220000, items: [['jewel_eclipse', 2]] }, { gold: 300000, items: [['box_rei', 1]] }, { gold: 500000, items: [['box_mitico', 1], ['jewel_eclipse', 3]] },
+];
+export interface DailyTask { stat: string; goal: number; name: string; item: [string, number] }
+const TASKS: DailyTask[] = [
+  { stat: 'b', goal: 1, name: 'Derrote 1 chefe', item: ['box_ouro', 1] },
+  { stat: 'q', goal: 2, name: 'Conclua 2 missões da Capitã Lyra', item: ['jewel_destiny', 2] },
+  { stat: 'w', goal: 1, name: 'Ajude a derrotar um Chefe Mundial', item: ['box_rei', 1] },
+  { stat: 'g', goal: 5, name: 'Derrote 5 monstros dourados', item: ['jewel_eclipse', 1] },
+  { stat: 'd', goal: 1, name: 'Vença um duelo', item: ['jewel_destiny', 2] },
+];
+/** As 3 missões do dia: sempre "derrotar monstros" e mais 2 que mudam todo dia (iguais para todo mundo). */
+export function dailyTasks(day: number): DailyTask[] {
+  const a = day % TASKS.length, b = (a + 1 + (Math.floor(day / TASKS.length) % (TASKS.length - 1))) % TASKS.length;
+  return [{ stat: 'k', goal: 400, name: 'Derrote 400 monstros', item: ['jewel_aurora', 3] }, TASKS[a], TASKS[b === a ? (a + 1) % TASKS.length : b]];
+}
+/** Moedas do Diário crescem com o nível do personagem (resets contam como 400 níveis). */
+export const dailyGold = (base: number, level: number, resets: number) => Math.round(base * (1 + (Math.min(level + resets * 400, 4000)) / 200));

@@ -1,6 +1,6 @@
 import { rollPlus, canPlus, adminItem, adminSet, goodFactor, excChance, ancChance, PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
-import { ACHIEVEMENTS, ACH, parseAch, type AchState } from '../shared/achievements';
+import { ACHIEVEMENTS, ACH, parseAch, type AchState, dayNum, LOGIN_REWARDS, dailyTasks, dailyGold } from '../shared/achievements';
 import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG } from '../shared/events';
 import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
 
@@ -299,6 +299,9 @@ export class MapRoom {
       case 'pm': return this.enqueueParty(() => this.setMode(p));
       case 'lo': p.lootOff = m.on === false; if (!p.lootOff) p.wantDrop = 0; return; // Coleta desligada: não recolhe nada sozinho
       case 'lp': if (Number.isInteger(m.id) && this.drops.has(m.id)) p.wantDrop = m.id; return; // clicou num item: pega só esse
+      case 'dq': return this.sendDaily(p);
+      case 'dc': return this.dailyLogin(p);
+      case 'dm': return this.dailyTask(p, m.i);
       case 'achq': return this.sendAch(p);
       case 'achc': return this.achClaim(p, m.id);
       case 'acht': { const a = ACH[m.id]; if (m.id === '' || (a?.title && p.ach.r.includes(a.id))) { p.ach.t = m.id || ''; p.dirty = true; this.forgetLook(p); this.sendAch(p); } return; }
@@ -473,7 +476,10 @@ export class MapRoom {
     }
   }
   private achCheck(p: Player) {
-    if (p.gone || !p.achCol) return; // sem a coluna no banco (migração 0010 pendente) não dá para guardar: fica desligado
+    if (p.gone || !p.achCol) return;
+    { const d = this.dailyInfo(p), key = d.today + ':' + d.tasks.filter(t => t.done).length, q = p as Player & { dn?: number; dKey?: string };
+      if (q.dKey !== undefined && q.dKey !== key) for (const t of d.tasks) if (t.done && !t.claimed && !q.dKey.startsWith(d.today + ':' + d.tasks.length)) { this.sys(p, `📅 Missão do dia concluída: ${t.name}! Abra Conquistas (tecla K ou menu ☰) para pegar.`); break; }
+      q.dKey = key; if (d.ready !== q.dn) { q.dn = d.ready; this.send(p, { t: 'dn', n: d.ready }); } }
     const vals = new Map<string, number>(), names: string[] = []; let got = false;
     for (const a of ACHIEVEMENTS) {
       if (p.ach.u.includes(a.id) || p.ach.r.includes(a.id)) continue;
@@ -494,6 +500,37 @@ export class MapRoom {
     for (const [k, q] of a.items ?? []) this.give(p, k, q, 0, 'ach');
     p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
     this.sys(p, `🏅 Recompensa de "${a.name}" recebida${a.title ? ` · título "${a.title}" liberado` : ''}.`); this.send(p, { t: 'achn', n: p.ach.u.length }); this.sendAch(p);
+  }
+  // ---------- Diário (fica em p.ach.c, gravado junto com as conquistas) ----------
+  /** Garante o estado do dia: zera as missões quando o dia muda (horário de Brasília). */
+  private dailyRoll(p: Player) {
+    const c = p.ach.c, today = dayNum(Date.now());
+    if (c.md !== today) { c.md = today; c.mc = 0; for (const k of ['k', 'b', 'q', 'w', 'g', 'd']) c['m0' + k] = c[k] ?? 0; p.dirty = true; }
+    return today;
+  }
+  private dailyInfo(p: Player) {
+    const today = this.dailyRoll(p), c = p.ach.c, claimed = c.dd === today, streak = claimed ? c.ds ?? 1 : c.dd === today - 1 ? (c.ds ?? 0) % 7 + 1 : 1;
+    const tasks = dailyTasks(today).map((t, i) => { const have = Math.max(0, (c[t.stat] ?? 0) - (c['m0' + t.stat] ?? 0)); return { name: t.name, have: Math.min(have, t.goal), goal: t.goal, done: have >= t.goal, claimed: !!((c.mc ?? 0) & (1 << i)), gold: dailyGold(60000, p.level, p.resets), item: t.item }; });
+    const ready = (claimed ? 0 : 1) + tasks.filter(t => t.done && !t.claimed).length;
+    return { today, claimed, streak, tasks, ready, login: LOGIN_REWARDS.map(r => ({ gold: dailyGold(r.gold, p.level, p.resets), items: r.items })) };
+  }
+  private sendDaily(p: Player) { if (!p.achCol) return this.send(p, { t: 'daily', off: 1 }); const d = this.dailyInfo(p); this.send(p, { t: 'daily', ...d }); this.send(p, { t: 'dn', n: d.ready }); }
+  private dailyPay(p: Player, gold: number, items: [string, number][], what: string) {
+    const need = items.reduce((n, [k, q]) => n + this.slotsNeeded(p, k, q), 0); if (need > this.freeSlots(p)) { this.sys(p, `Libere ${need} espaço(s) na bolsa para receber a recompensa.`); return false; }
+    const g = Math.floor(gold * (this.cfg.gold || 1)); p.gold = Math.min(2e9, p.gold + g); p.logs.push(['daily_gold', null, what, 0, g, Date.now()]);
+    for (const [k, q] of items) this.give(p, k, q, 0, 'daily');
+    p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
+    this.sys(p, `📅 ${what}: ${g.toLocaleString('pt-BR')} moedas${items.map(([k, q]) => `, ${q > 1 ? q + 'x ' : ''}${ITEMS[k].name}`).join('')}.`); return true;
+  }
+  private dailyLogin(p: Player) {
+    if (!p.achCol) return; const d = this.dailyInfo(p), c = p.ach.c; if (d.claimed) return;
+    const r = d.login[d.streak - 1]; if (!this.dailyPay(p, r.gold, r.items, `Recompensa diária (dia ${d.streak} de 7)`)) return;
+    c.dd = d.today; c.ds = d.streak; this.sendDaily(p);
+  }
+  private dailyTask(p: Player, i: unknown) {
+    if (!p.achCol || !Number.isInteger(i)) return; const d = this.dailyInfo(p), t = d.tasks[i as number]; if (!t || !t.done || t.claimed) return;
+    if (!this.dailyPay(p, t.gold, [t.item], `Missão do dia "${t.name}"`)) return;
+    p.ach.c.mc = (p.ach.c.mc ?? 0) | (1 << (i as number)); this.sendDaily(p);
   }
   // ---------- Guildas ----------
   private guildSend(gid: number, msg: string) { for (const o of this.players.values()) if (o.guildId === gid) try { o.ws.send(msg); } catch { /* */ } }
