@@ -541,9 +541,12 @@ const wingCache = new Map<string, Cv[]>();
 /** Asas desenhadas em camadas a partir das costas, em dobro de resolução. */
 export const WING_ROOT = 66; // distância do ombro até o topo do quadro, em pixels do mundo
 const AURA = ['', '', '', '#ffd76a', '#f4fbff', '#ff5ad1'];
+/** Asas do mago: todas azuis, do azul-claro ao azul mais forte conforme o poder (nível da asa). */
+const MAGE_BLUE: [string, string, string][] = [['#d6e6ff', '#ffffff', '#9fc0ff'], ['#adc8ff', '#eef4ff', '#7fa8ff'], ['#82a8ff', '#dbe8ff', '#5f8cff'], ['#5c86f2', '#c4d8ff', '#4a78ff'], ['#3a63e0', '#a8c4ff', '#2f62ff'], ['#1c40c8', '#86b0ff', '#1f4fff']];
+const wingTheme = (cls: string, tier: number) => { const t = WING_THEME[cls]; if (cls !== 'arcane_wizard') return { t, aura: AURA[tier], gem: ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][tier] }; const b = MAGE_BLUE[tier] ?? MAGE_BLUE[0]; return { t: { ...t, c: b[0], c2: b[1] }, aura: b[2], gem: tier ? b[2] : '' }; };
 export function wingSprites(cls: string, tier: number): Cv[] {
   const k = cls + tier; let out = wingCache.get(k); if (out) return out;
-  const t = WING_THEME[cls], L = [36, 46, 58, 64, 70, 76][tier], W = (L + 8) * 2, H = WING_ROOT + L + 10 + (tier >= 4 ? Math.round(L * .55) : 0), sc = 2;
+  const { t, aura, gem } = wingTheme(cls, tier), L = [36, 46, 58, 64, 70, 76][tier], W = (L + 8) * 2, H = WING_ROOT + L + 10 + (tier >= 4 ? Math.round(L * .55) : 0), sc = 2;
   const blade = (g: G, len: number, wid: number, base: string, tip: string, edge: string, pointed: boolean, shaft: string | null) => {
     const gr = g.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, base); gr.addColorStop(.62, base); gr.addColorStop(1, tip);
     g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * .35, -wid, len * .78, -wid * .55); if (pointed) g.lineTo(len, 0); else g.quadraticCurveTo(len * 1.03, -wid * .1, len, wid * .25); g.quadraticCurveTo(len * .55, wid * .7, 0, 0); g.closePath();
@@ -586,14 +589,14 @@ export function wingSprites(cls: string, tier: number): Cv[] {
     const lower = 6 + tier * 2; for (let i = lower - 1; i >= 0; i--) { const u = i / (lower - 1); rot(.0 + u * 1.12, () => blade(g, L * (.76 - u * .3), 3.5, t.c, t.c2, dark, pointed, shade(t.c, 45))); }
     const sec = 7 + tier * 2; for (let i = sec - 1; i >= 0; i--) { const u = i / (sec - 1); rot(-1.15 + u * 2.1, () => blade(g, L * (.58 - Math.abs(u - .35) * .18), 3.4, light, shade(t.c2, -18), dark, pointed, null)); }
     const cov = 6 + tier; for (let i = cov - 1; i >= 0; i--) { const u = i / (cov - 1); rot(-1.1 + u * 1.95, () => blade(g, L * .32, 3.2, dark, t.c, shade(t.c, -70), pointed, null)); }
-    if (tier >= 1) { g.beginPath(); g.arc(4, -1, 2.6 + tier * .6, 0, 6.3); g.fillStyle = ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][tier]; g.fill(); g.beginPath(); g.arc(4, -1, 1.3 + tier * .3, 0, 6.3); g.fillStyle = t.c2; g.fill(); }
+    if (tier >= 1) { g.beginPath(); g.arc(4, -1, 2.6 + tier * .6, 0, 6.3); g.fillStyle = gem; g.fill(); g.beginPath(); g.arc(4, -1, 1.3 + tier * .3, 0, 6.3); g.fillStyle = t.c2; g.fill(); }
   };
   out = [-.3, -.17, -.02, .13, .02, -.15].map(a => {
     const c = cv(W * sc, H * sc), g = ctx(c); noHd.add(c); g.scale(sc, sc); g.shadowColor = t.c2; g.shadowBlur = [0, 2, 4, 5, 6, 7][tier];
     if (tier >= 4) for (const sgn of [1, -1]) { g.save(); g.translate(W / 2 + sgn * 2, WING_ROOT + 6); g.scale(sgn * .62, .62); g.rotate(a + .95); wing(g); g.restore(); }
-    if (tier >= 3) { g.shadowColor = AURA[tier]; g.shadowBlur = 6 + tier; }
+    if (tier >= 3) { g.shadowColor = aura; g.shadowBlur = 6 + tier; }
     for (const sgn of [1, -1]) { g.save(); g.translate(W / 2 + sgn * 3, WING_ROOT); g.scale(sgn, 1); g.rotate(a); wing(g); g.restore(); }
-    if (tier >= 3) { g.globalCompositeOperation = 'source-atop'; const gr = g.createRadialGradient(W / 2, WING_ROOT, L * .55, W / 2, WING_ROOT, L * 1.05); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, AURA[tier]); g.fillStyle = gr; g.globalAlpha = .75; g.fillRect(0, 0, W, H); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
+    if (tier >= 3) { g.globalCompositeOperation = 'source-atop'; const gr = g.createRadialGradient(W / 2, WING_ROOT, L * .55, W / 2, WING_ROOT, L * 1.05); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, aura); g.fillStyle = gr; g.globalAlpha = .75; g.fillRect(0, 0, W, H); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
     return c;
   });
   wingCache.set(k, out); return out;
@@ -669,7 +672,7 @@ export function icon(key: string | null): Cv {
     const w = wingSprites(d.cls!, d.wtier!)[2], tmp = cv(w.width, w.height), tg = ctx(tmp); tg.drawImage(w, 0, 0); const im = tg.getImageData(0, 0, w.width, w.height).data;
     let x0 = w.width, y0 = w.height, x1 = 0, y1 = 0; for (let y = 0; y < w.height; y += 2) for (let x = 0; x < w.width; x += 2) if (im[(y * w.width + x) * 4 + 3] > 170) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     const bw = Math.max(1, x1 - x0), bh = Math.max(1, y1 - y0), q = Math.min(27 / bw, 25 / bh); g.clearRect(0, 0, 28, 28); g.imageSmoothingEnabled = true; g.drawImage(w, x0, y0, bw, bh, (28 - bw * q) / 2, (28 - bh * q) / 2, bw * q, bh * q); g.imageSmoothingEnabled = false;
-    const tc = ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][d.wtier ?? 0]; if ((d.wtier ?? 0) >= 3) for (let i = 0; i < d.wtier! - 2; i++) r(g, 1 + i * 3, 1, 2, 2, tc);
+    const tc = wingTheme(d.cls!, d.wtier ?? 0).gem || '#ffffff'; if ((d.wtier ?? 0) >= 3) for (let i = 0; i < d.wtier! - 2; i++) r(g, 1 + i * 3, 1, 2, 2, tc);
     iconCache.set(k, c); return c;
   }
   if (d?.set) {
