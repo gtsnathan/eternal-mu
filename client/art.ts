@@ -543,7 +543,7 @@ export const WING_ROOT = 66; // distância do ombro até o topo do quadro, em pi
 const AURA = ['', '', '', '#ffd76a', '#f4fbff', '#ff5ad1'];
 /** Asas do mago: todas azuis, do azul-claro ao azul mais forte conforme o poder (nível da asa). */
 const MAGE_BLUE: [string, string, string][] = [['#d6e6ff', '#ffffff', '#9fc0ff'], ['#adc8ff', '#eef4ff', '#7fa8ff'], ['#82a8ff', '#dbe8ff', '#5f8cff'], ['#5c86f2', '#c4d8ff', '#4a78ff'], ['#3a63e0', '#a8c4ff', '#2f62ff'], ['#1c40c8', '#86b0ff', '#1f4fff']];
-const wingTheme = (cls: string, tier: number) => { const t = WING_THEME[cls]; if (cls !== 'arcane_wizard') return { t, aura: AURA[tier], gem: ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][tier] }; const b = MAGE_BLUE[tier] ?? MAGE_BLUE[0]; return { t: { ...t, c: b[0], c2: b[1] }, aura: b[2], gem: tier ? b[2] : '' }; };
+const wingTheme = (cls: string, tier: number) => { const t = WING_THEME[cls]; if (cls === 'mystic_archer') return { t, aura: ['', '', '', '#d9a441', '#ffc85a', '#8aff6a'][tier], gem: ['', '#8a6a2c', '#c99a4a', '#e8c36a', '#ffe1a0', '#5fe08a'][tier] }; if (cls !== 'arcane_wizard') return { t, aura: AURA[tier], gem: ['', '#b08a3c', '#f0cf65', '#ffe9a8', '#e8f6ff', '#ff9ee6'][tier] }; const b = MAGE_BLUE[tier] ?? MAGE_BLUE[0]; return { t: { ...t, c: b[0], c2: b[1] }, aura: b[2], gem: tier ? b[2] : '' }; };
 export function wingSprites(cls: string, tier: number): Cv[] {
   const k = cls + tier; let out = wingCache.get(k); if (out) return out;
   const { t, aura, gem } = wingTheme(cls, tier), L = [36, 46, 58, 64, 70, 76][tier], W = (L + 8) * 2, H = WING_ROOT + L + 10 + (tier >= 4 ? Math.round(L * .55) : 0), sc = 2;
@@ -566,6 +566,18 @@ export function wingSprites(cls: string, tier: number): Cv[] {
       if (tier >= 2) { g.save(); g.rotate(1.12); g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(L * .5, -2.5, L * .85, 1); g.quadraticCurveTo(L * .5, 3, 0, 0); g.fillStyle = t.c2; g.globalAlpha = .55; g.fill(); g.globalAlpha = 1; g.restore(); }
       part(L * .74, L * .3, .62, 1.6 + tier * .3); part(L * 1.02, L * .44, -.82, 2.2 + tier * .4);
       for (let i = 0; i < 4 + tier * 2; i++) { const a = -1.5 + i * .37, d = L * (.55 + (i * 37 % 40) / 100); g.fillStyle = i % 2 ? '#ffffff' : t.c2; g.fillRect(Math.cos(a) * d, Math.sin(a) * d, 1.2, 1.2); }
+      return;
+    }
+    if (t.style === 'hawk') { // asas de falcão: penas largas e pontudas, abertas para fora, com faixas escuras e ponta de bronze
+      const rot = (a: number, f: () => void) => { g.save(); g.rotate(a); f(); g.restore(); }, band = shade(t.c, -60), quill = shade(t.c2, 25);
+      const feather = (len: number, wid: number, base: string, tip: string, bands: number) => {
+        blade(g, len, wid, base, tip, band, true, quill);
+        g.save(); g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * .35, -wid, len * .78, -wid * .55); g.lineTo(len, 0); g.quadraticCurveTo(len * .55, wid * .7, 0, 0); g.clip();
+        g.fillStyle = band; g.globalAlpha = .5; for (let k = 1; k <= bands; k++) g.fillRect(len * (.34 + k * .5 / (bands + 1)), -wid, len * .05, wid * 2); g.globalAlpha = 1; g.restore(); };
+      const prim = 6 + tier; for (let i = prim - 1; i >= 0; i--) { const u = i / (prim - 1); rot(-1.18 + u * 1.05, () => feather(L * (1.06 - u * .26), 4.6, t.c, t.c2, 2 + (tier >> 1))); }
+      const secn = 5 + tier; for (let i = secn - 1; i >= 0; i--) { const u = i / (secn - 1); rot(-.05 + u * 1.05, () => feather(L * (.74 - u * .3), 4.8, shade(t.c, -12), shade(t.c2, -30), 2)); }
+      const cov = 5 + tier; for (let i = cov - 1; i >= 0; i--) { const u = i / (cov - 1); rot(-1.05 + u * 1.9, () => blade(g, L * .36, 4.4, dark, shade(t.c, 8), shade(t.c, -75), true, null)); }
+      if (tier >= 2) { g.beginPath(); g.arc(3, -1, 1.6 + tier * .35, 0, 6.3); g.fillStyle = gem; g.fill(); }
       return;
     }
     if (t.style === 'bat' || t.style === 'bone' || t.style === 'dragon') {
@@ -596,7 +608,7 @@ export function wingSprites(cls: string, tier: number): Cv[] {
     if (tier >= 4) for (const sgn of [1, -1]) { g.save(); g.translate(W / 2 + sgn * 2, WING_ROOT + 6); g.scale(sgn * .62, .62); g.rotate(a + .95); wing(g); g.restore(); }
     if (tier >= 3) { g.shadowColor = aura; g.shadowBlur = 6 + tier; }
     for (const sgn of [1, -1]) { g.save(); g.translate(W / 2 + sgn * 3, WING_ROOT); g.scale(sgn, 1); g.rotate(a); wing(g); g.restore(); }
-    if (tier >= 3) { g.globalCompositeOperation = 'source-atop'; const gr = g.createRadialGradient(W / 2, WING_ROOT, L * .55, W / 2, WING_ROOT, L * 1.05); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, aura); g.fillStyle = gr; g.globalAlpha = .75; g.fillRect(0, 0, W, H); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
+    if (tier >= 3) { g.globalCompositeOperation = 'source-atop'; const gr = g.createRadialGradient(W / 2, WING_ROOT, L * .55, W / 2, WING_ROOT, L * 1.05); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, aura); g.fillStyle = gr; g.globalAlpha = t.style === 'hawk' ? .32 : .75; g.fillRect(0, 0, W, H); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
     return c;
   });
   wingCache.set(k, out); return out;

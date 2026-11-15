@@ -83,8 +83,8 @@ Object.assign(SETS, {
 export const SET_PIECES = ['helm', 'armor', 'pants', 'boots'] as const;
 const PIECE = { helm: ['Elmo', 11, 40, 1], armor: ['Couraça', 20, 90, 1.6], pants: ['Grevas', 14, 50, 1.1], boots: ['Botas', 8, 30, .9] } as const;
 // Asas: exclusivas por classe, em 3 níveis
-export const WING_THEME: Record<string, { name: string; style: 'bat' | 'feather' | 'blade' | 'leaf' | 'bone' | 'angel' | 'fairy' | 'dragon'; c: string; c2: string }> = {
-  dark_warrior: { name: 'de Morcego', style: 'bat', c: '#5a1424', c2: '#ff4a5e' }, arcane_wizard: { name: 'Angelicais', style: 'angel', c: '#5c86f2', c2: '#c4d8ff' }, mystic_archer: { name: 'de Fada', style: 'fairy', c: '#6fe0c8', c2: '#ff9ee6' },
+export const WING_THEME: Record<string, { name: string; style: 'bat' | 'feather' | 'blade' | 'leaf' | 'bone' | 'angel' | 'fairy' | 'hawk' | 'dragon'; c: string; c2: string }> = {
+  dark_warrior: { name: 'de Morcego', style: 'bat', c: '#5a1424', c2: '#ff4a5e' }, arcane_wizard: { name: 'Angelicais', style: 'angel', c: '#5c86f2', c2: '#c4d8ff' }, mystic_archer: { name: 'de Falcão', style: 'hawk', c: '#4a6b3a', c2: '#c99a4a' },
   spell_knight: { name: 'Dracônicas', style: 'dragon', c: '#4a2f8a', c2: '#ffb13d' }, shadow_summoner: { name: 'do Abismo', style: 'bone', c: '#3a2458', c2: '#d9d2bb' },
 };
 export const WING_TIER = [{ name: 'Noviças', lvl: 20, def: 15, hp: 100, atk: .12, abs: .1, price: 30000 }, { name: 'Ancestrais', lvl: 40, def: 45, hp: 300, atk: .22, abs: .2, price: 250000 }, { name: 'Soberanas', lvl: 60, def: 100, hp: 700, atk: .35, abs: .3, price: 1500000 },

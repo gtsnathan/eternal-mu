@@ -971,3 +971,45 @@ function drawEnt(e: Ent, ts: number) {
   const kk = e.info.wb ? 1.4 : 1, cw = c.width * kk, ch = c.height * kk; if (e.info.wb && Math.random() < .3) parts.push({ x: e.x + (Math.random() - .5) * 2.4, y: e.y - Math.random() * 2.2, vx: 0, vy: -1, life: 0, max: .9, c: Math.random() < .5 ? '#ff3a2a' : '#2a0a12', s: 3 }); shadow(X, Y + 2, sz * .55 * kk, sz * .22 * kk); g.drawImage(c, X - cw / 2 + (e.dir === 3 ? -lunge : lunge), Y - ch + 6, cw, ch); if (ts < (e.flash ?? 0)) { g.globalCompositeOperation = 'lighter'; g.drawImage(c, X - cw / 2 + (e.dir === 3 ? -lunge : lunge), Y - ch + 6, cw, ch); g.globalCompositeOperation = 'source-over'; }
 }
 showChars();
+
+/** Arruma o HUD sozinho: painéis do alto (missão, grupo, chefe, arena, duelo, alvo) nunca ficam um em cima do outro,
+ *  o ranking do chefe procura um canto livre e as mensagens do sistema desviam do que estiver na tela. */
+function hudLayout() {
+  const W = innerWidth, H = innerHeight, vis = (e: HTMLElement | null): e is HTMLElement => !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
+  const hit = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 4 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
+  const q = (s: string) => document.querySelector<HTMLElement>(s), placed: DOMRect[] = [];
+  for (const s of ['#portrait', '#minimap', '.menu', '#lootc']) { const e = q(s); if (vis(e)) placed.push(e.getBoundingClientRect()); }
+  const bar = q('#bar'), barR = vis(bar) ? bar.getBoundingClientRect() : null;
+  for (const s of ['#tframe', '#bossbar', '#arenabar', '#duelbar', '#party', '#qtrack']) {
+    const e = q(s); if (!e) continue; e.style.top = ''; if (!vis(e)) continue;
+    let r = e.getBoundingClientRect(); if (s === '#qtrack' && r.top > H * .55) { placed.push(r); continue; } // a missão fica embaixo no celular deitado
+    for (let k = 0; k < 8; k++) { const o = placed.find(p => hit(r, p)); if (!o) break; e.style.top = `${Math.round(o.bottom + 5)}px`; r = e.getBoundingClientRect(); }
+    placed.push(r);
+  }
+  const wb = q('#wbrank');
+  if (wb) { const disp = wb.style.display; wb.style.cssText = ''; wb.style.display = disp; wb.classList.remove('mini');
+    if (vis(wb)) { const blocked = () => { const r = wb.getBoundingClientRect(); return placed.some(p => hit(r, p)) || r.bottom > H - 4 || r.top < 0; };
+      const tries: (() => void)[] = [() => {}, () => { const below = Math.max(0, ...placed.filter(p => p.right > W - 200 && p.top < H * .5).map(p => p.bottom)); Object.assign(wb.style, { left: 'auto', right: '8px', bottom: 'auto', top: `${Math.round(below + 6)}px` }); },
+        () => { const below = Math.max(0, ...placed.filter(p => p.left < W / 2 + 90 && p.right > W / 2 - 90 && p.top < H * .5).map(p => p.bottom)); Object.assign(wb.style, { left: `${Math.round(W / 2 - wb.offsetWidth / 2)}px`, right: 'auto', bottom: 'auto', top: `${Math.round(below + 6)}px` }); }];
+      const area = (a: DOMRect, b: DOMRect) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      const score = () => { const r = wb.getBoundingClientRect(); return placed.reduce((n, p) => n + area(r, p) * 4, 0) + (barR && W < 900 ? area(r, barR) : 0) + Math.max(0, r.bottom - H) * 999 + Math.max(0, -r.top) * 999; };
+      let best = Infinity, pick: [boolean, number] = [false, 0];
+      for (const mini of [false, true]) for (let i = 0; i < tries.length; i++) { wb.style.cssText = ''; wb.style.display = disp; wb.classList.toggle('mini', mini); tries[i](); const sc = score() + (mini ? 1 : 0); if (sc < best - .5) { best = sc; pick = [mini, i]; } }
+      wb.style.cssText = ''; wb.style.display = disp; wb.classList.toggle('mini', pick[0]); tries[pick[1]](); placed.push(wb.getBoundingClientRect()); } }
+  const nt = q('#notes');
+  if (nt) { nt.style.cssText = '';
+    if (barR) { const n0 = nt.getBoundingClientRect(); if (Math.min(barR.right, n0.right) - Math.max(barR.left, n0.left) > 4 && n0.bottom > barR.top - 4 && barR.top > H * .6 && W >= 700) nt.style.bottom = `${Math.round(H - barR.top + 6)}px`; }
+    let r = nt.getBoundingClientRect();
+    for (const p of placed) if (p.top > H * .3 && p.top < r.bottom && p.bottom > r.bottom - 10 && p.left >= W * .2 && p.right <= W * .8 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 4) { nt.style.bottom = `${Math.round(H - p.top + 4)}px`; r = nt.getBoundingClientRect(); }
+    let L = r.left, R = r.right;
+    for (const p of placed) { if (!(p.top < r.bottom && p.bottom > r.top - 200)) continue; if (Math.min(p.right, R) - Math.max(p.left, L) <= 4) continue;
+      if (p.bottom > r.bottom - 40 && p.right < W * .45) L = Math.max(L, p.right + 6); else if (p.bottom > r.bottom - 40 && p.left > W * .55) R = Math.min(R, p.left - 6); }
+    if (R - L < 170) { nt.style.maxHeight = '0px'; return; } // sem espaço: esconde as mensagens até sobrar lugar
+    if (L !== r.left || R !== r.right) Object.assign(nt.style, { left: `${Math.round(L)}px`, width: `${Math.round(R - L)}px`, transform: 'none' });
+    r = nt.getBoundingClientRect();
+    const roof = Math.max(H * .5 + 12, ...placed.filter(p => p.bottom <= r.bottom && p.top < H * .6 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 4).map(p => p.bottom));
+    for (const c of nt.children) c.classList.remove('cut');
+    if (roof > r.top - 4) { const room = Math.max(0, Math.round(r.bottom - roof - 6)); nt.style.maxHeight = `${room}px`; // esconde os avisos mais antigos inteiros em vez de cortar no meio
+      const kids = [...nt.children] as HTMLElement[]; let h = kids.reduce((n, c) => n + c.offsetHeight + 3, 0); for (const c of kids.slice(0, -1)) { if (h <= room) break; h -= c.offsetHeight + 3; c.classList.add('cut'); } } }
+}
+(window as any).__hud = hudLayout; setInterval(hudLayout, 250); addEventListener('resize', () => setTimeout(hudLayout, 50));
