@@ -920,7 +920,7 @@ export class MapRoom {
           done.add(cur.eid); pts.push([round(cur.x), round(cur.y)]);
           const tg = cur, mul = k; this.later(now + i * 90, () => { if (p.gone || tg.hp <= 0) return; if (sk.slow) tg.slowUntil = Date.now() + sk.slow; this.hit(p, tg, atk * mul, s.crit); });
           k *= .85; let nx: Mob | undefined, bd = sk.radius!;
-          for (const x of this.mobs.values()) if (x.hp > 0 && !done.has(x.eid) && x.state !== 'back') { const dd = dist(x, cur); if (dd < bd) { bd = dd; nx = x; } }
+          for (const x of this.mobs.values()) if (x.hp > 0 && !done.has(x.eid)) { const dd = dist(x, cur); if (dd < bd) { bd = dd; nx = x; } }
           if (!nx) break; cur = nx;
         }
         this.fx.push({ k: 'chain', x: p.x, y: p.y, id: p.eid, pts, b: sk.color });
@@ -1144,7 +1144,7 @@ export class MapRoom {
     for (const o of grp) this.addXp(o, Math.floor(byLevel ? total * o.level / sum : total / grp.length));
   }
   private hit(p: Player, m: Mob, atk: number, crit: number) {
-    if (m.state === 'back') return;
+    if (m.hp <= 0) return; // monstro voltando para casa também leva dano (antes ficava imune e os poderes "não pegavam")
     const isCrit = Math.random() < crit; const def = m.def.def * (classOf(p.cls).magic ? .5 : 1) * (Date.now() < m.curseUntil ? .6 : 1); let dmg = rollDamage(atk, def, Math.random()); if (isCrit) dmg = Math.round(dmg * 1.6);
     m.hp -= dmg; m.hitBy.set(p.charId, (m.hitBy.get(p.charId) ?? 0) + dmg);
     this.fx.push({ k: 'hit', x: m.x, y: m.y, id: m.eid, v: dmg, c: isCrit ? 1 : 0 });
@@ -1220,7 +1220,7 @@ export class MapRoom {
     for (const s of this.summons.values()) {
       if (s.owner.gone || s.owner.deadUntil || now > s.expires) { this.summons.delete(s.eid); continue; }
       let best: Mob | null = null, bd = 7;
-      for (const m of this.mobs.values()) if (m.hp > 0 && m.state !== 'back' && dist(m, s.owner) <= 9) { const d = dist(m, s); if (d < bd) { bd = d; best = m; } }
+      for (const m of this.mobs.values()) if (m.hp > 0 && dist(m, s.owner) <= 9) { const d = dist(m, s); if (d < bd) { bd = d; best = m; } }
       const goal: Pt | null = best && bd > 1.3 ? best : !best && dist(s, s.owner) > 2 ? s.owner : null;
       if (goal) { const d = dist(goal, s) || 1, v = 5 * dt; if (d > 6) { s.x = s.owner.x; s.y = s.owner.y; } else step(this.map, s, (goal.x - s.x) / d * v, (goal.y - s.y) / d * v); }
       else if (best && now >= s.nextAtk) { s.nextAtk = now + 1100; this.fx.push({ k: 'bite', x: s.x, y: s.y, id: s.eid, tx: best.x, ty: best.y }); this.hit(s.owner, best, s.atk, 0); }

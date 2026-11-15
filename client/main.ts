@@ -134,7 +134,7 @@ function handle(m: any) {
     case 's': snapshot(m); break;
     case 'sys': log(m.m, 'sys'); if (String(m.m).startsWith('☠') || String(m.m).startsWith('🏅 Conquista') || String(m.m).startsWith('📅 Missão do dia concluída')) { const el = $('#toast'); el.textContent = String(m.m).split('! ')[0] + (String(m.m).includes('! ') ? '!' : ''); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(90, 500, 'sawtooth', .05); } break;
     case 'wbr': { const el = $('#wbrank'); if (!m.top?.length) { el.innerHTML = ''; el.style.display = 'none'; break; } el.style.display = 'block'; el.innerHTML = `<b>Dano no Chefe Mundial</b>${m.top.map((r: [string, number], i: number) => `<div><span>${i + 1}. ${esc(r[0])}</span><span>${r[1]}%</span></div>`).join('')}${m.me && m.me[0] > 5 ? `<div class=me><span>${m.me[0]}. Você</span><span>${m.me[1]}%</span></div>` : ''}`; break; }
-    case 'c': log(`${m.ch === 'u' ? '[Guilda] ' : ''}<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : m.ch === 'u' ? 'gu' : '', true); break;
+    case 'c': if (m.from === '⚑') { note(`[Guilda] ${m.m}`); break; } log(`${m.ch === 'u' ? '[Guilda] ' : ''}<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : m.ch === 'u' ? 'gu' : '', true); break;
     case 'cd': cds[m.n] = { until: performance.now() + m.ms, ms: m.ms }; break;
     case 'kick': log(m.m, 'sys'); break;
     case 'party': party = m.m ? m : null; renderParty(); break;
@@ -153,7 +153,13 @@ function handle(m: any) {
     case 'tr': trade = m.m; if (m.msg) log(m.msg, 'sys'); renderTrade(); break;
   }
 }
-function log(s: string, cls = '', html = false) { const l = $('#log'), d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = s; else d.textContent = s; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); l.scrollTop = l.scrollHeight; }
+/** Avisos do jogo (itens, níveis, erros): aparecem numa faixa separada e somem sozinhos; a caixa de chat fica só com o que as pessoas escrevem. */
+function note(s: string) {
+  const box = $('#notes'), d = document.createElement('div'); d.textContent = s; box.appendChild(d);
+  while (box.children.length > 4) box.firstChild!.remove();
+  setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 600); }, 5500 + Math.min(4000, s.length * 25));
+}
+function log(s: string, cls = '', html = false) { if (cls === 'sys') return note(s); const l = $('#log'), d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = s; else d.textContent = s; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); l.scrollTop = l.scrollHeight; }
 function snapshot(m: any) {
   const t = performance.now(), seen = new Set<number>();
   for (const n of m.n ?? []) {
@@ -755,7 +761,7 @@ function frame(ts: number) {
     const h = e.k === 'p' ? 50 : mobSize(e.info.mob) * (e.info.wb ? 1.4 : 1) + 10, X = Math.round(e.x * 32), Y = Math.round(e.y * 32) - h, boss = e.k === 'm' && MOBS[e.info.mob].boss, bw = boss ? 72 : 32;
     if (e.k === 'p' && e.info.ti) label(X, Y - 19, `✦ ${e.info.ti} ✦`, '#ffd76a');
     if (e.k === 'p' || e.id === target || boss || e.info.g) label(X, Y - 6, e.k === 'p' ? `${e.info.gt ? `«${e.info.gt}» ` : ''}${e.info.res || e.info.mr ? `[${fmtRes(e.info.res, e.info.mr)}] ` : ''}${e.info.name}` : `${e.info.g ? '★ ' : e.info.wb ? '☠ ' : ''}${MOBS[e.info.mob].name}${e.info.g ? ' Dourado' : e.info.wb ? ' Desperto' : ''} Nv${MOBS[e.info.mob].level}`, e.id === target ? '#ffd24a' : e.k === 'p' ? '#fff' : e.info.g ? '#ffe08a' : e.info.wb ? '#ff6a4a' : '#ffb4a8');
-    g.fillStyle = '#0a0814'; g.fillRect(X - bw / 2 - 1, Y - 3, bw + 2, 6); g.fillStyle = '#3a2f4a'; g.fillRect(X - bw / 2, Y - 2, bw, 4); { const w = Math.round(bw * e.hp / 100); g.fillStyle = e.k !== 'p' ? '#e0425a' : e.hp > 50 ? '#58d36a' : e.hp > 25 ? '#f0cf65' : '#ff6b6b'; g.fillRect(X - bw / 2, Y - 2, w, 4); g.fillStyle = '#ffffff66'; g.fillRect(X - bw / 2, Y - 2, w, 1); }
+    g.fillStyle = '#0a0814'; g.fillRect(X - bw / 2 - 1, Y - 3, bw + 2, 6); g.fillStyle = '#3a2f4a'; g.fillRect(X - bw / 2, Y - 2, bw, 4); { const w = Math.round(bw * Math.max(0, Math.min(100, e.hp)) / 100); g.fillStyle = e.k !== 'p' ? '#e0425a' : e.hp > 50 ? '#58d36a' : e.hp > 25 ? '#f0cf65' : '#ff6b6b'; g.fillRect(X - bw / 2, Y - 2, w, 4); g.fillStyle = '#ffffff66'; g.fillRect(X - bw / 2, Y - 2, w, 1); }
   }
   texts = texts.filter(t => (t.t += dt) < .85); for (const t of texts) { const u = t.t / .85; g.font = `bold ${Math.round((t.big ? 17 : 12) * (1 + Math.max(0, .12 - t.t) * 4))}px system-ui,Segoe UI,Roboto,sans-serif`; g.globalAlpha = 1 - u * u; g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = '#0a0814'; const y = t.y * 32 - 38 - u * 26; g.strokeText(t.s, t.x * 32, y); g.fillStyle = t.c; g.fillText(t.s, t.x * 32, y); } g.globalAlpha = 1;
   // clima e iluminação
