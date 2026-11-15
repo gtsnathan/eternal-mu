@@ -16,3 +16,12 @@ export function upcomingBosses(now: number, n = 4) {
   for (let s = cur.slot + 1; out.length < n; s++) out.push({ slot: s, map: WB_MAPS[s % WB_MAPS.length], start: s * WB_EVERY + WB_OFFSET, live: false });
   return out;
 }
+
+// Arena dos Demônios: entrada aberta 5 min antes, dura 10 min, toda hora no minuto 30.
+export const AR_EVERY = 3600000, AR_OFFSET = 30 * 60000, AR_OPEN = 5 * 60000, AR_LIFE = 10 * 60000, AR_WAVES = 4;
+/** Janela da arena que contém `now` (a do horário atual) ou a próxima. */
+export function arenaAt(now: number) {
+  let slot = Math.floor((now - AR_OFFSET + AR_OPEN) / AR_EVERY); const start = slot * AR_EVERY + AR_OFFSET;
+  return { slot, start, open: now >= start - AR_OPEN && now < start, running: now >= start && now < start + AR_LIFE, end: start + AR_LIFE };
+}
+export function nextArena(now: number) { const a = arenaAt(now); return a.open || a.running ? a : arenaAt(a.start + AR_EVERY - AR_OPEN); }

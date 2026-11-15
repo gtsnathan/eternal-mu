@@ -49,6 +49,7 @@ function valoria() {
     { id: 'bau', name: 'Baú', x: 27.5, y: 23, shop: 'chest', line: 'Seus itens ficam guardados aqui.', look: 0 },
     { id: 'armeira', name: 'Isaura, Armeira de Sets', x: 25.5, y: 15.5, shop: 'armeira', line: 'Armaduras de lenda, para quem pode pagar.', look: 4 },
     { id: 'guildas', name: 'Bertrand, Mestre das Guildas', x: 40.5, y: 21, shop: 'guild', line: 'Juntos, vocês vão mais longe. Funde sua guilda aqui.', look: 6 },
+    { id: 'arena', name: 'Morgana, Guardiã da Arena', x: 28.5, y: 20.5, shop: 'arena', line: 'A Arena dos Demônios abre toda hora. Tem coragem?', look: 5 },
     { id: 'missoes', name: 'Capitã Lyra, Missões', x: 19.5, y: 22.5, shop: 'missoes', line: 'Tenho trabalho para quem sabe lutar. Recompensa garantida!', look: 3 },
     { id: 'guarda', name: 'Guarda Teodoro', x: 44.5, y: 17.5, line: 'O portal leva a Frostvale. Lá fora, os monstros não perdoam.', look: 3 });
   return m;
@@ -72,6 +73,7 @@ function solmira() {
     { id: 'bau', name: 'Baú', x: 22.5, y: 14.5, shop: 'chest', line: 'Seus itens ficam guardados aqui.', look: 0 },
     { id: 'mestre', name: 'Mestre Ancião', x: 28.5, y: 14.5, shop: 'reset', line: 'Quem alcança o topo pode renascer ainda mais forte.', look: 6 },
     { id: 'guildas', name: 'Bertrand, Mestre das Guildas', x: 38.5, y: 22.5, shop: 'guild', line: 'Juntos, vocês vão mais longe. Funde sua guilda aqui.', look: 6 },
+    { id: 'arena', name: 'Morgana, Guardiã da Arena', x: 21.5, y: 21.5, shop: 'arena', line: 'A Arena dos Demônios abre toda hora. Tem coragem?', look: 5 },
     { id: 'missoes', name: 'Capitã Lyra, Missões', x: 33.5, y: 20.5, shop: 'missoes', line: 'Os mundos do norte estão cheios de trabalho.', look: 3 },
     { id: 'guarda', name: 'Guarda Nadir', x: 44.5, y: 17.5, line: 'Depois deste portal, só as dunas e o Rei das Areias.', look: 3 });
   return m;
@@ -236,8 +238,26 @@ const MOBS_IS_BOSS = (k: string) => ['boss', 'ignarok', 'aracnia', 'vorgath', 'a
 const cache: Record<string, GameMap> = {};
 /** Destinos da janela de viagem (tecla M): mesmas regras e chegadas dos portais de Valoria. */
 export function travelList() { const v = getMap('valoria'); return [{ to: 'valoria', name: v.name, lvl: 0, x: v.spawn.x, y: v.spawn.y }, ...[...v.portals, ...getMap('solmira').portals.filter(g => g.to !== 'valoria')].map(g => ({ to: g.to, name: getMap(g.to).name, lvl: g.lvl ?? 0, x: g.tx, y: g.ty }))].sort((a, b) => a.lvl - b.lvl); }
-export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial', 'solmira', 'dunas', ...HI_MAPS.map(h => h.id)];
-export function getMap(id: string): GameMap { const hi = HI_MAPS.findIndex(h => h.id === id); if (hi >= 0) return cache[id] ??= enlarge(hiMap(HI_MAPS[hi], HI_PORTAL_X[hi])); return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
+export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial', 'solmira', 'dunas', ...HI_MAPS.map(h => h.id), 'arena1', 'arena2', 'arena3'];
+// ---------- Arena dos Demônios: 3 salas fechadas, uma por faixa de nível ----------
+export const ARENAS = [
+  { id: 'arena1', name: 'Arena dos Demônios I', min: 15, max: 149, floor: T.DUNGEON, mob: [15, 150] as [number, number] },
+  { id: 'arena2', name: 'Arena dos Demônios II', min: 150, max: 299, floor: T.ASH, mob: [150, 300] as [number, number] },
+  { id: 'arena3', name: 'Arena dos Demônios III', min: 300, max: 9999, floor: T.MARBLE, mob: [300, 400] as [number, number] },
+];
+export const arenaFor = (level: number) => ARENAS.find(a => level >= a.min && level <= a.max) ?? null;
+function arenaMap(id: string): GameMap {
+  const a = ARENAS.find(x => x.id === id)!, W = 44, H = 32, m = makeMap(id, a.name, W, H, false, a.floor);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) { m.tiles[y * W + x] = T.DWALL; m.solid[y * W + x] = 1; }
+  for (let x = 4; x < W - 3; x += 5) m.objs.push({ k: 'torch', x, y: 1, w: 1, h: 1, v: 0 }); // tochas na parede de cima
+  for (const [x, y] of [[9, 8], [34, 8], [9, 23], [34, 23], [16, 15], [27, 15]]) obj(m, 'pillar', x, y, 1, 1, 1);
+  if (id === 'arena3') for (const [x, y] of [[4, 4], [38, 4], [4, 26], [38, 26]]) { for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { m.tiles[(y + j) * W + x + i] = T.LAVA; m.solid[(y + j) * W + x + i] = 1; } }
+  else if (id === 'arena2') for (const [x, y] of [[20, 4], [21, 4], [20, 27], [21, 27]]) { m.tiles[y * W + x] = T.LAVA; m.solid[y * W + x] = 1; }
+  obj(m, 'statue', 21, 3, 2, 1);
+  m.spawn = { x: 22.5, y: 24.5 };
+  return m;
+}
+export function getMap(id: string): GameMap { if (id.startsWith('arena')) return cache[id] ??= arenaMap(id); const hi = HI_MAPS.findIndex(h => h.id === id); if (hi >= 0) return cache[id] ??= enlarge(hiMap(HI_MAPS[hi], HI_PORTAL_X[hi])); return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
 
 export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return !(i >= 0 && j >= 0 && i < m.w && j < m.h) || m.solid[j * m.w + i] === 1; }; // NaN conta como parede
 const R = .3;

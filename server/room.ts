@@ -1,8 +1,8 @@
-import { rollPlus, canPlus, adminItem, adminSet, goodFactor, excChance, ancChance, PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { ARENA_TICKET_PRICE, rollPlus, canPlus, adminItem, adminSet, goodFactor, excChance, ancChance, PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
 import { ACHIEVEMENTS, ACH, parseAch, type AchState, dayNum, LOGIN_REWARDS, dailyTasks, dailyGold } from '../shared/achievements';
-import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG } from '../shared/events';
-import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList } from '../shared/world';
+import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG, arenaAt, AR_LIFE, AR_WAVES } from '../shared/events';
+import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, travelList, ARENAS, arenaFor } from '../shared/world';
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
@@ -15,7 +15,7 @@ interface Player extends Pt {
   nextMove?: number; budget: number; lastChat: number; nextTrap: number; nextRegen: number; gone: boolean; lastInvFull: number;
 }
 interface Trade { peer: Player; ids: Set<string>; gold: number; st: number }
-interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number>; golden?: number; wb?: number }
+interface Mob extends Pt { eid: number; def: MobDef; hx: number; hy: number; hp: number; state: 'idle' | 'chase' | 'back'; target: number; path: Pt[] | null; nextAtk: number; nextThink: number; respawnAt: number; nextNova: number; phase: number; curseUntil: number; slowUntil: number; hitBy: Map<number, number>; golden?: number; wb?: number; arena?: number }
 interface Summon extends Pt { eid: number; owner: Player; pet: string; atk: number; expires: number; nextAtk: number }
 interface Drop extends Pt { eid: number; key: string | null; gold: number; rarity: number; opts: string[]; plus?: number; owner: number; party: number; ownUntil: number; expires: number }
 
@@ -51,7 +51,10 @@ export class MapRoom {
   private fx: (Pt & Record<string, unknown>)[] = [];
   private timed: { at: number; run: () => void }[] = []; private saveWarnAt = 0;
   /** Invasão Dourada: a cada 30 min (a primeira entre 5 e 15 min depois que alguém entra no mapa), 8 monstros dourados por 10 min. */
-  private nextInvasion = 0; private invasionEnd = 0; private nextAchAll = 0;
+  private nextInvasion = 0; private invasionEnd = 0;
+  /** Arena dos Demônios (só nas salas arena1..3). */
+  private get isArena() { return this.mapId.startsWith('arena'); }
+  private arSlot = -1; private arScore = new Map<number, { name: string; pts: number; kills: number }>(); private arDone = -1; private arBoss = -1; private arNext = 0; private arStatus = 0; private arAnn = -1; private nextAchAll = 0;
   /** Guildas dos jogadores desta sala (cache; o banco é a fonte). */
   private guilds = new Map<number, { id: number; name: string; tag: string; color: number; leader: number; notice: string; m: { id: number; name: string; rank: number; lv: number; cls: string; res: number; mr: number }[] }>();
   /** Chefe Mundial: agenda pelo relógio (shared/events.ts). wbSlot = janela já tratada nesta sala. */
@@ -299,6 +302,8 @@ export class MapRoom {
       case 'pm': return this.enqueueParty(() => this.setMode(p));
       case 'lo': p.lootOff = m.on === false; if (!p.lootOff) p.wantDrop = 0; return; // Coleta desligada: não recolhe nada sozinho
       case 'lp': if (Number.isInteger(m.id) && this.drops.has(m.id)) p.wantDrop = m.id; return; // clicou num item: pega só esse
+      case 'are': return this.arenaEnter(p);
+      case 'arb': return this.arenaBuy(p, m.n);
       case 'dq': return this.sendDaily(p);
       case 'dc': return this.dailyLogin(p);
       case 'dm': return this.dailyTask(p, m.i);
@@ -501,11 +506,78 @@ export class MapRoom {
     p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'up', x: p.x, y: p.y, id: p.eid, ok: 1, v: 0 });
     this.sys(p, `🏅 Recompensa de "${a.name}" recebida${a.title ? ` · título "${a.title}" liberado` : ''}.`); this.send(p, { t: 'achn', n: p.ach.u.length }); this.sendAch(p);
   }
+  // ---------- Arena dos Demônios ----------
+  private arenaBuy(p: Player, n: unknown) {
+    if (!this.nearNpc(p, 'arena')) return; const q = Math.max(1, Math.min(10, Math.floor(Number(n) || 1))), cost = ARENA_TICKET_PRICE * q;
+    if (p.gold < cost) return this.sys(p, `${q} convite(s) custam ${cost.toLocaleString('pt-BR')} moedas.`);
+    if (this.slotsNeeded(p, 'arena_ticket', q) > this.freeSlots(p)) return this.sys(p, 'Inventário cheio.');
+    p.gold -= cost; p.logs.push(['buy', null, 'arena_ticket', q, -cost, Date.now()]); this.give(p, 'arena_ticket', q, 0, 'buy'); p.dirty = true; p.meDirty = true; this.sendInv(p);
+    this.sys(p, `Você comprou ${q} Convite(s) da Arena.`);
+  }
+  private arenaEnter(p: Player) {
+    if (!this.nearNpc(p, 'arena')) return; const a = arenaAt(Date.now()), t = arenaFor(p.level);
+    if (!a.open) return this.sys(p, a.running ? 'A Arena já começou. A entrada abre 5 minutos antes de cada sessão (toda hora, no minuto 25).' : 'A entrada da Arena abre toda hora no minuto 25 e fecha no minuto 30.');
+    if (!t) return this.sys(p, 'A Arena dos Demônios é a partir do nível 15.');
+    const tk = p.items.find(i => i.key === 'arena_ticket' && !i.equip); if (!tk) return this.sys(p, 'Você precisa de um Convite da Arena (cai dos monstros ou compre comigo).');
+    this.takeOne(p, tk); p.logs.push(['arena_in', tk.id, 'arena_ticket', 1, 0, Date.now()]);
+    const sp = getMap(t.id).spawn; this.sys(p, `Entrando na ${t.name}...`); this.travel(p, t.id, sp.x, sp.y);
+  }
+  private arenaPool(wave: number) {
+    const t = ARENAS.find(a => a.id === this.mapId)!, all = Object.values(this.defs).filter(d => !d.boss && d.level >= t.mob[0] && d.level <= t.mob[1]).sort((a, b) => a.level - b.level);
+    const n = all.length, q = Math.max(1, Math.ceil(n / AR_WAVES)), from = Math.min(n - 1, wave * q);
+    return all.slice(from, Math.min(n, from + q + 2));
+  }
+  private tickArena(now: number) {
+    const a = arenaAt(now);
+    if (!this.isArena) { // cidades e mapas de caça: só avisam quando a entrada abre
+      if (a.open && this.arAnn !== a.slot && a.start - now > AR_LIFE / 2 - 60000 - 240000) { this.arAnn = a.slot; this.allSys(`⚔ A Arena dos Demônios abriu! Entrada por 5 minutos com Morgana, a Guardiã da Arena (Valoria e Solmira). Precisa de um Convite da Arena.`); }
+      return;
+    }
+    if (this.arSlot !== a.slot) { this.arSlot = a.slot; this.arScore.clear(); this.arBoss = -1; }
+    // fora do horário (ou depois do fim + 12 s): todo mundo volta para Valoria
+    if (!a.open && !a.running && now > a.end + 12000) { const v = getMap('valoria'); for (const p of [...this.players.values()]) { this.sys(p, 'A Arena está fechada. Voltando para Valoria.'); this.travel(p, 'valoria', v.spawn.x, v.spawn.y); } return; }
+    if (a.running) {
+      const wave = Math.min(AR_WAVES - 1, Math.floor((now - a.start) / (AR_LIFE / AR_WAVES))), alive = [...this.mobs.values()].filter(m => m.arena && m.hp > 0).length, want = Math.min(36, 8 + this.players.size * 5);
+      if (now >= this.arNext && alive < want && this.players.size) {
+        this.arNext = now + 700; const pool = this.arenaPool(wave);
+        for (let k = 0; k < Math.min(4, want - alive) && pool.length; k++) {
+          const base = pool[Math.floor(Math.random() * pool.length)]; let at = this.randomFree(22, 16, 14); for (let tries = 0; tries < 8 && [...this.players.values()].some(p => dist(p, at) < 5); tries++) at = this.randomFree(22, 16, 14);
+          const def = { ...base, respawnMs: 1e12, detect: 40, leash: 80 };
+          this.mobs.set(this.nextId, { eid: this.nextId++, def, x: at.x, y: at.y, hx: at.x, hy: at.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, curseUntil: 0, slowUntil: 0, hitBy: new Map(), arena: 1 });
+        }
+      }
+      if (wave === AR_WAVES - 1 && this.arBoss !== a.slot && this.players.size) { // campeão da arena na última onda
+        this.arBoss = a.slot; const t = ARENAS.find(x => x.id === this.mapId)!, bosses = Object.values(this.defs).filter(d => d.boss && d.level <= t.mob[1] + 20).sort((x, y) => y.level - x.level), b = bosses.find(d => d.level >= t.mob[0]) ?? bosses[0];
+        if (b) { const def = { ...b, name: `${b.name}, Campeão da Arena`, hp: Math.round(b.hp * 1.5), respawnMs: 1e12, detect: 40, leash: 80 }, at = this.randomFree(22, 8, 4); this.mobs.set(this.nextId, { eid: this.nextId++, def, x: at.x, y: at.y, hx: at.x, hy: at.y, hp: def.hp, state: 'idle', target: 0, path: null, nextAtk: 0, nextThink: 0, respawnAt: 0, nextNova: 0, phase: 1, curseUntil: 0, slowUntil: 0, hitBy: new Map(), arena: 1 }); this.allSys(`☠ Última onda! ${def.name} entrou na Arena (vale 60 pontos).`); }
+      }
+    }
+    if (!a.running && now >= a.end && this.arDone !== a.slot) { this.arDone = a.slot; this.arenaFinish(); }
+    if (now >= this.arStatus) { this.arStatus = now + 1000; this.arenaStatus(a, now); }
+  }
+  private arenaRank() { return [...this.arScore.entries()].sort((x, y) => y[1].pts - x[1].pts); }
+  private arenaStatus(a: ReturnType<typeof arenaAt>, now: number) {
+    const rank = this.arenaRank(), top = rank.slice(0, 5).map(([, s]) => [s.name, s.pts]), wave = a.running ? Math.min(AR_WAVES, Math.floor((now - a.start) / (AR_LIFE / AR_WAVES)) + 1) : 0;
+    for (const p of this.players.values()) { const i = rank.findIndex(([c]) => c === p.charId); this.send(p, { t: 'arena', phase: a.open ? 'wait' : a.running ? 'run' : 'end', left: a.open ? a.start - now : a.running ? a.end - now : Math.max(0, a.end + 12000 - now), wave, waves: AR_WAVES, top, me: i < 0 ? null : [i + 1, rank[i][1].pts] }); }
+  }
+  private arenaFinish() {
+    for (const [id, m] of [...this.mobs]) if (m.arena) this.mobs.delete(id);
+    const rank = this.arenaRank(), tier = ARENAS.findIndex(a => a.id === this.mapId), mult = [1, 4, 10][tier] ?? 1, lines: string[] = [];
+    rank.forEach(([cid, sc], i) => {
+      const p = this.byChar.get(cid); if (!p || p.gone || sc.pts <= 0) return;
+      const xp = Math.floor(xpToNext(Math.min(p.level, CONFIG.maxLevel - 1)) * Math.min(1.6, .25 + sc.pts / 120)), gold = Math.floor((i === 0 ? 3e6 : i < 3 ? 1.5e6 : 4e5 * Math.min(1, sc.pts / 50)) * mult * (this.cfg.gold || 1));
+      const prizes: [string, number][] = i === 0 ? [['box_mitico', 1], ['jewel_eclipse', 3]] : i < 3 ? [['box_rei', 1], ['jewel_destiny', 3]] : i < 10 && sc.pts >= 30 ? [['box_ouro', 1], ['jewel_aurora', 3]] : [['jewel_aurora', 2]];
+      this.addXp(p, xp); p.gold = Math.min(2e9, p.gold + gold); p.logs.push(['arena_gold', null, this.mapId, 0, gold, Date.now()]); this.achInc(p, 'ar');
+      const got = [`${xp.toLocaleString('pt-BR')} XP`, `${gold.toLocaleString('pt-BR')} moedas`]; for (const [k, q] of prizes) if (this.give(p, k, q, 0, 'arena')) got.push(`${q > 1 ? q + 'x ' : ''}${ITEMS[k].name}`); else got.push(`(sem espaço para ${ITEMS[k].name})`);
+      p.dirty = true; p.meDirty = true; this.sendInv(p); this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid });
+      this.sys(p, `⚔ Arena encerrada! Você ficou em ${i + 1}º com ${sc.pts} pontos (${sc.kills} abates): ${got.join(', ')}.`); if (i < 3) lines.push(`${i + 1}º ${sc.name} (${sc.pts})`);
+    });
+    if (lines.length) this.allSys(`⚔ Pódio da ${this.map.name}: ${lines.join(' · ')}. Voltando para Valoria em 12 s.`); else this.allSys('⚔ Arena encerrada. Voltando para Valoria em 12 s.');
+  }
   // ---------- Diário (fica em p.ach.c, gravado junto com as conquistas) ----------
   /** Garante o estado do dia: zera as missões quando o dia muda (horário de Brasília). */
   private dailyRoll(p: Player) {
     const c = p.ach.c, today = dayNum(Date.now());
-    if (c.md !== today) { c.md = today; c.mc = 0; for (const k of ['k', 'b', 'q', 'w', 'g', 'd']) c['m0' + k] = c[k] ?? 0; p.dirty = true; }
+    if (c.md !== today) { c.md = today; c.mc = 0; for (const k of ['k', 'b', 'q', 'w', 'g', 'd', 'ar']) c['m0' + k] = c[k] ?? 0; p.dirty = true; }
     return today;
   }
   private dailyInfo(p: Player) {
@@ -759,10 +831,11 @@ export class MapRoom {
   }
   private nearNpc(p: Player, id: unknown) { const n = this.map.npcs.find(x => x.id === id); return n?.shop && dist(p, n) <= 4 ? n : null; }
   private buy(p: Player, npc: unknown, key: unknown, qty: unknown) {
-    const n = this.nearNpc(p, npc); if (!n || typeof key !== 'string' || !SHOPS[n.shop!].includes(key) || !Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > 50) return;
+    const n = this.nearNpc(p, npc); if (!n || typeof key !== 'string' || !SHOPS[n.shop!].includes(key) || !Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > 1000) return;
     const d = ITEMS[key], stack = isStack(d), q = stack ? qty as number : 1, cost = d.price * q;
-    if (p.gold < cost) return this.sys(p, 'Moedas insuficientes.');
+    if (p.gold < cost) return this.sys(p, `Moedas insuficientes: ${q} custam ${cost.toLocaleString('pt-BR')}.`);
     if (!this.give(p, key, q, 0, 'buy')) return this.sys(p, 'Inventário cheio.');
+    if (q > 1) this.sys(p, `Comprou ${q}x ${d.name} por ${cost.toLocaleString('pt-BR')} moedas.`);
     p.gold -= cost; p.logs.push(['buy_pay', null, key, q, -cost, Date.now()]); p.dirty = true; p.meDirty = true; this.sendInv(p);
   }
   private sell(p: Player, npc: unknown, slot: unknown, all = false) {
@@ -1057,17 +1130,19 @@ export class MapRoom {
     if (m.hp <= 0) this.killMob(m, p);
   }
   private killMob(m: Mob, killer: Player) {
-    m.hp = 0; m.respawnAt = Date.now() + m.def.respawnMs; m.path = null; m.state = 'idle'; m.target = 0; if (m.golden || m.wb) this.mobs.delete(m.eid); // dourado e chefe mundial não voltam
+    m.hp = 0; m.respawnAt = Date.now() + m.def.respawnMs; m.path = null; m.state = 'idle'; m.target = 0; if (m.golden || m.wb || m.arena) this.mobs.delete(m.eid); // dourado e chefe mundial não voltam
     this.fx.push({ k: 'die', x: m.x, y: m.y, id: m.eid });
     { const ks = this.stats(killer); if (ks.lifeK || ks.manaK) { killer.hp = Math.min(ks.maxHp, killer.hp + ks.maxHp * ks.lifeK); killer.mp = Math.min(ks.maxMp, killer.mp + ks.maxMp * ks.manaK); killer.meDirty = true; killer.dirty = true; } }
     if (m.wb) this.worldBossRewards(m);
-    { const own = this.byChar.get([...m.hitBy.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? killer.charId) ?? killer; this.achInc(own, 'k'); if (m.def.boss && !m.wb) this.achInc(own, 'b'); if (m.golden) this.achInc(own, 'g'); }
+    { const own = this.byChar.get([...m.hitBy.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? killer.charId) ?? killer; this.achInc(own, 'k'); if (m.def.boss && !m.wb) this.achInc(own, 'b'); if (m.golden) this.achInc(own, 'g');
+      if (m.arena) { const sc = this.arScore.get(own.charId) ?? { name: own.name, pts: 0, kills: 0 }; sc.pts += m.def.boss ? 60 : 1 + Math.floor(m.def.level / 25); sc.kills++; this.arScore.set(own.charId, sc); } }
     let topChar = killer.charId, top = 0; for (const [c, d] of m.hitBy) if (d > top) { top = d; topChar = c; }
     const owner = this.byChar.get(topChar) ?? killer; m.hitBy.clear();
     this.shareXp(owner, m.def.xp, m); this.questKill(m, owner);
     const [lo, hi] = m.def.gold, now = Date.now();
     const src = m.def.boss || m.wb ? 'boss' as const : 'mob' as const, drop = (key: string | null, gold: number, rarity: number, opts: string[] = []) => { const plus = key && canPlus(key) ? rollPlus(src) : 0; const a = Math.random() * 6.283, d = Math.random() * 1.2; let x = m.x + Math.cos(a) * d, y = m.y + Math.sin(a) * d; if (isSolid(this.map, x, y)) { x = m.x; y = m.y; } const eid = this.nextId++; this.drops.set(eid, { eid, x: round(x), y: round(y), key, gold, rarity, opts, plus, owner: owner.charId, party: owner.partyId, ownUntil: now + CONFIG.dropOwnMs, expires: now + CONFIG.dropLifeMs }); };
     drop(null, lo + Math.floor(Math.random() * (hi - lo + 1)), 0);
+    if (!this.isArena && m.def.level >= 15 && Math.random() < (m.def.boss ? .35 : .0025) * (this.cfg.drop || 1)) drop('arena_ticket', 0, 0); // Convite da Arena
     for (const [key, ch] of m.def.drops) if (Math.random() < ch) { const k = ITEMS[key].kind, gear = SLOTS.includes(k as Slot), lm = (1 + Math.max(0, m.def.level - 100) / 100) * (m.def.boss ? 2 : 1), il = ITEMS[key].lvl, anc = gear && k !== 'wings' && k !== 'pet' && Math.random() < ancChance(il, lm, this.cfg.exc), exc = gear && k !== 'wings' && k !== 'pet' && Math.random() < excChance(il, lm, this.cfg.exc); if (anc || exc) { const pool = [...(k === 'weapon' || k === 'ring' ? EXC_WEAPON : EXC_ARMOR)].sort(() => Math.random() - .5); drop(key, 0, anc ? 4 : 3, pool.slice(0, anc ? (Math.random() < .3 ? 3 : 2) : Math.random() < .25 ? 2 : 1)); continue; } const r = !gear ? 0 : Math.random() < .05 * lm / (1 + il / 200) ? 2 : Math.random() < Math.min(.5, .22 * lm) ? 1 : 0; drop(key, 0, r); }
     if (m.def.boss && !m.wb) for (const o of this.players.values()) this.sys(o, `${m.def.name} foi derrotada por ${owner.name}!`);
   }
@@ -1109,6 +1184,7 @@ export class MapRoom {
     const now = Date.now(), dt = Math.min(.25, (now - this.last) / 1000); this.last = now;
     for (const p of this.players.values()) this.tickPlayer(p, dt, now);
     for (const m of this.mobs.values()) this.tickMob(m, dt, now);
+    this.tickArena(now);
     if (now >= this.nextAchAll) { this.nextAchAll = now + 3000; for (const p of this.players.values()) this.achCheck(p); }
     this.tickInvasion(now); this.tickWorldBoss(now); this.tickDuels(now);
     if (this.timed.length) { const due = this.timed.filter(t => t.at <= now); if (due.length) { this.timed = this.timed.filter(t => t.at > now); for (const t of due) t.run(); } }

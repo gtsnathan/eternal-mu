@@ -1,5 +1,5 @@
 import { GUILD_COLORS } from '../shared/data';
-import { upcomingBosses, WB_NAMES, WB_LIFE } from '../shared/events';
+import { upcomingBosses, WB_NAMES, WB_LIFE, arenaAt, nextArena } from '../shared/events';
 import { VERSION, CHANGELOG } from '../shared/version';
 import { fmtRes, CLASSES, HAIR_COLORS, ITEMS, MOBS, SETS, WING_THEME } from '../shared/data';
 import { FRAME_H, FRAME_W, hdOf, heroSprites, lookFromGear, wingSprites, WING_ROOT } from './art';
@@ -48,6 +48,7 @@ function drawBosses() {
   const box = document.getElementById('wboss'); if (!box) return; const now = Date.now();
   const t = (ms: number) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), d = (ms: number) => new Date(ms).toDateString() === new Date().toDateString() ? 'hoje' : 'amanhã';
   box.innerHTML = '<h3>☠ Chefe Mundial</h3>' + upcomingBosses(now, 4).map(b => { const [n, l] = WB_NAMES[b.map]; return `<div class="st"><span>${n}<small>a partir do nível ${l}</small></span><b${b.live ? ' class="live"' : ''}>${b.live ? `AGORA · ${Math.max(1, Math.ceil((b.start + WB_LIFE - now) / 60000))} min` : `${d(b.start)} ${t(b.start)}`}</b></div>`; }).join('') + '<p>A cada 2 horas um chefe desperta. Todo mundo que ajudar ganha XP, moedas, baús e joias conforme o dano causado.</p>';
+  { const a = arenaAt(now), n = nextArena(now); box.innerHTML += `<h3 style="margin-top:14px">⚔ Arena dos Demônios</h3><div class="st"><span>${a.open ? 'Entrada aberta!' : a.running ? 'Em andamento' : 'Próxima sessão'}<small>entrada 5 min antes, com Convite da Arena</small></span><b${a.open || a.running ? ' class="live"' : ''}>${a.running ? `até ${t(a.end)}` : t(n.start)}</b></div><p>Toda hora no minuto 30: 4 ondas de monstros em 10 minutos, ranking por pontos e prêmios para os melhores.</p>`; }
 }
 function drawOnline(list: { name: string; cls: string; level: number; resets: number; mr: number; map: string }[]) {
   const u = $('#onl'); u.replaceChildren(); if (!list.length) { u.append(el('li', '', 'Ninguém online agora.')); return; }

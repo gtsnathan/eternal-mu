@@ -247,6 +247,8 @@ body.boss #tframe{display:none!important}
 .achhead{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}.achhead b{color:var(--gold);font-size:15px}.achtitle{display:flex;align-items:center;gap:8px;font-size:13px;color:#cbbfa6}.achtitle select{flex:1;background:#0008;color:#f3ead8;border:1px solid #c9a24f66;border-radius:8px;padding:5px 8px;font:inherit}
 .achrow{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:#0004;margin-bottom:6px;border:1px solid #ffffff10}.achrow.ready{border-color:var(--gold);background:#3a2a0a66}.achrow.got{opacity:.62}.achic{font-size:20px;width:26px;text-align:center;flex:none}.achtx{flex:1;min-width:0}.achtx b{display:block;font-size:14px}.achtx small{display:block;color:#bba;font-size:12px}.achtx .achpz{color:#d9c48a;margin-top:2px}
 .achbar{position:relative;height:14px;border-radius:7px;background:#0008;overflow:hidden;margin-top:4px;border:1px solid #ffffff14}.achbar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#8a6420,#ffd76a)}.achbar span{position:relative;display:block;text-align:center;font-size:10px;line-height:13px;color:#fff;text-shadow:0 1px 0 #000}.achrow button{flex:none}
+.qtybtns{display:flex;gap:4px;flex:none}.qtybtns button{padding:6px 8px;min-width:0}
+#arenabar{display:none;position:absolute;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));min-width:230px;padding:7px 12px;border-radius:10px;background:#1a0a0ecc;border:1px solid #a03a2a;color:#f3e6d6;font-size:12px;pointer-events:none;z-index:4;text-align:center}#arenabar b{color:#ff8a6a;font-size:13px}#arenabar .arl{color:#ffd76a;margin:2px 0 4px}#arenabar .arr{display:flex;justify-content:space-between;gap:12px;text-align:left}#arenabar .me{color:#ffd76a;border-top:1px solid #5a2a22;margin-top:2px}.touch #arenabar{top:calc(170px + env(safe-area-inset-top));min-width:180px;font-size:11px}.arinfo{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin-top:8px;font-size:13px}.arinfo span{color:#a99}
 </style>
 </head>
 <body>
@@ -284,6 +286,7 @@ body.boss #tframe{display:none!important}
   <div id="qtrack"></div>
   <div id="bossbar"><b></b><div><i></i></div></div>
   <div id="wbrank"></div>
+  <div id="arenabar"></div>
   <div class="win p" id="w-trade"><h3>Troca com <span id="tname"></span></h3>
     <div class="tcols"><div><b>Sua oferta</b> <small id="tstm"></small><div class="tgrid" id="tmine"></div><label>Moedas</label><input id="tgold" type="text" inputmode="numeric" value="0" autocomplete="off"></div>
     <div><b>Oferta dele</b> <small id="tstt"></small><div class="tgrid" id="ttheirs"></div><div id="ttg" class="info"></div></div></div>

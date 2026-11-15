@@ -17,6 +17,8 @@ export const ACHIEVEMENTS: Ach[] = [
   A(1, 'b3', 'Flagelo dos chefes', 'Derrote 200 chefes', 'b', 200, 25000000, [['box_mitico', 3], ['jewel_eclipse', 5]], 'Flagelo dos Chefes'),
   A(1, 'w1', 'Contra o desperto', 'Ajude a derrotar um Chefe Mundial', 'w', 1, 500000, [['box_ouro', 1]]),
   A(1, 'w2', 'Desafiante do Eclipse', 'Ajude a derrotar 20 Chefes Mundiais', 'w', 20, 15000000, [['box_mitico', 2], ['chaos_feather', 5]], 'Desafiante do Eclipse'),
+  A(1, 'ar1', 'Desafiante da arena', 'Participe da Arena dos Demônios', 'ar', 1, 300000, [['jewel_destiny', 2]]),
+  A(1, 'ar2', 'Campeão da arena', 'Participe de 25 Arenas dos Demônios', 'ar', 25, 15000000, [['box_mitico', 2]], 'Campeão da Arena'),
   A(1, 'd1', 'Primeiro duelo', 'Vença um duelo', 'd', 1, 50000),
   A(1, 'd2', 'Duelista', 'Vença 25 duelos', 'd', 25, 2000000, [['jewel_destiny', 3]], 'Duelista'),
   A(1, 'd3', 'Gladiador', 'Vença 100 duelos', 'd', 100, 10000000, [['jewel_eclipse', 5]], 'Gladiador'),
@@ -66,6 +68,7 @@ const TASKS: DailyTask[] = [
   { stat: 'w', goal: 1, name: 'Ajude a derrotar um Chefe Mundial', item: ['box_rei', 1] },
   { stat: 'g', goal: 5, name: 'Derrote 5 monstros dourados', item: ['jewel_eclipse', 1] },
   { stat: 'd', goal: 1, name: 'Vença um duelo', item: ['jewel_destiny', 2] },
+  { stat: 'ar', goal: 1, name: 'Participe da Arena dos Demônios', item: ['box_ouro', 1] },
 ];
 /** As 3 missões do dia: sempre "derrotar monstros" e mais 2 que mudam todo dia (iguais para todo mundo). */
 export function dailyTasks(day: number): DailyTask[] {

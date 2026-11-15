@@ -171,6 +171,7 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'plume', name: 'Pluma Gélida', kind: 'material', lvl: 1, price: 2000, blade: '#cfefff' },
   { key: 'magma_heart', name: 'Coração de Magma', kind: 'material', lvl: 1, price: 8000, blade: '#ff6a2b' },
   { key: 'ancient_scale', name: 'Escama Ancestral', kind: 'material', lvl: 1, price: 60000, blade: '#ffd76a' },
+  { key: 'arena_ticket', name: 'Convite da Arena', kind: 'material', lvl: 1, price: 75000, blade: '#ff4a5a' },
   { key: 'chaos_feather', name: 'Pena do Caos', kind: 'material', lvl: 1, price: 250000, blade: '#ff5ad1' },
   { key: 'void_crystal', name: 'Cristal do Vazio', kind: 'material', lvl: 1, price: 1500000, blade: '#9a7bff' },
   { key: 'shard', name: 'Estilhaço Gélido', kind: 'material', lvl: 1, price: 15 },
@@ -440,3 +441,6 @@ export function adminSet(x: any): Record<string, number> | string {
   for (const [k, [, lo, hi]] of Object.entries(ADMIN_FIELDS)) { if (x[k] === undefined || x[k] === '' || x[k] === null) continue; const n = Math.floor(Number(x[k])); if (!Number.isFinite(n) || n < lo || n > hi) return `Valor inválido em ${k} (de ${lo} a ${hi}).`; out[k] = n; }
   return out;
 }
+
+// Arena dos Demônios
+export const ARENA_TICKET_PRICE = 300000;
