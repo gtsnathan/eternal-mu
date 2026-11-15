@@ -1,7 +1,7 @@
 // Regras e conteúdo do jogo. Todos os números de balanceamento ficam aqui.
 export const CONFIG = {
   tickMs: 50, testCommands: true, aoiRadius: 22, pointsPerLevel: 5, maxLevel: 400, playerSpeed: 5,
-  attackRange: 1.7, invSize: 45, startGold: 100, saveEveryMs: 60000, dropOwnMs: 5000, dropLifeMs: 10000,
+  attackRange: 1.7, invSize: 45, startGold: 100, saveEveryMs: 60000, dropOwnMs: 5000, dropLifeMs: 30000,
 };
 export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings' | 'ring' | 'amulet' | 'pet';
 export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings', 'ring', 'amulet', 'pet'];
@@ -377,6 +377,17 @@ export function goodFactor(key: string, good = 1): number {
   return Math.min(1, f * good);
 }
 /** Chance de um item caído virar Excelente/Ancestral, já com o peso do nível do item (quanto mais alto, mais raro). */
+/** Melhoria (+) com que um equipamento cai. Monstros comuns: de +0 a +8, quase sempre baixo.
+ *  +9 ou mais só sai de chefes e dos baús do Rei e Mítico. */
+export function rollPlus(src: 'mob' | 'boss' | 'box_rei' | 'box_mitico'): number {
+  const r = Math.random(), pick = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
+  if (src === 'mob') return r < .5 ? 0 : r < .74 ? pick(1, 2) : r < .9 ? pick(3, 4) : r < .97 ? pick(5, 6) : pick(7, 8);
+  if (src === 'boss') return r < .3 ? pick(2, 4) : r < .65 ? pick(5, 7) : r < .8 ? 8 : r < .95 ? pick(9, 11) : pick(12, 13);
+  if (src === 'box_rei') return r < .45 ? pick(4, 6) : r < .75 ? pick(7, 8) : r < .95 ? pick(9, 10) : 11;
+  return r < .3 ? pick(6, 8) : r < .75 ? pick(9, 11) : r < .95 ? 12 : 13; // box_mitico
+}
+/** Equipamento que pode ter melhoria (+): tudo que vai no corpo, menos pet. */
+export const canPlus = (key: string) => { const d = ITEMS[key]; return !!d && SLOTS.includes(d.kind as Slot) && d.kind !== 'pet'; };
 export const excChance = (lvl: number, lm: number, exc: number) => .025 * lm * exc / (1 + lvl / 250);
 export const ancChance = (lvl: number, lm: number, exc: number) => .0022 * lm * exc / (1 + lvl / 250);
 

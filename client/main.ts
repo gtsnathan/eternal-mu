@@ -116,7 +116,7 @@ function setConn(ok: boolean) { const c = $('#conn'); c.textContent = ok ? `● 
 function handle(m: any) {
   switch (m.t) {
     case 'w': {
-      for (const k of Object.keys(m.jc ?? {})) JEWELS[k].chance = m.jc[k]; you = m.you; myName = m.name; myCls = classOf(m.cls); myCls.skills.forEach(s => { const b = $(`[data-sk="${s.n}"] b`), ic = hdOf(skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a'))); b.replaceChildren(ic); b.parentElement!.title = s.lvl ? `${s.name} (nível ${s.lvl})` : s.name; }); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
+      for (const k of Object.keys(m.jc ?? {})) JEWELS[k].chance = m.jc[k]; send({ t: 'lo', on: autoLoot }); you = m.you; myName = m.name; myCls = classOf(m.cls); myCls.skills.forEach(s => { const b = $(`[data-sk="${s.n}"] b`), ic = hdOf(skillIcon(s.kind, s.color ?? (s.kind === 'summon' ? '#a58cff' : '#ffd76a'))); b.replaceChildren(ic); b.parentElement!.title = s.lvl ? `${s.name} (nível ${s.lvl})` : s.name; }); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
       if (map?.id !== m.map) { map = getMap(m.map); bakeMini(); log(`— ${map.name} —`, 'sys'); }
       camX = m.x; camY = m.y; retries = 0; over(''); clearInterval(pingTimer); pingTimer = setInterval(() => send({ t: 'ping', c: performance.now() }), 3000) as unknown as number; send({ t: 'ping', c: performance.now() });
       lastInput = ''; syncInput(); break;
@@ -168,7 +168,7 @@ function faceTo(e: Ent, tx: number, ty: number) { const dx = tx - e.x, dy = ty -
 function effect(f: any) {
   const e = ents.get(f.id), now = performance.now();
   switch (f.k) {
-    case 'hit': if (e) e.flash = now + 90; texts.push({ x: f.x, y: f.y, s: String(f.v), c: f.p ? '#ff7070' : f.c ? '#ffd24a' : '#fff', t: 0, big: !!f.c }); burst(f.x, f.y - .4, f.c ? 12 : 6, f.p ? '#e0425a' : '#bdf0ff'); if (f.id === target || f.p) beep(f.p ? 150 : f.c ? 420 : 260, 70); break;
+    case 'hit': if (e) e.flash = now + 90; if (f.id === you && f.v > 0) { shakeUntil = now + 160; shakeAmp = Math.min(7, 2.5 + f.v / Math.max(1, me?.maxHp ?? 1) * 40); } else if (f.c && f.id === target) { shakeUntil = Math.max(shakeUntil, now + 110); shakeAmp = Math.max(shakeAmp * (now < shakeUntil ? 1 : 0), 2); } texts.push({ x: f.x, y: f.y, s: String(f.v), c: f.p ? '#ff7070' : f.c ? '#ffd24a' : '#fff', t: 0, big: !!f.c }); burst(f.x, f.y - .4, f.c ? 12 : 6, f.p ? '#e0425a' : '#bdf0ff'); if (f.id === target || f.p) beep(f.p ? 150 : f.c ? 420 : 260, 70); break;
     case 'miss': texts.push({ x: f.x, y: f.y, s: 'Esquiva', c: '#b9e6ff', t: 0, big: false }); break;
     case 'swing': if (e) { faceTo(e, f.tx, f.ty); e.atkUntil = now + 220; if (f.b) bolts.push({ x: e.x, y: e.y, tx: f.tx, ty: f.ty, t: 0, c: f.b }); else slashes.push({ x: e.x, y: e.y, a: Math.atan2(f.ty - e.y, f.tx - e.x), t: 0 }); } break;
     case 'bolt': if (e) { faceTo(e, f.tx, f.ty); e.atkUntil = now + 240; } bolts.push({ x: f.x, y: f.y, tx: f.tx, ty: f.ty, t: 0, c: f.b }); beep(480, 110, 'sawtooth', .025); break;
@@ -484,12 +484,12 @@ document.querySelectorAll<HTMLElement>('.menu .extra').forEach(b => b.addEventLi
 $('#chatb').onclick = () => { const c = $('#chat'), o = !c.classList.contains('open'); c.classList.toggle('open', o); if (o) $<HTMLInputElement>('#chati').focus(); };
 $('#chati').addEventListener('blur', () => { if (touch) setTimeout(() => { if (document.activeElement !== $('#chati') && !$<HTMLInputElement>('#chati').value) $('#chat').classList.remove('open'); }, 150); });
 // Auto ataque e Auto coleta são separados: dá para ligar só um, os dois ou nenhum (fica lembrado neste aparelho)
-const autoUi = () => { for (const [id, on] of [['#auto', auto], ['#autoloot', autoLoot]] as [string, boolean][]) { $(id).style.borderColor = on ? 'var(--gold)' : ''; $(id).style.color = on ? 'var(--gold)' : ''; } try { localStorage.setItem('em_auto', JSON.stringify([auto, autoLoot])); } catch { /* sem armazenamento */ } };
-try { [auto, autoLoot] = JSON.parse(localStorage.getItem('em_auto') ?? '[false,false]'); } catch { /* sem armazenamento */ }
+const autoUi = () => { for (const [id, on] of [['#auto', auto], ['#autoloot', autoLoot]] as [string, boolean][]) { $(id).style.borderColor = on ? 'var(--gold)' : ''; $(id).style.color = on ? 'var(--gold)' : ''; } try { localStorage.setItem('em_auto2', JSON.stringify([auto, autoLoot])); localStorage.setItem('em_auto', JSON.stringify([auto, autoLoot])); } catch { /* sem armazenamento */ } };
+try { const v2 = localStorage.getItem('em_auto2'); if (v2) [auto, autoLoot] = JSON.parse(v2); else { auto = !!JSON.parse(localStorage.getItem('em_auto') ?? '[false]')[0]; autoLoot = true; } } catch { autoLoot = true; } // Coleta começa ligada
 $('#snd').onclick = () => { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); };
 soundUi();
 $('#auto').onclick = () => { auto = !auto; autoUi(); log(auto ? 'Auto ataque ligado.' : 'Auto ataque desligado.', 'sys'); };
-$('#autoloot').onclick = () => { autoLoot = !autoLoot; autoUi(); log(autoLoot ? 'Auto coleta ligada: os itens somem 10 s depois de cair.' : 'Auto coleta desligada.', 'sys'); };
+$('#autoloot').onclick = () => { autoLoot = !autoLoot; autoUi(); send({ t: 'lo', on: autoLoot }); log(autoLoot ? 'Coleta ligada: pega os itens sozinho (os itens somem 30 s depois de cair).' : 'Coleta desligada: não pega nada sozinho, só ataca. Para pegar um item, clique nele.', 'sys'); };
 autoUi();
 $('#atk').onclick = () => { const m = nearestMob(12); if (m) attack(m); };
 document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => b.onclick = () => touch ? skill(+b.dataset.sk!) : selectSkill(+b.dataset.sk!));
@@ -523,6 +523,7 @@ canvas.addEventListener('pointerdown', e => {
   if (best) { if (e.pointerType === 'mouse') holdAtk = true; return attack(best); }
   if (e.pointerType !== 'mouse') for (const en of ents.values()) if (en.k === 'p' && en.id !== you && Math.hypot(en.x - wx, en.y - .6 - wy) < .9) { playerMenu(en, e.clientX, e.clientY); return; }
   for (const n of map.npcs) if (Math.hypot(n.x - wx, n.y - .6 - wy) < 1.1) { const a = ents.get(you); pendingNpc = n; target = 0; if (a && Math.hypot(a.x - n.x, a.y - n.y) > 2.5) { send({ t: 'g', x: n.x, y: n.y + 1.4 }); startPred(n.x, n.y + 1.4); } return; }
+  { let dp: Ent | null = null, dd = .9; for (const en of ents.values()) if (en.k === 'd') { const d = Math.hypot(en.x - wx, en.y - wy); if (d < dd) { dd = d; dp = en; } } if (dp) send({ t: 'lp', id: dp.id }); }
   autoAt = performance.now() + 1500; target = 0; pendingNpc = null; marker = { x: wx, y: wy, t: 0 }; closeWin('shop'); send({ t: 'g', x: wx, y: wy }); startPred(wx, wy);
   if (e.pointerType === 'mouse') { holding = true; holdAt = performance.now() + 250; } // segurar: segue o cursor
 });
@@ -597,7 +598,7 @@ function frame(ts: number) {
   }
   const W = canvas.width, H = canvas.height, vw = W / Z, vh = H / Z;
   const cx = Math.max(vw / 2, Math.min(map.w * 32 - vw / 2, camX * 32)), cy = Math.max(vh / 2, Math.min(map.h * 32 - vh / 2, camY * 32));
-  const ox = Math.round((vw / 2 - (vw > map.w * 32 ? map.w * 16 : cx)) * Z) / Z, oy = Math.round((vh / 2 - (vh > map.h * 32 ? map.h * 16 : cy)) * Z) / Z;
+  const sh = ts < shakeUntil ? shakeAmp * (shakeUntil - ts) / 160 : 0, ox = Math.round((vw / 2 - (vw > map.w * 32 ? map.w * 16 : cx) + (Math.random() - .5) * sh) * Z) / Z, oy = Math.round((vh / 2 - (vh > map.h * 32 ? map.h * 16 : cy) + (Math.random() - .5) * sh) * Z) / Z;
   g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false; g.fillStyle = '#0a0814'; g.fillRect(0, 0, W, H); g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   viewX = ox; viewY = oy;
   if (a) {
@@ -643,10 +644,10 @@ function frame(ts: number) {
   }
   // luz do dia/noite e fontes de luz
   const night = map.id in DARK_MAPS ? DARK_MAPS[map.id] : map.id === 'dunas' ? 0 : map.id === 'ashen' ? .95 : map.id === 'celestial' ? 0 : map.id === 'eldergrove' ? Math.max(.42, nightFactor()) : nightFactor(), vx0 = x0 * 32, vy0 = y0 * 32;
-  if (night > .02) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : map.id === 'infernal' ? [255, 214, 190] : map.id === 'eldergrove' ? [214, 240, 214] : map.id === 'celestial' ? [255, 248, 228] : [226, 236, 255], [122, 130, 188], night); g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
+  if (night > .02) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = lerpCol(map.safe ? [255, 246, 232] : map.id === 'infernal' ? [255, 214, 190] : map.id === 'eldergrove' ? [214, 240, 214] : map.id === 'celestial' ? [255, 248, 228] : [226, 236, 255], MAP_FX[map.id]?.night ?? [122, 130, 188], night); g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'lighter'; g.imageSmoothingEnabled = true; g.setTransform(Z, 0, 0, Z, ox * Z, oy * Z);
   const light = (x: number, y: number, r: number, c: string, al: number) => { g.globalAlpha = Math.min(1, al); g.drawImage(glowSprite(c), x - r, y - r, r * 2, r * 2); };
   for (const p of map.portals) light(p.x * 32, p.y * 32 - 26, 96 + Math.sin(ts / 300) * 8, '#8a55ff', .55 + night * .35);
-  if (map.id === 'infernal') for (let j = y0 - y0 % 4; j <= y1; j += 4) for (let i = x0 - x0 % 4; i <= x1; i += 4) if (map.tiles[j * map.w + i] === T.LAVA) light(i * 32 + 16, j * 32 + 16, 118 + Math.sin(ts / 300 + i + j) * 6, '#ff5a1c', .34);
+  for (const [tt, gc, gr, ga, st] of MAP_FX[map.id]?.glow ?? []) for (let j = Math.max(0, y0 - y0 % st); j <= y1; j += st) for (let i = Math.max(0, x0 - x0 % st); i <= x1; i += st) if (map.tiles[j * map.w + i] === tt) light(i * 32 + 16, j * 32 + 16, gr + Math.sin(ts / 300 + i + j) * gr * .05, gc, ga * (.85 + Math.sin(ts / 520 + i * 1.7 + j) * .15));
   for (const o of vis) {
     if (o.k === 'spire' && (o.x + o.y) % 4 === 0) light(o.x * 32 + 16, o.y * 32 - 6, 44, '#ff6a2b', .3);
     if (o.k === 'torch') light(o.x * 32 + 16, o.y * 32 + 8, 130 + Math.sin(ts / 110 + o.x) * 7, '#ff9a4a', .9);
@@ -656,7 +657,7 @@ function frame(ts: number) {
     else if (o.k === 'rock' && (o.x + o.y) % 5 === 0) light(o.x * 32 + 16, o.y * 32 + 2, 52, '#4fc6ff', .3 + night * .4); }
   for (const b of bolts) { const u = b.t / .16; light((b.x + (b.tx - b.x) * u) * 32, (b.y + (b.ty - b.y) * u) * 32 - 18, 34, b.c, .9); }
   for (const r of rings) if (!r.tele) light(r.x * 32, r.y * 32, r.r * 40, r.c, .3 * (1 - r.t / r.max));
-  for (const e of ents.values()) { if (e.k === 'd' && e.info.rarity) light(e.x * 32, e.y * 32, 34, RARITY[e.info.rarity].color, .5); if (e.k === 's') light(e.x * 32, e.y * 32 - 14, 46, e.info.mob === 'wisp' ? '#6dff9c' : '#a04dff', .6); if (e.k === 'm' && e.info.wb) light(e.x * 32, e.y * 32 - 40, 160, '#ff2a1a', .35 + Math.sin(ts / 300) * .1); if (e.k === 'm' && e.info.g) light(e.x * 32, e.y * 32 - 20, 70, '#ffd76a', .45); if (e.k === 'm' && MOBS[e.info.mob].boss) light(e.x * 32, e.y * 32 - 50, 130, MOBS[e.info.mob].nova ?? '#59c8ff', .15 + night * .15); if (e.k === 'p' && e.info.wings && ITEMS[e.info.wings].wtier! >= 3) light(e.x * 32, e.y * 32 - 30, 40 + ITEMS[e.info.wings].wtier! * 8, ITEMS[e.info.wings].blade!, .25 + Math.sin(ts / 400 + e.id) * .08); if (e.k === 'p' && e.info.weapon && ITEMS[e.info.weapon].lvl >= 26) light(e.x * 32 + (e.dir === 3 ? -12 : 12), e.y * 32 - 34, 34, ITEMS[e.info.weapon].blade!, .4 + Math.sin(ts / 240 + e.id) * .12); if (e.k === 'p' && e.info.wings && ITEMS[e.info.wings].wtier! >= 2 && Math.random() < [0, 0, .35, .5, .65, .8][ITEMS[e.info.wings].wtier!]) parts.push({ x: e.x + (Math.random() - .5) * 2.6, y: e.y - .4 - Math.random(), vx: 0, vy: .6, life: 0, max: .9, c: ITEMS[e.info.wings].blade!, s: 2 }); if (e.k === 'p') { const fs = fullSetOf(SET_PIECES.map(p => e.info[p])); if (fs) { const col = SETS[fs].key === 'dragon' ? '#7dffb0' : SETS[fs].trim; light(e.x * 32, e.y * 32 + 2, 46 + Math.sin(ts / 260) * 4, col, .3); if (Math.random() < .25) parts.push({ x: e.x + (Math.random() - .5) * .9, y: e.y + .1, vx: 0, vy: -1.4, life: 0, max: .8, c: col, s: 2 }); } } if (e.id === you && night > .05) light(e.x * 32, e.y * 32 - 18, 130, '#ffdca0', night * .4); }
+  for (const e of ents.values()) { if (e.k === 'd' && e.info.rarity) light(e.x * 32, e.y * 32, 34, RARITY[e.info.rarity].color, .5); else if (e.k === 'd' && (e.info.pl ?? 0) >= 9) light(e.x * 32, e.y * 32, 30, '#ff9de6', .4); if (e.k === 's') light(e.x * 32, e.y * 32 - 14, 46, e.info.mob === 'wisp' ? '#6dff9c' : '#a04dff', .6); if (e.k === 'm' && e.info.wb) light(e.x * 32, e.y * 32 - 40, 160, '#ff2a1a', .35 + Math.sin(ts / 300) * .1); if (e.k === 'm' && e.info.g) light(e.x * 32, e.y * 32 - 20, 70, '#ffd76a', .45); if (e.k === 'm' && MOBS[e.info.mob].boss) light(e.x * 32, e.y * 32 - 50, 130, MOBS[e.info.mob].nova ?? '#59c8ff', .15 + night * .15); if (e.k === 'p' && e.info.wings && ITEMS[e.info.wings].wtier! >= 3) light(e.x * 32, e.y * 32 - 30, 40 + ITEMS[e.info.wings].wtier! * 8, ITEMS[e.info.wings].blade!, .25 + Math.sin(ts / 400 + e.id) * .08); if (e.k === 'p' && e.info.weapon && ITEMS[e.info.weapon].lvl >= 26) light(e.x * 32 + (e.dir === 3 ? -12 : 12), e.y * 32 - 34, 34, ITEMS[e.info.weapon].blade!, .4 + Math.sin(ts / 240 + e.id) * .12); if (e.k === 'p' && e.info.wings && ITEMS[e.info.wings].wtier! >= 2 && Math.random() < [0, 0, .35, .5, .65, .8][ITEMS[e.info.wings].wtier!]) parts.push({ x: e.x + (Math.random() - .5) * 2.6, y: e.y - .4 - Math.random(), vx: 0, vy: .6, life: 0, max: .9, c: ITEMS[e.info.wings].blade!, s: 2 }); if (e.k === 'p') { const fs = fullSetOf(SET_PIECES.map(p => e.info[p])); if (fs) { const col = SETS[fs].key === 'dragon' ? '#7dffb0' : SETS[fs].trim; light(e.x * 32, e.y * 32 + 2, 46 + Math.sin(ts / 260) * 4, col, .3); if (Math.random() < .25) parts.push({ x: e.x + (Math.random() - .5) * .9, y: e.y + .1, vx: 0, vy: -1.4, life: 0, max: .8, c: col, s: 2 }); } } if (e.id === you && night > .05) light(e.x * 32, e.y * 32 - 18, 130, '#ffdca0', night * .4); }
   if (map.safe && night > .15) for (let i = 0; i < 12; i++) light(-ox + vw / 2 + Math.sin(ts / 3900 + i * 3.1) * vw * .47, -oy + vh / 2 + Math.cos(ts / 3300 + i * 1.7) * vh * .44, 13, '#c6ff7a', night * (.5 + Math.sin(ts / 310 + i * 2) * .4));
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.imageSmoothingEnabled = false;
   if (quality === 2 && 'filter' in g) {
@@ -671,7 +672,7 @@ function frame(ts: number) {
   for (const p of map.portals) label(p.x * 32, p.y * 32 - 92, `» ${p.label}${p.lvl ? ` (Nv ${p.lvl})` : ''}`, me && p.lvl && me.level < p.lvl ? '#ff9b8e' : '#d6bcff');
   for (const e of ents.values()) {
     if (e.k === 's') continue;
-    if (e.k === 'd') { label(e.x * 32, e.y * 32 - 22, e.info.key ? `${cmpItem({ key: e.info.key, rarity: e.info.rarity })?.arrow === '▲' ? '▲ ' : ''}${ITEMS[e.info.key].name}` : `${e.info.gold} moedas`, e.info.key ? (ITEMS[e.info.key].set ? '#ffd76a' : RARITY[e.info.rarity].color) : '#f0d27a'); continue; }
+    if (e.k === 'd') { label(e.x * 32, e.y * 32 - 22, e.info.key ? `${cmpItem({ key: e.info.key, rarity: e.info.rarity })?.arrow === '▲' ? '▲ ' : ''}${ITEMS[e.info.key].name}${e.info.pl ? ` +${e.info.pl}` : ''}${e.info.rarity >= 2 ? ` · ${RARITY[e.info.rarity].name}` : ''}` : `${e.info.gold} moedas`, e.info.key ? (ITEMS[e.info.key].set ? '#ffd76a' : e.info.rarity ? RARITY[e.info.rarity].color : (e.info.pl ?? 0) >= 9 ? '#ffb5f0' : (e.info.pl ?? 0) >= 5 ? '#bfe3ff' : RARITY[0].color) : '#f0d27a'); continue; }
     const h = e.k === 'p' ? 50 : mobSize(e.info.mob) * (e.info.wb ? 1.4 : 1) + 10, X = Math.round(e.x * 32), Y = Math.round(e.y * 32) - h, boss = e.k === 'm' && MOBS[e.info.mob].boss, bw = boss ? 72 : 32;
     if (e.k === 'p' && e.info.ti) label(X, Y - 19, `✦ ${e.info.ti} ✦`, '#ffd76a');
     if (e.k === 'p' || e.id === target || boss || e.info.g) label(X, Y - 6, e.k === 'p' ? `${e.info.gt ? `«${e.info.gt}» ` : ''}${e.info.res || e.info.mr ? `[${fmtRes(e.info.res, e.info.mr)}] ` : ''}${e.info.name}` : `${e.info.g ? '★ ' : e.info.wb ? '☠ ' : ''}${MOBS[e.info.mob].name}${e.info.g ? ' Dourado' : e.info.wb ? ' Desperto' : ''} Nv${MOBS[e.info.mob].level}`, e.id === target ? '#ffd24a' : e.k === 'p' ? '#fff' : e.info.g ? '#ffe08a' : e.info.wb ? '#ff6a4a' : '#ffb4a8');
@@ -680,11 +681,31 @@ function frame(ts: number) {
   texts = texts.filter(t => (t.t += dt) < .85); for (const t of texts) { const u = t.t / .85; g.font = `bold ${Math.round((t.big ? 17 : 12) * (1 + Math.max(0, .12 - t.t) * 4))}px system-ui,Segoe UI,Roboto,sans-serif`; g.globalAlpha = 1 - u * u; g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = '#0a0814'; const y = t.y * 32 - 38 - u * 26; g.strokeText(t.s, t.x * 32, y); g.fillStyle = t.c; g.fillText(t.s, t.x * 32, y); } g.globalAlpha = 1;
   // clima e iluminação
   g.setTransform(1, 0, 0, 1, 0, 0);
-  if (map.id === 'infernal') { for (const f of snow) { f.y -= f.s * dt * 4; f.x += Math.sin(ts / 700 + f.d) * .0008; if (f.y < 0) f.y = 1; g.globalAlpha = .45 + f.s * 7; g.fillStyle = f.s > .055 ? '#ffd76a' : '#ff7a2b'; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), 2 * Z, 2 * Z); } g.globalAlpha = 1; }
-  else if (!map.safe) {
-    g.fillStyle = map.id === 'dunas' ? '#e9cf94' : map.id === 'eldergrove' ? '#b6f06a' : map.id === 'celestial' ? '#ffe9a8' : map.id === 'ashen' ? '#6a6478' : '#fff'; for (const f of snow) { f.y += f.s * dt * 5; f.x += Math.sin(ts / 900 + f.d) * .0006; if (f.y > 1) f.y = 0; g.globalAlpha = .35 + f.s * 8; const sz = (f.s > .055 ? 3 : 2) * Z; g.fillRect(Math.round(((f.x % 1) + 1) % 1 * W), Math.round(f.y * H), sz, sz); } g.globalAlpha = 1;
-  }
-  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : map.id === 'infernal' ? '#40080888' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  { const fx = MAP_FX[map.id]; if (fx && !map.safe) {
+    if (fx.fog) { g.globalAlpha = .1; for (let i = 0; i < 4; i++) { const fxp = ((ts / (26000 + i * 7000) + i * .29) % 1.4 - .2) * W, fyp = H * (.2 + i * .22) + Math.sin(ts / 5000 + i) * H * .05; g.drawImage(glowSprite(fx.fog), fxp - W * .45, fyp - H * .2, W * .9, H * .4); } g.globalAlpha = 1; }
+    const n = Math.round(snow.length * Math.min(1, fx.n ?? 1)), sp = fx.n && fx.n > 1 ? fx.n : 1, glowy = fx.amb === 'fireflies' || fx.amb === 'void' || fx.amb === 'wisps' || fx.amb === 'motes';
+    if (glowy) g.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < n; k++) {
+      const f = snow[k], col = fx.c[k % fx.c.length]; let a = .35 + f.s * 8, sz = (f.s > .055 ? 3 : 2) * Z;
+      switch (fx.amb) {
+        case 'snow': f.y += f.s * dt * 5 * sp; f.x += Math.sin(ts / 900 + f.d) * .0006; break;
+        case 'ash': f.y += f.s * dt * 2; f.x += Math.sin(ts / 1400 + f.d) * .0005 + .00015; a *= .8; break;
+        case 'embers': f.y -= f.s * dt * 4 * sp; f.x += Math.sin(ts / 700 + f.d) * .0008; a = (.4 + f.s * 7) * (.6 + Math.sin(ts / 90 + f.d * 7) * .4); break;
+        case 'sand': f.x += f.s * dt * 9; f.y += Math.sin(ts / 600 + f.d) * .0004 + f.s * dt * .4; a *= .7; break;
+        case 'spores': f.y -= f.s * dt * 1.2; f.x += Math.sin(ts / 1300 + f.d) * .0007; a *= .75; break;
+        case 'motes': f.y -= f.s * dt * 1.4; f.x += Math.sin(ts / 1700 + f.d) * .0005; a = .25 + Math.sin(ts / 400 + f.d * 5) * .2 + f.s * 4; break;
+        case 'fireflies': f.x += Math.sin(ts / 2100 + f.d * 3) * .0009; f.y += Math.cos(ts / 1800 + f.d * 2) * .0007; a = Math.max(0, Math.sin(ts / 520 + f.d * 9)) * .9; break;
+        case 'void': f.y -= f.s * dt * .8; f.x += Math.cos(ts / 2400 + f.d) * .0007; a = .2 + Math.max(0, Math.sin(ts / 700 + f.d * 6)) * .6; break;
+        case 'wisps': f.x += Math.sin(ts / 3000 + f.d) * .0006 + .0002; f.y -= f.s * dt * .5; a = .12 + Math.max(0, Math.sin(ts / 900 + f.d * 4)) * .25; break;
+      }
+      if (f.y > 1.02) f.y = -.02; if (f.y < -.02) f.y = 1.02; if (f.x > 1.02) f.x -= 1.04;
+      const X = Math.round(((f.x % 1) + 1) % 1 * W), Y = Math.round(f.y * H);
+      if (glowy) { const r = (fx.amb === 'wisps' ? 13 : fx.amb === 'fireflies' ? 9 : 7) * Z * (f.s > .055 ? 1.3 : 1); g.globalAlpha = Math.min(1, a); g.drawImage(glowSprite(col), X - r, Y - r, r * 2, r * 2); g.fillStyle = '#ffffff'; g.globalAlpha = Math.min(1, a * .8); g.fillRect(X - Z, Y - Z, 2 * Z, 2 * Z); }
+      else { g.globalAlpha = Math.min(1, a); g.fillStyle = col; if (fx.amb === 'sand') g.fillRect(X, Y, sz * 2.5, Math.max(1, sz / 2)); else g.fillRect(X, Y, sz, sz); }
+    }
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  } }
+  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .42, W / 2, H / 2, Math.max(W, H) * .72); vg.addColorStop(0, '#0a081400'); vg.addColorStop(1, map.safe ? '#1a103040' : map.id === 'infernal' || map.id === 'vulcao' || map.id === 'caos' ? '#40080888' : map.id === 'vazio' || map.id === 'abismo' ? '#1a0a4080' : map.id === 'pantano' ? '#0a2a1070' : '#0a1a4060'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   if (me?.dead) { g.fillStyle = '#50000066'; g.fillRect(0, 0, W, H); }
   for (const n of [1, 2, 3, 4, 5, 6]) { const c = cds[n], el = cdEl[n] ??= document.querySelector(`[data-sk="${n}"] .cd`) as HTMLElement, h = c && c.until > ts ? `${Math.ceil((c.until - ts) / c.ms * 20) * 5}%` : '0'; if (cdVal[n] !== h) { cdVal[n] = h; el.style.height = h; } }
   if (ts > miniAt) { miniAt = ts + 200; renderMini(); { const te = ents.get(target), tf = $('#tframe'); if (te?.k === 'm') { const d = MOBS[te.info.mob]; tf.style.display = 'block'; $('#tfn').textContent = `${d.name} · Nv ${d.level}`; $('#tfb').style.width = `${te.hp}%`; } else if (tf.style.display !== 'none') tf.style.display = 'none'; } if (party) document.querySelectorAll<HTMLElement>('.pm').forEach(r => { const e = [...ents.values()].find(x => x.k === 'p' && x.info.name === r.dataset.n), b = r.querySelector('i') as HTMLElement; b.style.width = `${e ? e.hp : 0}%`; r.style.opacity = e ? '1' : '.55'; }); }
@@ -773,6 +794,21 @@ const okCol = (c: unknown): c is string => typeof c === 'string' && c.length ===
 const GRADE: Record<string, [string, string, number]> = { valoria: ['#ffe9b0', '#2a3a6a', .3], frostvale: ['#dff1ff', '#1d3a78', .34], infernal: ['#ffb070', '#3a0812', .42], eldergrove: ['#d8ffb0', '#0a2a20', .38], ashen: ['#8a80b0', '#0a0818', .4], celestial: ['#ffe2b0', '#34488f', .62], solmira: ['#ffe0a0', '#7a3a20', .34], dunas: ['#fff0b8', '#8a4a20', .38] };
 const FOG: Record<string, string> = { frostvale: '#dcebff', eldergrove: '#7fbf8a', ashen: '#3a3550', infernal: '#5a2418', dunas: '#f0d8a0' };
 /** Escuridão fixa dos mundos de alto nível (0 = dia, 1 = breu). */
+type Amb = 'snow' | 'ash' | 'embers' | 'fireflies' | 'sand' | 'motes' | 'void' | 'spores' | 'wisps';
+/** Clima e luz de cada mundo: partículas no ar, cor da noite, brilho de chão e neblina. */
+const MAP_FX: Record<string, { amb: Amb; c: string[]; n?: number; night?: [number, number, number]; glow?: [number, string, number, number, number][]; fog?: string }> = {
+  frostvale: { amb: 'snow', c: ['#ffffff', '#dff2ff'] }, cume: { amb: 'snow', c: ['#ffffff', '#cfeeff'], n: 1.3 },
+  eldergrove: { amb: 'fireflies', c: ['#c6ff7a', '#ffe98a'], n: .5 }, infernal: { amb: 'embers', c: ['#ffd76a', '#ff7a2b'], glow: [[T.LAVA, '#ff5a1c', 118, .34, 4]] },
+  ashen: { amb: 'ash', c: ['#8a8496', '#5f596c'] }, celestial: { amb: 'motes', c: ['#ffe9a8', '#fff6d8'], n: .7 }, dunas: { amb: 'sand', c: ['#e9cf94', '#d8b46a'] },
+  pantano: { amb: 'spores', c: ['#b6f06a', '#7dd65a'], night: [120, 160, 112], glow: [[T.WATER, '#7dff6a', 64, .12, 5]], fog: '#9ad48a' },
+  vulcao: { amb: 'embers', c: ['#ffd76a', '#ff6a2b', '#ff3a1a'], n: 1.2, night: [176, 104, 84], glow: [[T.LAVA, '#ff5a1c', 118, .38, 4]] },
+  necropole: { amb: 'wisps', c: ['#9fffe0', '#cfe8ff'], n: .35, night: [86, 104, 120], fog: '#8ab8b0' },
+  sombria: { amb: 'fireflies', c: ['#7dffd0', '#c6ff7a', '#8ad0ff'], n: .8, night: [74, 98, 140], fog: '#6a8ab8' },
+  abismo: { amb: 'motes', c: ['#8ae8ff', '#c8f4ff', '#a08aff'], n: .55, night: [78, 128, 172] },
+  caos: { amb: 'embers', c: ['#ff4a5a', '#ffb13d', '#ff2a6a'], n: 1.1, night: [166, 78, 92], glow: [[T.LAVA, '#ff3a2a', 118, .36, 4]] },
+  vazio: { amb: 'void', c: ['#c58bff', '#8ad0ff', '#ffffff'], n: .9, night: [118, 88, 172], fog: '#8a6aff' },
+};
+let shakeUntil = 0, shakeAmp = 0;
 const DARK_MAPS: Record<string, number> = { pantano: .45, vulcao: .55, necropole: .92, sombria: .7, abismo: .85, caos: .5, vazio: .75 };
 const RAYS = new Set(['valoria', 'solmira', 'dunas', 'eldergrove']);
 /** Luz solar, névoa e cor de cada mapa, em tela cheia e abaixo dos nomes. */

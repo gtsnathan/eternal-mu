@@ -239,7 +239,7 @@ export function travelList() { const v = getMap('valoria'); return [{ to: 'valor
 export const MAP_IDS = ['valoria', 'frostvale', 'infernal', 'eldergrove', 'ashen', 'celestial', 'solmira', 'dunas', ...HI_MAPS.map(h => h.id)];
 export function getMap(id: string): GameMap { const hi = HI_MAPS.findIndex(h => h.id === id); if (hi >= 0) return cache[id] ??= enlarge(hiMap(HI_MAPS[hi], HI_PORTAL_X[hi])); return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
 
-export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return i < 0 || j < 0 || i >= m.w || j >= m.h || m.solid[j * m.w + i] === 1; };
+export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return !(i >= 0 && j >= 0 && i < m.w && j < m.h) || m.solid[j * m.w + i] === 1; }; // NaN conta como parede
 const R = .3;
 export const blocked = (m: GameMap, x: number, y: number) => isSolid(m, x - R, y - R) || isSolid(m, x + R, y - R) || isSolid(m, x - R, y + R) || isSolid(m, x + R, y + R);
 export function step(m: GameMap, p: { x: number; y: number }, dx: number, dy: number) {
