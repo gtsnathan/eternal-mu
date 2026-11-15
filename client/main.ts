@@ -1,7 +1,7 @@
 import { ACHIEVEMENTS, ACH_CATS, type AchState } from '../shared/achievements';
 import { arenaAt, nextArena } from '../shared/events';
 import { ARENAS, arenaFor } from '../shared/world';
-import { ARENA_TICKET_PRICE, PET_RECIPES, petText, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_COLORS, GUILD_RANKS, GUILD_XP, GUILD_XP_MAX, fmtRes, MR_RESETS, MR_GOLD, MR_POINTS, WTYPE_NAME, MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
+import { skillReach, selfArea, ARENA_TICKET_PRICE, PET_RECIPES, petText, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_COLORS, GUILD_RANKS, GUILD_XP, GUILD_XP_MAX, fmtRes, MR_RESETS, MR_GOLD, MR_POINTS, WTYPE_NAME, MASTER_NODES, MASTER_NODE_MAX, JEWEL_PACKS, WING_RECIPES, EXC_TEXT, glowTier, JEWELS, canWield, CLASSES, classOf, CONFIG, fullSetOf, setCounts, SETS, SET_PIECES, HAIR_COLORS, HAIR_STYLES, ItemInst, ITEMS, itemStat, MOBS, RARITY, sellPrice, SHOPS, SLOTS, SLOT_NAMES } from '../shared/data';
 import { VERSION } from '../shared/version';
 import { quests } from '../shared/quests';
 import { travelList, trapUp, findPath, getMap, GameMap, Npc, step, T } from '../shared/world';
@@ -425,10 +425,15 @@ function skill(n: number, quiet = false) {
     if (!touch) ({ x, y } = toWorld(curX, curY)); else if (tt && tt.k === 'm') { x = tt.x; y = tt.y; } else { const d = [[0, 1], [0, -1], [1, 0], [-1, 0]][a.dir] ?? [0, 1]; x = a.x + d[0] * (sk.range ?? 7); y = a.y + d[1] * (sk.range ?? 7); }
     send({ t: 'k', n, id: 0, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 }); return;
   }
-  const needs = !['spin', 'spirits', 'summon', 'buff', 'heal', 'nova'].includes(sk.kind); let t = ents.get(target);
+  if (selfArea(sk) && !(duelWith && target === duelWith)) { // golpes em volta do personagem: se o monstro está longe, anda até ele e solta o golpe ao chegar
+    const r = (sk.radius ?? 2.5) - .4, near = [...ents.values()].some(e => e.k === 'm' && e.hp > 0 && Math.hypot(e.x - a.x, e.y - a.y) <= r);
+    if (!near) { let tt = ents.get(target); if (!tt || tt.k !== 'm') tt = nearestMob(10) ?? undefined; if (!tt) { if (!quiet) warn('Sem alvo'); return; } queued = { n, until: now + 4000 }; attack(tt); return; }
+    send({ t: 'k', n, id: 0 }); return;
+  }
+  const needs = !['summon', 'buff', 'heal'].includes(sk.kind); let t = ents.get(target);
   if (needs && duelWith && target === duelWith && t) { if (Math.hypot(t.x - a.x, t.y - a.y) > Math.max(sk.range ?? 0, sk.radius ?? 0, 2.5)) { attack(t); return; } send({ t: 'k', n, id: t.id }); return; }
-  if (needs && (!t || t.k !== 'm')) { const nm = nearestMob(Math.max(sk.range ?? 8, 8)); if (!nm) { if (!quiet) warn('Sem alvo'); return; } attack(nm); t = nm; }
-  if (needs && t && Math.hypot(t.x - a.x, t.y - a.y) > (sk.range ?? 8)) { queued = { n, until: now + 4000 }; attack(t); return; }
+  if (needs && (!t || t.k !== 'm')) { const nm = nearestMob(Math.max(skillReach(sk), 8)); if (!nm) { if (!quiet) warn('Sem alvo'); return; } attack(nm); t = nm; }
+  if (needs && t && Math.hypot(t.x - a.x, t.y - a.y) > skillReach(sk) - .2) { queued = { n, until: now + 4000 }; attack(t); return; }
   send({ t: 'k', n, id: t?.id ?? 0 });
 }
 /** Usa a poção mais adequada: a menor que cubra o que falta; se nenhuma cobrir, a maior que tiver. */
@@ -689,7 +694,7 @@ function frame(ts: number) {
   if (a) {
     if (holdAtk && !target) { const w = toWorld(curX, curY), m = mobAt(w.x, w.y) ?? nearestMob(7); if (m) attack(m); }
     if (holdSkill && ts > skillAt) { skillAt = ts + 180; const w = toWorld(curX, curY), m = mobAt(w.x, w.y); if (m) target = m.id; skill(slotMap[activeSkill], true); }
-    if (queued) { const q = queued, sk = myCls.skills.find(s => s.n === q.n)!, t = ents.get(target); if (ts > q.until || !t) queued = null; else if (Math.hypot(t.x - a.x, t.y - a.y) <= (sk.range ?? 8)) { queued = null; send({ t: 'k', n: q.n, id: t.id }); } }
+    if (queued) { const q = queued, sk = myCls.skills.find(s => s.n === q.n)!, t = ents.get(target); if (ts > q.until || !t) queued = null; else if (Math.hypot(t.x - a.x, t.y - a.y) <= (selfArea(sk) ? (sk.radius ?? 2.5) - .4 : skillReach(sk) - .1)) { queued = null; send({ t: 'k', n: q.n, id: selfArea(sk) ? 0 : t.id }); } }
   }
   if (holding && ts > holdAt) { holdAt = ts + 200; const w = toWorld(curX, curY); target = 0; pendingNpc = null; send({ t: 'g', x: w.x, y: w.y }); startPred(w.x, w.y); }
   const x0 = Math.max(0, Math.floor(-ox / 32)), y0 = Math.max(0, Math.floor(-oy / 32)), x1 = Math.min(map.w - 1, Math.ceil((-ox + vw) / 32)), y1 = Math.min(map.h - 1, Math.ceil((-oy + vh) / 32));
@@ -935,7 +940,7 @@ function autoPlay(a: Ent, ts: number) {
     if (!ready(s)) continue;
     if (s.kind === 'buff' || s.kind === 'summon') { if (dist < 9) return cast(s, 0); continue; }
     if (s.kind === 'heal' || s.kind === 'teleport') continue;
-    if (s.kind === 'spin' || s.kind === 'spirits' || s.kind === 'nova' ? dist <= s.radius! - .2 : dist <= (s.range ?? 8) - .2) return cast(s, t.id);
+    if (selfArea(s) ? dist <= (s.radius ?? 2.5) - .4 : dist <= skillReach(s) - .2) return cast(s, selfArea(s) ? 0 : t.id);
   }
 }
 function drawNpc(n: Npc) { if (n.id === 'prensa') { shadow(n.x * 32, n.y * 32 + 4, 28, 9); g.drawImage(pressSprite(), Math.round(n.x * 32) - 26, Math.round(n.y * 32) - 56); return; } if (n.id === 'bau') { shadow(n.x * 32, n.y * 32 + 4, 24, 8); g.drawImage(chestSprite(), Math.round(n.x * 32) - 22, Math.round(n.y * 32) - 34); return; } if (n.id === 'artifice') { const w = wingSprites('arcane_wizard', 1)[Math.floor(performance.now() / 135) % 6], fw = w.width / 2; g.imageSmoothingEnabled = true; g.drawImage(w, Math.round(n.x * 32 - fw / 2), Math.round(n.y * 32) - 27 - WING_ROOT, fw, w.height / 2); g.imageSmoothingEnabled = false; } shadow(n.x * 32, n.y * 32 + 2, 15, 6); g.drawImage(heroSprites(npcLooks[n.look])[0][0], Math.round(n.x * 32 - FRAME_W / 2), Math.round(n.y * 32 - FRAME_H + 6)); }

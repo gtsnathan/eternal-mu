@@ -380,6 +380,10 @@ export const CLASSES: Record<string, ClassDef> = {
     { n: 12, lvl: 150, name: 'Réquiem', desc: 'Canto fúnebre que explode ao redor depois de um instante.', kind: 'nova', mana: 110, cd: 18000, mult: 5.4, radius: 5.5, color: '#c58bff' },
     { n: 13, lvl: 220, name: 'Colheita da Morte', desc: 'Rouba muita vida de um alvo.', kind: 'drain', heal: .8, mana: 130, cd: 20000, mult: 6.4, range: 10, color: '#ff3c5a' }] },
 };
+/** Até onde a habilidade alcança a partir do personagem: alcance declarado ou, nos golpes de perto (leque, giro, nova), o próprio raio. */
+export const skillReach = (sk: Skill) => sk.range ?? sk.radius ?? 2.5;
+/** Habilidades que acontecem em volta do próprio personagem (não precisam mirar, mas precisam de monstros por perto). */
+export const selfArea = (sk: Skill) => sk.kind === 'spin' || sk.kind === 'spirits' || sk.kind === 'nova';
 export const classOf = (name?: string): ClassDef => Object.values(CLASSES).find(c => c.name === name) ?? CLASSES.dark_warrior;
 export const canWield = (c: ClassDef, d: ItemDef) => d.kind === 'wings' ? d.cls === c.key : d.set ? SETS[d.set].cls === c.key : d.kind !== 'weapon' || c.weapons.includes(d.wtype!);
 export const HAIR_COLORS = ['#2b2230', '#7a4a22', '#d9b24a', '#b23a2e', '#d8dde6', '#3f6fb5'];

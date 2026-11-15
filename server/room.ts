@@ -1,4 +1,4 @@
-import { ARENA_TICKET_PRICE, rollPlus, canPlus, adminItem, adminSet, goodFactor, excChance, ancChance, PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
+import { skillReach, ARENA_TICKET_PRICE, rollPlus, canPlus, adminItem, adminSet, goodFactor, excChance, ancChance, PET_RECIPES, PET_LOOT_RADIUS, GUILD_LVL, GUILD_GOLD, GUILD_MAX, GUILD_XP, GUILD_XP_MAX, GUILD_COLORS, cleanGuildName, validGuildName, validGuildTag, masterNext, MR_RESETS, MR_GOLD, MR_POINTS, MASTER_RESETS, MASTER_MAX, MASTER_NODE_MAX, MASTER_NODES, JEWEL_PACKS, WING_TIER, WING_RECIPES, EXC_ARMOR, EXC_WEAPON, cleanSettings, DEFAULT_SETTINGS, Settings, SETS, SET_PIECES, canWield, JEWELS, isStack, STACK_MAX, classOf, CONFIG, derive, ItemInst, ITEMS, MOBS, MobDef, rollDamage, SHOPS, SLOTS, sellPrice, xpToNext, Slot, RARITY } from '../shared/data';
 import { quests } from '../shared/quests';
 import { ACHIEVEMENTS, ACH, parseAch, type AchState, dayNum, LOGIN_REWARDS, dailyTasks, dailyGold } from '../shared/achievements';
 import { worldBoss, WB_LIFE, WB_WARN, WB_HP, WB_DMG, arenaAt, AR_LIFE, AR_WAVES } from '../shared/events';
@@ -857,7 +857,7 @@ export class MapRoom {
     }
     if (this.map.safe && foe) return;
     const s = this.stats(p), m = this.mobs.get(id as number), targeted = !['spin', 'spirits', 'summon', 'buff', 'heal', 'nova', 'teleport'].includes(sk.kind);
-    if (targeted && (!m || m.hp <= 0 || dist(m, p) > sk.range!)) return;
+    if (targeted && (!m || m.hp <= 0 || dist(m, p) > skillReach(sk) + .4)) return; // fora do alcance: não gasta mana
     let dest: Pt | null = null;
     if (sk.kind === 'teleport') { // destino: ponto escolhido (ou perto do alvo), até o alcance; procura o lugar livre mais próximo
       let x = Number(tx), y = Number(ty); if (!Number.isFinite(x) || !Number.isFinite(y)) { if (!m) return; x = m.x; y = m.y; }
