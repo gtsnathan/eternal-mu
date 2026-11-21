@@ -607,6 +607,17 @@ document.querySelectorAll<HTMLElement>('.menu .extra').forEach(b => b.addEventLi
   const mk = (t: string, tip: string, f: () => void) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = tip; b.onclick = e => { e.stopPropagation(); f(); }; return b; };
   const up = mk('▲', 'Subir a conversa', () => L().scrollBy({ top: -L().clientHeight * .7, behavior: 'smooth' })), down = mk('▼', 'Descer a conversa (até as mensagens novas)', () => { const l = L(); if (l.scrollHeight - l.scrollTop - l.clientHeight < l.clientHeight * .8) l.scrollTo({ top: l.scrollHeight, behavior: 'smooth' }); else l.scrollBy({ top: l.clientHeight * .7, behavior: 'smooth' }); });
   if (touch) $<HTMLInputElement>('#chati').placeholder = 'Escreva aqui para falar...';
+  { // alça: arraste para baixo/cima para mudar a altura do chat (fica salva; toque duplo volta ao padrão)
+    const grip = document.createElement('div'); grip.id = 'chatgrip'; grip.textContent = '⇕ arraste para aumentar'; L().after(grip); const ch = $('#chat');
+    const key = () => ch.classList.contains('big') ? 'em_chathb' : 'em_chath', prop = () => ch.classList.contains('big') ? '--chathb' : '--chath';
+    const apply = () => { for (const [k, pr] of [['em_chath', '--chath'], ['em_chathb', '--chathb']]) { let v = ''; try { v = localStorage.getItem(k) ?? ''; } catch { /* */ } if (v) ch.style.setProperty(pr, `${v}px`); else ch.style.removeProperty(pr); } }; apply();
+    let y0 = 0, h0 = 0, drag = false;
+    grip.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); drag = true; y0 = e.clientY; h0 = L().getBoundingClientRect().height; grip.setPointerCapture(e.pointerId); });
+    grip.addEventListener('pointermove', e => { if (!drag) return; const top = L().getBoundingClientRect().top, h = Math.round(Math.max(60, Math.min(innerHeight - top - 90, h0 + e.clientY - y0))); ch.style.setProperty(prop(), `${h}px`); });
+    const end = () => { if (!drag) return; drag = false; const v = parseInt(ch.style.getPropertyValue(prop())) || 0; try { if (v) localStorage.setItem(key(), String(v)); } catch { /* */ } const l = L(); l.scrollTop = l.scrollHeight; };
+    grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
+    grip.addEventListener('dblclick', () => { try { localStorage.removeItem(key()); } catch { /* */ } apply(); });
+  }
   down.id = 'chatdown'; ctl.append(big, up, down); $('#chat').prepend(ctl);
   L().addEventListener('scroll', () => { const l = L(); if (l.scrollHeight - l.scrollTop - l.clientHeight < 30) down.classList.remove('new'); }); let on = false; try { on = localStorage.getItem('em_chatbig') === '1'; } catch { /* */ } set(on);
 }
@@ -1058,6 +1069,9 @@ function hudLayout() {
     if (R - L < 170) { nt.style.maxHeight = '0px'; return; } // sem espaço: esconde as mensagens até sobrar lugar
     if (L !== r.left || R !== r.right) Object.assign(nt.style, { left: `${Math.round(L)}px`, width: `${Math.round(R - L)}px`, transform: 'none' });
     r = nt.getBoundingClientRect();
+    { const above = placed.filter(p => p.top < r.top + 4 && p.bottom > r.top + 4 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > (r.right - r.left) * .4); // algo grande (como o chat aumentado) desce por cima dos avisos: os avisos vão para baixo dele
+      if (above.length) { const top = Math.max(...above.map(p => p.bottom)) + 6, lim = Math.min((barR && barR.left < r.right ? barR.top : H - 30), ...placed.filter(p => p.top >= top - 2 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 4).map(p => p.top)) - top - 6; Object.assign(nt.style, { top: `${Math.round(top)}px`, bottom: 'auto', maxHeight: `${Math.max(0, Math.round(lim))}px` });
+        const kids = [...nt.children] as HTMLElement[]; for (const c of kids) c.classList.remove('cut'); let h = kids.reduce((n, c) => n + c.offsetHeight + 3, 0); for (const c of kids.slice(0, -1)) { if (h <= lim) break; h -= c.offsetHeight + 3; c.classList.add('cut'); } if (lim < 24) nt.style.maxHeight = '0px'; return; } }
     const roof = Math.max(H * .5 + 12, ...placed.filter(p => p.bottom <= r.bottom && p.top < H * .6 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 4).map(p => p.bottom));
     for (const c of nt.children) c.classList.remove('cut');
     if (roof > r.top - 4) { const room = Math.max(0, Math.round(r.bottom - roof - 6)); nt.style.maxHeight = `${room}px`; // esconde os avisos mais antigos inteiros em vez de cortar no meio

@@ -297,6 +297,21 @@ body.boss #tframe{display:none!important}
 #chat #log:empty::before{content:'Nenhuma mensagem ainda.';color:#a89cc0;font-size:12px}
 @media (min-width:700px) and (min-height:600px){.touch .chatline{display:flex!important}}
 .touch #chat.open .chatline input,.touch .chatline input{font-size:16px;padding:7px 9px}
+
+/* 0.47.4: chat mais alto e com alça para puxar a altura */
+#chat #log{max-height:var(--chath,150px)!important;height:var(--chath,auto)!important}
+.touch #chat #log{max-height:var(--chath,150px)!important}
+@media (min-width:700px) and (min-height:600px){.touch #chat #log{max-height:var(--chath,210px)!important}}
+#chat.big #log,.touch #chat.big #log{max-height:var(--chathb,62vh)!important;height:var(--chathb,auto)!important}
+#chat.open #log{max-height:var(--chath,min(44vh,320px))!important}
+#chatgrip{pointer-events:auto;touch-action:none;height:18px;margin-top:2px;border-radius:0 0 10px 10px;background:#1e1830dd;border:1px solid #8a6a32;border-top:0;display:flex;align-items:center;justify-content:center;color:#ffe08a;font-size:12px;cursor:ns-resize;user-select:none}
+
+@media (orientation:landscape) and (max-height:500px){
+  .touch #chat{left:calc(196px + env(safe-area-inset-left))!important;width:min(320px,calc(100vw - 460px))!important}
+  .touch #chat #log{min-height:80px!important;max-height:var(--chath,84px)!important}
+  .touch #chatctl button{height:24px;width:28px;font-size:12px}
+  .touch #chatgrip{height:14px;font-size:10px}
+}
 </style>
 </head>
 <body>
