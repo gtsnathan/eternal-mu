@@ -204,7 +204,12 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries(([
   { key: 'rime_boots', name: 'Botas de Escarcha', kind: 'boots', lvl: 12, price: 1300, def: 8, hp: 30, tint: '#3c6c98' },
 ] as ItemDef[]).concat(SET_ITEMS, WING_ITEMS, WEAPON_ITEMS, ACC_ITEMS, PET_ITEMS).map(i => [i.key, i]));
 // Joias: faixa de melhoria, chance e quantos + perde ao falhar
-export const JEWELS: Record<string, { min: number; max: number; chance: number; fail: number }> = { jewel_aurora: { min: 0, max: 6, chance: 1, fail: 0 }, jewel_destiny: { min: 6, max: 9, chance: .6, fail: 1 }, jewel_eclipse: { min: 9, max: 15, chance: .4, fail: 2 } };
+export const JEWELS: Record<string, { min: number; max: number; chance: number; fail: number; safe?: number; steps?: Record<number, number> }> = { jewel_aurora: { min: 0, max: 6, chance: 1, fail: 0 }, jewel_destiny: { min: 6, max: 9, chance: .6, fail: 1 },
+  // Eclipse: chance cai a cada nível (+9→+10 60% … +14→+15 35%); até +12 a falha não tira nível, depois cai só 1 (antes caía 2 sempre e o +15 era quase impossível)
+  jewel_eclipse: { min: 9, max: 15, chance: .5, fail: 1, safe: 12, steps: { 9: .6, 10: .55, 11: .5, 12: .45, 13: .4, 14: .35 } } };
+/** Chance real de uma joia num item +plus; `conf` é a chance configurada no admin (escala a tabela). */
+export const jewelChance = (key: string, plus: number, conf?: number) => { const j = JEWELS[key]; if (!j) return 0; const base = j.steps?.[plus] ?? j.chance, mul = conf == null ? 1 : conf / (JEWELS_BASE[key] || 1); return Math.max(0, Math.min(1, base * mul)); };
+const JEWELS_BASE: Record<string, number> = { jewel_aurora: 1, jewel_destiny: .6, jewel_eclipse: .5 };
 /** Itens empilháveis juntam até 1000 unidades no mesmo espaço da bolsa. */
 export const STACK_MAX = 1000;
 export const isStack = (d: ItemDef) => d.kind === 'potion' || d.kind === 'material' || d.kind === 'box' || d.kind === 'jewel' || d.kind === 'pack';
