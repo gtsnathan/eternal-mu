@@ -1,7 +1,7 @@
 // Regras e conteúdo do jogo. Todos os números de balanceamento ficam aqui.
 export const CONFIG = {
   tickMs: 50, testCommands: true, aoiRadius: 22, pointsPerLevel: 5, maxLevel: 400, playerSpeed: 5,
-  attackRange: 1.7, invSize: 45, startGold: 100, saveEveryMs: 60000, dropOwnMs: 5000, dropLifeMs: 30000,
+  attackRange: 1.7, invSize: 45, startGold: 100, saveEveryMs: 60000, dropOwnMs: 5000, dropLifeMs: 30000, mobDropCut: .45, mobJewelCut: .7, mobMaxItems: 1, // monstros comuns soltam menos itens (chefes não mudam)
 };
 export type Slot = 'weapon' | 'helm' | 'armor' | 'pants' | 'boots' | 'wings' | 'ring' | 'amulet' | 'pet';
 export const SLOTS: Slot[] = ['weapon', 'helm', 'armor', 'pants', 'boots', 'wings', 'ring', 'amulet', 'pet'];
@@ -79,6 +79,12 @@ Object.assign(SETS, {
   necromante: { cls: 'shadow_summoner', key: 'necromante', name: 'Necromante Supremo', of: 'do', lvl: 180, color: '#1a2a1a', trim: '#7dffb0', cape: '#0a140a', power: 20.8, price: 13082694, bonus: { def: 198, hp: 2080, atk: 0.88 } },
   pesadelo: { cls: 'shadow_summoner', key: 'pesadelo', name: 'Pesadelo Vivo', of: 'do', lvl: 240, color: '#2a0a2a', trim: '#ff4af0', cape: '#140414', power: 27.4, price: 33491697, bonus: { def: 260, hp: 2740, atk: 1.09 } },
   abismal: { cls: 'shadow_summoner', key: 'abismal', name: 'Senhor Abismal', of: 'do', lvl: 300, color: '#0a0a1a', trim: '#7a4aff', cape: '#04040c', power: 34.0, price: 85738746, bonus: { def: 323, hp: 3400, atk: 1.3 } },
+  // Sets do Vazio Eterno (340): os mais fortes do jogo, só caem no Vazio Eterno e do Kaorth
+  imperador: { cls: 'dark_warrior', key: 'imperador', name: 'Imperador Eterno', of: 'do', lvl: 340, color: '#2a0c10', trim: '#ffcf4a', cape: '#5a0a14', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
+  arquimago: { cls: 'arcane_wizard', key: 'arquimago', name: 'Arquimago do Vazio', of: 'do', lvl: 340, color: '#141a4a', trim: '#8fd8ff', cape: '#0a0e2e', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
+  cacador: { cls: 'mystic_archer', key: 'cacador', name: 'Caçador Estelar', of: 'do', lvl: 340, color: '#1e3a24', trim: '#e8c36a', cape: '#2e2410', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
+  celestial: { cls: 'spell_knight', key: 'celestial', name: 'Guardião Celestial', of: 'do', lvl: 340, color: '#e4e8f4', trim: '#5ad0ff', cape: '#2a3a6a', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
+  rainhavazio: { cls: 'shadow_summoner', key: 'rainhavazio', name: 'Rainha do Vazio', of: 'da', lvl: 340, color: '#1a0a2a', trim: '#ff6af0', cape: '#0c0418', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
 } as Record<string, SetDef>);
 export const SET_PIECES = ['helm', 'armor', 'pants', 'boots'] as const;
 const PIECE = { helm: ['Elmo', 11, 40, 1], armor: ['Couraça', 20, 90, 1.6], pants: ['Grevas', 14, 50, 1.1], boots: ['Botas', 8, 30, .9] } as const;
@@ -272,8 +278,9 @@ function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?
   const dmg = Math.round(lerpT(L, [[120, 1810], [150, 2006], [180, 2660], [210, 2940], [240, 3620], [270, 3995], [300, 4678], [340, 5240], [380, 5585], [400, 5800]]) * (b ? 1.5 : 1));
   const def = Math.round(lerpT(L, [[120, 675], [150, 925], [180, 1250], [210, 1575], [240, 2050], [270, 2500], [300, 3125], [340, 3875], [380, 4375], [400, 4600]]) * (b ? 1.2 : 1));
   // arma/acessório do nível do mundo (e o anterior); set do nível mais alto que o monstro alcança
-  const wt = HI_TIERS.filter(t => t <= L).pop() ?? 110, wp = HI_TIERS[HI_TIERS.indexOf(wt) - 1] ?? 110, st = [120, 180, 240, 300].filter(t => t <= L).pop(), sets = st ? Object.values(SETS).filter(s => s.lvl === st).map(s => s.key) : TOP_SETS;
-  const drops: [string, number][] = b ? [...wep(wt, .5), ...wep(wp, .6), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...sets.flatMap(s => setDrops(s, .2)), ['box_mitico', L >= 200 ? .5 : .25], ['chaos_feather', 1], ['chaos_feather', L >= 240 ? 1 : .6], ...(L >= 210 ? [['void_crystal', L >= 300 ? 1 : .5] as [string, number]] : [])]
+  const wt = HI_TIERS.filter(t => t <= L).pop() ?? 110, wp = HI_TIERS[HI_TIERS.indexOf(wt) - 1] ?? 110, ST = [120, 180, 240, 300, 340], st = ST.filter(t => t <= L).pop(), sets = st ? Object.values(SETS).filter(s => s.lvl === st).map(s => s.key) : TOP_SETS,
+    prevSets = st && b ? Object.values(SETS).filter(s => s.lvl === ST[ST.indexOf(st) - 1]).map(s => s.key) : []; // chefes também soltam o set do mundo anterior
+  const drops: [string, number][] = b ? [...wep(wt, .5), ...wep(wp, .6), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...sets.flatMap(s => setDrops(s, .2)), ...prevSets.flatMap(s => setDrops(s, .1)), ['box_mitico', L >= 200 ? .5 : .25], ['chaos_feather', 1], ['chaos_feather', L >= 240 ? 1 : .6], ...(L >= 210 ? [['void_crystal', L >= 300 ? 1 : .5] as [string, number]] : [])]
     : [...wep(wt, .006), ...wep(wp, .008), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...sets.flatMap(s => setDrops(s, .005)), ['box_mitico', L >= 200 ? .004 : .002], ['chaos_feather', L >= 150 ? .012 : .006], ...(L >= 210 ? [['void_crystal', L >= 300 ? .004 : .002] as [string, number]] : [])];
   return { key, name, level: L, hp, dmg, def, speed: b ? 3.2 : 3, detect: b ? 14 : 9, leash: b ? 20 : 14, attackMs: b ? 1400 : 1500, xp: Math.round(hp * (b ? 2.5 : 1.15)), respawnMs: b ? 3600000 : 42000, gold: b ? [L * 1400, L * 2400] : [L * 55, L * 95], drops, boss: b || undefined, reach: o.reach ?? (b ? 3.4 : undefined), bolt: o.bolt, nova: o.nova };
 }

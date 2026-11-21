@@ -327,6 +327,10 @@ function heroFrame(dir: number, f: number, o: Look): Cv {
     else if (a === 'tiger') { for (let i = 1; i < tw - 1; i += 4) { r(g, X + tx + i, Y + 22, 2, 3 + i % 3, t); r(g, X + tx + i + 1, Y + 27, 2, 2, t); } }
     else if (a === 'kraken') { for (let i = 0; i < 3; i++) { const yy = Y + 22 + i * 3; for (let x = 0; x < tw; x += 2) r(g, X + tx + x, yy + (x + i * 2) % 4 / 2, 2, 1, t); } }
     else if (a === 'demon') { if (dir !== 1) { r(g, mid - 2, Y + 22, 7, 7, '#1d0a12'); r(g, mid - 1, Y + 24, 2, 2, t); r(g, mid + 2, Y + 24, 2, 2, t); r(g, mid, Y + 27, 3, 1, t); } r(g, X + tx, Y + 29, tw, 2, t); }
+    else if (SETS[a].lvl >= 340) { // sets do Vazio Eterno: emblema de estrela brilhante no peito e frisos duplos
+      r(g, X + tx, Y + 29, tw, 1, t); r(g, X + tx + 1, Y + 22, 1, 7, t); r(g, X + tx + tw - 2, Y + 22, 1, 7, t);
+      if (dir !== 1) { r(g, mid, Y + 21, 3, 9, t); r(g, mid - 3, Y + 24, 9, 3, t); r(g, mid - 1, Y + 23, 5, 5, t); r(g, mid, Y + 24, 3, 3, '#ffffff'); r(g, mid + 1, Y + 22, 1, 7, '#fff8e0'); }
+      else for (let y = 22; y < 29; y += 3) r(g, mid - 2, Y + y, 6, 1, t); }
     else if (a === 'phoenix') { for (let i = 0; i < tw; i += 2) { const h = 3 + (i * 7 % 5); r(g, X + tx + i, Y + 29 - h, 2, h, i % 4 ? t : '#ffe08a'); } }
   }
   if (dir === 0) { r(g, X + 15, Y + 22, 3, 7, armL); r(g, X + 15, Y + 29, 3, 2, '#f0d27a'); }
