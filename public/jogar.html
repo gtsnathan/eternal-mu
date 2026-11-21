@@ -278,6 +278,18 @@ body.boss #tframe{display:none!important}
 /* menu aberto: duas colunas e nunca por cima das habilidades */
 .menu.open{max-width:250px!important;display:grid!important;grid-template-columns:1fr 1fr;gap:4px!important;overflow-y:auto;overscroll-behavior:contain;z-index:3}
 .menu.open .ver{grid-column:1/-1}
+
+/* 0.47.2: item tocado e descarte em grupo */
+.cell.isel{outline:2px solid #ffd76a;outline-offset:1px;box-shadow:0 0 10px #ffd76a88}
+.cell.tsel{outline:2px solid #ff5a6a;outline-offset:1px}
+.cell.tsel::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#c0203a88;color:#fff;font:800 22px/1 system-ui,sans-serif;text-shadow:0 1px 2px #000;border-radius:7px;pointer-events:none}
+#itemd.itemd,#itemd.trashbar{margin-top:8px;padding:8px 10px;border:1px solid #8a6a32;border-radius:10px;background:#120e1fee}
+#itemd b{display:block;font-size:15px;margin-bottom:4px}
+#itemd .idesc{font-size:13px;line-height:1.45;color:#e8e0cc;max-height:150px;overflow-y:auto}
+#itemd .trow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+#itemd .trow span{flex:1 1 100%;font-size:13px;color:#ffd76a}
+#itemd .trow button{flex:1 1 auto;min-height:38px;padding:6px 10px;font-size:13px}
+#itemd .trow button.danger{background:linear-gradient(180deg,#7a1f2a,#4a1018);border-color:#ff5a6a;color:#ffe0e4}
 </style>
 </head>
 <body>

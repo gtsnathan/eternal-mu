@@ -73,7 +73,7 @@ interface Ent { id: number; k: string; info: any; snaps: { t: number; x: number;
 interface Me { quest?: { id: string; have: number } | null; hp: number; mp: number; maxHp: number; maxMp: number; xp: number; xpNext: number; level: number; points: number; str: number; agi: number; vit: number; ene: number; atk: number; def: number; gold: number; dead: boolean; loot: number; lootMs: number; resets: number; mr: number; ml: number; mxp: number; mxpNext: number; mpts: number; mtree: Record<string, number> }
 const canvas = $<HTMLCanvasElement>('#game'), g = canvas.getContext('2d')!; hdCtx(g);
 let ws: WebSocket | null = null, charId = 0, running = false, you = 0, myName = '', map: GameMap | null = null, me: Me | null = null, items: ItemInst[] = [];
-let ents = new Map<number, Ent>(), target = 0, auto = false, autoLoot = false, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
+let ents = new Map<number, Ent>(), target = 0, auto = false, autoLoot = false, lootMode = 0, retries = 0, rtt = 0, manualClose = false, shop: Npc | null = null, pendingNpc: Npc | null = null, marker: { x: number; y: number; t: number } | null = null;
 let pred: { x: number; y: number; path: { x: number; y: number }[] | null; stop: number; tx: number; ty: number; hold: number } | null = null;
 type GuildInfo = { id: number; name: string; tag: string; color: number; leader: number; notice: string; me: number; m: { id: number; name: string; rank: number; lv: number; cls: string; res: number; mr: number }[] };
 let guild: GuildInfo | null = null;
@@ -119,7 +119,7 @@ function setConn(ok: boolean) { const c = $('#conn'); c.textContent = ok ? `● 
 function handle(m: any) {
   switch (m.t) {
     case 'w': {
-      for (const k of Object.keys(m.jc ?? {})) JEWELS[k].chance = m.jc[k]; send({ t: 'lo', on: autoLoot }); $('#arenabar').style.display = 'none'; you = m.you; myName = m.name; myCls = classOf(m.cls); loadSlots(); drawSkillBar(); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
+      for (const k of Object.keys(m.jc ?? {})) JEWELS[k].chance = m.jc[k]; send({ t: 'lo', on: autoLoot, mode: lootMode }); $('#arenabar').style.display = 'none'; you = m.you; myName = m.name; myCls = classOf(m.cls); loadSlots(); drawSkillBar(); myLook = { hc: m.hairColor, hs: m.hairStyle }; ents = new Map(); target = 0; pendingNpc = null; closeWin('shop'); parts = []; texts = []; rings = [];
       if (map?.id !== m.map) { map = getMap(m.map); bakeMini(); log(`— ${map.name} —`, 'sys'); }
       camX = m.x; camY = m.y; retries = 0; over(''); clearInterval(pingTimer); pingTimer = setInterval(() => send({ t: 'ping', c: performance.now() }), 3000) as unknown as number; send({ t: 'ping', c: performance.now() });
       lastInput = ''; syncInput(); break;
@@ -252,18 +252,45 @@ function cmpItem(i: Pick<ItemInst, 'key' | 'rarity'> & { plus?: number; opts?: s
 function itemText(i: ItemInst) { const d = ITEMS[i.key], parts = [`${d.name}${i.plus ? ` +${i.plus}` : ''}${i.rarity ? ` (${RARITY[i.rarity].name})` : ''}`]; if (d.kind === 'pack') parts.push('Desmonte na Prensa de Joias para usar'); if (d.pet) parts.push(`Pet · ${petText(d.pet)} · recolhe itens num raio maior`); if (d.kind === 'box') parts.push('Clique para abrir: moedas e prêmios aleatórios'); if (d.kind === 'potion') parts.push(d.heal ? `Recupera ${d.heal} de vida` : `Recupera ${d.mana} de mana`); if (d.kind === 'ring' || d.kind === 'amulet') parts.push([d.dmg ? `Ataque +${itemStat(i, 'dmg')}` : `Defesa +${itemStat(i, 'def')}`, `Vida +${itemStat(i, 'hp')}`, `Nível ${d.lvl}`].join(' · ')); if (JEWELS[i.key]) parts.push(`Melhora itens de +${JEWELS[i.key].min} a +${JEWELS[i.key].max - 1} · ${JEWELS[i.key].steps ? `${Math.round(jewelChance(i.key, JEWELS[i.key].min, JEWELS[i.key].chance) * 100)}% a ${Math.round(jewelChance(i.key, JEWELS[i.key].max - 1, JEWELS[i.key].chance) * 100)}% (cai a cada nível)` : `${Math.round(JEWELS[i.key].chance * 100)}%`}${JEWELS[i.key].safe ? ` · falha não tira nível até +${JEWELS[i.key].safe}` : ''}`); const a = itemStat(i, 'dmg'), b = itemStat(i, 'def'), c = itemStat(i, 'hp'); if (a) parts.push(`Dano +${a}`); if (b) parts.push(`Defesa +${b}`); if (c) parts.push(`Vida +${c}`); if (d.heal) parts.push(`Cura ${d.heal}`); if (d.mana) parts.push(`Mana ${d.mana}`); if (d.lvl > 1) parts.push(`Nível ${d.lvl}`); if (!canWield(myCls, d)) parts.push(d.set || d.cls ? `Exclusivo: ${CLASSES[d.cls ?? SETS[d.set!].cls!].name}` : 'Outra classe'); if (d.set) parts.push(`Set ${SETS[d.set].name}`); if (!i.equip) { const cm = cmpItem(i); if (cm) parts.push(cm.text + (cm.needLevel ? ` (requer nível ${d.lvl})` : '')); } if (d.kind === 'wings') { const tw = d.wtier!; parts.push(`+${[12, 22, 35][tw]}% ataque, -${[10, 20, 30][tw]}% dano recebido`); } for (const o of i.opts ?? []) parts.push(EXC_TEXT[o]); return parts.join(' · '); }
 function makeCell(i: ItemInst | undefined, click: () => void, label = '') {
   const c = document.createElement('button'); c.className = 'cell'; c.type = 'button';
-  if (i) { c.style.borderColor = i.rarity ? RARITY[i.rarity].color : ''; const ic = cv(56, 56); ic.getContext('2d')!.drawImage(hdOf(icon(i.key)), 0, 0); c.appendChild(ic); if (i.qty > 1) { const s = document.createElement('s'); s.textContent = String(i.qty); c.appendChild(s); } if (i.plus) { const u = document.createElement('u'); u.textContent = `+${i.plus}`; u.style.color = glowTier(i.plus) ?? '#fff'; c.appendChild(u); } if (!i.equip) { const cm = cmpItem(i); if (cm) { const a = document.createElement('em'); a.textContent = cm.arrow; a.style.color = cm.needLevel && cm.arrow === '▲' ? '#f0cf65' : cm.color; c.appendChild(a); } } c.title = itemText(i); c.onclick = click; const info = $('#invinfo'); c.onpointerenter = () => { info.dataset.hover = '1'; info.textContent = itemText(i); }; c.onpointerleave = () => { delete info.dataset.hover; info.textContent = `Moedas: ${(me?.gold ?? 0).toLocaleString('pt-BR')}`; }; }
+  if (i) { c.style.borderColor = i.rarity ? RARITY[i.rarity].color : ''; const ic = cv(56, 56); ic.getContext('2d')!.drawImage(hdOf(icon(i.key)), 0, 0); c.appendChild(ic); if (i.qty > 1) { const s = document.createElement('s'); s.textContent = String(i.qty); c.appendChild(s); } if (i.plus) { const u = document.createElement('u'); u.textContent = `+${i.plus}`; u.style.color = glowTier(i.plus) ?? '#fff'; c.appendChild(u); } if (!i.equip) { const cm = cmpItem(i); if (cm) { const a = document.createElement('em'); a.textContent = cm.arrow; a.style.color = cm.needLevel && cm.arrow === '▲' ? '#f0cf65' : cm.color; c.appendChild(a); } } c.title = itemText(i); c.onclick = click; const info = $('#invinfo'); if (!touch) { c.onpointerenter = () => { info.dataset.hover = '1'; info.textContent = itemText(i); }; c.onpointerleave = () => { delete info.dataset.hover; info.textContent = `Moedas: ${(me?.gold ?? 0).toLocaleString('pt-BR')}`; }; } }
   else c.textContent = label;
   return c;
 }
 function renderInv() {
   const gear = $('#gear'), grid = $('#grid'); gear.replaceChildren(); grid.replaceChildren();
-  for (const s of SLOTS) { const i = items.find(x => x.equip === s); gear.appendChild(makeCell(i, () => { if (jewelSlot >= 0 && i) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); } else send({ t: 'ue', eq: s }); }, SLOT_NAMES[s])); }
-  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i || dragDone) return; if (trashMode) { if (!valuable(i) || confirm(`Descartar ${itemText(i).split('\n')[0]}? Não dá para desfazer.`)) send({ t: 'x', slot: n }); return; } if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (i) cel.addEventListener('pointerdown', e => dragToSell(e, i, cel)); if (n === jewelSlot) cel.classList.add('jsel'); grid.appendChild(cel); }
+  if (selItem && !items.some(x => x.id === selItem)) selItem = null; for (const id of [...trashSel]) if (!items.some(x => x.id === id && !x.equip)) trashSel.delete(id);
+  for (const s of SLOTS) { const i = items.find(x => x.equip === s); const gc = makeCell(i, () => { if (jewelSlot >= 0 && i) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (trashMode || !i) return; if (touch && selItem !== i.id) { selItem = i.id; renderInv(); return; } selItem = null; send({ t: 'ue', eq: s }); }, SLOT_NAMES[s]); if (i && i.id === selItem) gc.classList.add('isel'); gear.appendChild(gc); }
+  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i || dragDone) return; if (trashMode) { if (trashSel.has(i.id)) trashSel.delete(i.id); else trashSel.add(i.id); renderInv(); return; } if (jewelSlot < 0 && touch && selItem !== i.id) { selItem = i.id; renderInv(); return; } selItem = null; if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (i) cel.addEventListener('pointerdown', e => dragToSell(e, i, cel)); if (n === jewelSlot) cel.classList.add('jsel'); if (i && i.id === selItem) cel.classList.add('isel'); if (i && trashSel.has(i.id)) cel.classList.add('tsel'); grid.appendChild(cel); }
+  renderItemPanel();
   if (jewelSlot >= 0 && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Joia selecionada: clique no item que quer melhorar.';
-  grid.classList.toggle('trash', trashMode); $('#trash').classList.toggle('on', trashMode); if (trashMode && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Modo descarte: clique no item que quer jogar fora.';
+  grid.classList.toggle('trash', trashMode); $('#trash').classList.toggle('on', trashMode); if (trashMode && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Modo descarte: toque nos itens para marcar (pode marcar vários) e depois em Apagar marcados. Toque de novo para desmarcar.';
 }
 /** Itens que pedem confirmação antes de descartar. */
+let selItem: string | null = null; const trashSel = new Set<string>();
+/** Painel do item tocado (celular/tablet) e barra do descarte em grupo. */
+function renderItemPanel() {
+  let pn = document.getElementById('itemd'); if (!pn) { pn = document.createElement('div'); pn.id = 'itemd'; $('#grid').after(pn); }
+  pn.replaceChildren(); pn.className = '';
+  const btn = (t: string, f: () => void, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; if (cls) b.className = cls; b.onclick = e => { e.stopPropagation(); f(); }; return b; };
+  if (trashMode) {
+    const sel = items.filter(i => trashSel.has(i.id) && !i.equip), row = document.createElement('div'); row.className = 'trow'; pn.className = 'trashbar';
+    const t = document.createElement('span'); t.textContent = sel.length ? `${sel.length} marcado(s)` : 'Nenhum item marcado'; row.append(t);
+    row.append(btn('Marcar comuns', () => { for (const i of items.filter(junk)) trashSel.add(i.id); renderInv(); }), btn('Limpar', () => { trashSel.clear(); renderInv(); }),
+      btn(`🗑 Apagar marcados${sel.length ? ` (${sel.length})` : ''}`, () => { if (!sel.length) return; const v = sel.filter(valuable); if (!confirm(`Apagar ${sel.length} item(ns)? Não dá para desfazer.${v.length ? `\n\nAtenção, ${v.length} deles parecem valiosos: ${v.map(i => itemText(i).split(' · ')[0]).join(', ')}` : ''}`)) return; send({ t: 'xa', slots: sel.map(i => i.slot) }); trashSel.clear(); }, 'danger'));
+    pn.append(row); return;
+  }
+  const i = selItem ? items.find(x => x.id === selItem) : undefined; if (!i) return; const d = ITEMS[i.key];
+  pn.className = 'itemd'; const parts = itemText(i).split(' · '), h = document.createElement('b'); h.textContent = parts[0]; h.style.color = i.rarity ? RARITY[i.rarity].color : d.set ? '#ffd76a' : '#f4efe2'; pn.append(h);
+  const body = document.createElement('div'); body.className = 'idesc'; for (const l of parts.slice(1)) { const r = document.createElement('div'); r.textContent = l; body.append(r); }
+  const cm = !i.equip ? cmpItem(i) : null; if (cm) { const r = document.createElement('div'); r.textContent = `${cm.arrow} ${cm.text}`; r.style.color = cm.color; body.append(r); if (cm.needLevel) { const q = document.createElement('div'); q.textContent = `Requer nível ${d.lvl}`; q.style.color = '#ff9b8e'; body.append(q); } }
+  pn.append(body); const row = document.createElement('div'); row.className = 'trow';
+  if (i.equip) row.append(btn('Desequipar', () => { selItem = null; send({ t: 'ue', eq: i.equip }); }));
+  else if (JEWELS[i.key]) row.append(btn('Usar joia: escolher item', () => { selItem = null; jewelSlot = i.slot; renderInv(); }));
+  else if (d.kind === 'potion' || d.kind === 'box') row.append(btn(d.kind === 'box' ? 'Abrir' : 'Usar', () => send({ t: 'u', slot: i.slot })));
+  else if (d.kind !== 'material' && d.kind !== 'pack') row.append(btn('Equipar', () => { selItem = null; send({ t: 'e', slot: i.slot }); }));
+  if (!i.equip) row.append(btn('🗑 Descartar', () => { if (!valuable(i) || confirm(`Descartar ${parts[0]}? Não dá para desfazer.`)) { selItem = null; send({ t: 'x', slot: i.slot }); } }, 'danger'));
+  row.append(btn('Fechar', () => { selItem = null; renderInv(); })); pn.append(row);
+}
 const valuable = (i: ItemInst) => { const d = ITEMS[i.key]; return i.rarity > 0 || (i.plus ?? 0) > 0 || !!d.set || !!i.opts?.length || ['jewel', 'pack', 'box', 'wings', 'pet', 'ring', 'amulet'].includes(d.kind) || d.price >= 50000 || i.qty > 1; };
 /** Equipamento comum sem valor: sem raridade, sem +, fora de set e sem opções. */
 const junk = (i: ItemInst) => { const d = ITEMS[i.key]; return !i.equip && ['weapon', 'helm', 'armor', 'pants', 'boots'].includes(d.kind) && !i.rarity && !(i.plus ?? 0) && !d.set && !i.opts?.length; };
@@ -584,7 +611,11 @@ try { const v2 = localStorage.getItem('em_auto2'); if (v2) [auto, autoLoot] = JS
 $('#snd').onclick = () => { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); };
 soundUi();
 $('#auto').onclick = () => { auto = !auto; autoUi(); log(auto ? 'Auto ataque ligado.' : 'Auto ataque desligado.', 'sys'); };
-$('#autoloot').onclick = () => { autoLoot = !autoLoot; autoUi(); send({ t: 'lo', on: autoLoot }); log(autoLoot ? 'Coleta ligada: pega os itens sozinho (os itens somem 30 s depois de cair).' : 'Coleta desligada: não pega nada sozinho, só ataca. Para pegar um item, clique nele.', 'sys'); };
+const isJewelKey = (k: string | null | undefined) => !!k && (k.startsWith('jewel_') || k.startsWith('pack_'));
+const LOOT_TXT = ['Coleta: pega tudo sozinho (os itens somem 30 s depois de cair).', 'Coleta: só joias. Pega sozinho apenas as joias; para pegar outro item, toque nele.', 'Coleta desligada: não pega nada sozinho, só ataca. Para pegar um item, toque nele.'];
+const lootUi = () => { const b = $('#autoloot'), ic = ['✋', '💎', '🚫'][lootMode], lb = [' Coleta', ' Só joias', ' Coleta off'][lootMode]; b.firstChild!.textContent = ic; const sp = b.querySelector('.lbl'); if (sp) sp.textContent = lb; b.title = LOOT_TXT[lootMode]; try { localStorage.setItem('em_loot', String(lootMode)); } catch { /* */ } };
+try { const v = Number(localStorage.getItem('em_loot')); if (v === 0 || v === 1 || v === 2) lootMode = v; else lootMode = autoLoot ? 0 : 2; } catch { /* */ } autoLoot = lootMode !== 2; lootUi();
+$('#autoloot').onclick = () => { lootMode = (lootMode + 1) % 3; autoLoot = lootMode !== 2; autoUi(); lootUi(); send({ t: 'lo', on: autoLoot, mode: lootMode }); log(LOOT_TXT[lootMode], 'sys'); };
 autoUi();
 $('#atk').onclick = () => { const m = nearestMob(12); if (m) attack(m); };
 document.querySelectorAll<HTMLElement>('[data-sk]').forEach(b => b.onclick = () => touch ? skill(slotMap[+b.dataset.sk!]) : selectSkill(+b.dataset.sk!));
@@ -644,7 +675,7 @@ document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const c = cv
 // ---------- render ----------
 let chest: ItemInst[] = [], editId = 0;
 let jewelSlot = -1, gfxInit = false, trashMode = false, duelWith = 0, duelUntil = 0, duelName = '';
-$('#trash').onclick = () => { trashMode = !trashMode; jewelSlot = -1; renderInv(); };
+$('#trash').onclick = () => { trashMode = !trashMode; jewelSlot = -1; selItem = null; trashSel.clear(); renderInv(); };
 $('#stackb').onclick = () => send({ t: 'org' });
 $('#trashall').onclick = () => { const list = items.filter(junk); if (!list.length) return log('Nenhum item comum para descartar.', 'sys'); if (confirm(`Descartar ${list.length} item(ns) comum(ns)?\n\n${list.map(i => ITEMS[i.key].name).join(', ')}`)) send({ t: 'xa', slots: list.map(i => i.slot) }); };
 const bloomC = cv(16, 16), bloomX = bloomC.getContext('2d')!; noHd.add(bloomC);
@@ -941,7 +972,7 @@ function autoPlay(a: Ent, ts: number) {
   if (auto) { if (m0.hp < m0.maxHp * .4) potion('pot_hp'); else if (m0.mp < m0.maxMp * .25) potion('pot_mp'); if (heal && m0.hp < m0.maxHp * .6 && ready(heal)) return cast(heal, 0); }
   let t = ents.get(target); if (!t || t.k !== 'm') t = undefined;
   if (!t && autoLoot) {
-    let drop: Ent | null = null, bd = auto ? 6 : 8; for (const e of ents.values()) if (e.k === 'd' && !lootTried.has(e.id)) { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; drop = e; } }
+    let drop: Ent | null = null, bd = auto ? 6 : 8; for (const e of ents.values()) if (e.k === 'd' && !lootTried.has(e.id) && (lootMode !== 1 || isJewelKey(e.info.key))) { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; drop = e; } }
     if (drop) { lootTried.add(drop.id); if (lootTried.size > 300) lootTried.clear(); send({ t: 'g', x: drop.x, y: drop.y }); startPred(drop.x, drop.y); autoAt = ts + Math.min(1400, 250 + bd * 210); return; }
   }
   if (!auto) return;

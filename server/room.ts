@@ -6,7 +6,7 @@ import { trapUp, blocked, findPath, GameMap, getMap, isSolid, MAP_IDS, step, tra
 
 type Pt = { x: number; y: number };
 interface Player extends Pt {
-  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; ach: AchState; achCol: boolean; lootOff?: boolean; wantDrop?: number; guildId?: number; gRank?: number; ginvite?: { gid: number; until: number } | null; duel?: { with: number; until: number } | null; duelFrom?: { from: number; until: number } | null; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
+  accountId: number; eid: number; charId: number; ws: CfWebSocket; name: string; resets: number; mr: number; ml: number; ach: AchState; achCol: boolean; lootOff?: boolean; lootJewels?: boolean; wantDrop?: number; guildId?: number; gRank?: number; ginvite?: { gid: number; until: number } | null; duel?: { with: number; until: number } | null; duelFrom?: { from: number; until: number } | null; dbPos: Map<string, string>; newAt: Map<string, number>; delta: boolean; lastE: Map<number, string>; idleSnaps: number; quest: { id: string; have: number } | null; questCol: boolean; savedQuest: string; mxp: number; mpts: number; mtree: Record<string, number>; buffAtk: number; buffDef: number; maxHpC: number; streak: number; streakUntil: number; trade: Trade | null; tradeFrom: { from: number; until: number } | null; cls: string; partyId: number; invite: { from: number; until: number } | null; hairColor: number; hairStyle: number;
   level: number; xp: number; points: number; str: number; agi: number; vit: number; ene: number; hp: number; mp: number; gold: number;
   map: string; items: ItemInst[]; chest: ItemInst[]; ix: number; iy: number; path: Pt[] | null; target: number; nextAtk: number; nextRepath: number; nextPotion: number;
   cds: Record<number, number>; deadUntil: number; known: Set<number>; dirty: boolean; meDirty: boolean; dirtyItems: Set<string>; delItems: Set<string>; logs: unknown[][];
@@ -300,7 +300,7 @@ export class MapRoom {
       case 'pl': return this.enqueueParty(() => this.leaveParty(p.partyId, p.charId));
       case 'pk': return this.enqueueParty(() => this.kick(p, m.char));
       case 'pm': return this.enqueueParty(() => this.setMode(p));
-      case 'lo': p.lootOff = m.on === false; if (!p.lootOff) p.wantDrop = 0; return; // Coleta desligada: não recolhe nada sozinho
+      case 'lo': p.lootOff = m.on === false; p.lootJewels = !p.lootOff && m.mode === 1; if (!p.lootOff) p.wantDrop = 0; return; // Coleta desligada: não recolhe nada sozinho
       case 'lp': if (Number.isInteger(m.id) && this.drops.has(m.id)) p.wantDrop = m.id; return; // clicou num item: pega só esse
       case 'are': return this.arenaEnter(p);
       case 'arb': return this.arenaBuy(p, m.n);
@@ -1270,7 +1270,7 @@ export class MapRoom {
       }
     } else if (p.path) { this.follow(p, dst); p.dirty = true; }
     const lootR = p.lootOff ? 1.2 : p.items.some(i => i.equip === 'pet') ? PET_LOOT_RADIUS : 1.2;
-    for (const d of this.drops.values()) if ((!p.lootOff || d.eid === p.wantDrop) && dist(d, p) <= lootR && (d.owner === p.charId || (d.party && d.party === p.partyId) || now > d.ownUntil)) {
+    for (const d of this.drops.values()) if ((d.eid === p.wantDrop || !p.lootOff && (!p.lootJewels || !!d.key && (d.key.startsWith('jewel_') || d.key.startsWith('pack_')))) && dist(d, p) <= lootR && (d.owner === p.charId || (d.party && d.party === p.partyId) || now > d.ownUntil)) {
       if (d.key === null) { const g = Math.ceil(d.gold * (1 + p.streak * .05) * (1 + s.goldPct)); p.gold += g; p.logs.push(['loot_gold', null, null, 0, g, now]); p.dirty = true; p.meDirty = true; this.drops.delete(d.eid); this.bumpLoot(p, now); this.fx.push({ k: 'loot', x: p.x, y: p.y, id: p.eid, n: p.streak }); }
       else if (this.give(p, d.key, 1, d.rarity, 'loot', d.opts, d.plus ?? 0)) { p.dirty = true; this.drops.delete(d.eid); this.bumpLoot(p, now); this.fx.push({ k: 'loot', x: p.x, y: p.y, id: p.eid, n: p.streak }); this.sendInv(p); this.sys(p, `Obteve: ${ITEMS[d.key].name}${d.plus ? ` +${d.plus}` : ''}${d.rarity >= 2 ? ` (${RARITY[d.rarity].name})` : ''}`); }
       else if (now - p.lastInvFull > 5000) { p.lastInvFull = now; this.sys(p, 'Inventário cheio.'); }
