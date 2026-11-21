@@ -159,7 +159,7 @@ function note(s: string) {
   while (box.children.length > 4) box.firstChild!.remove();
   setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 600); }, 5500 + Math.min(4000, s.length * 25));
 }
-function log(s: string, cls = '', html = false) { if (cls === 'sys') return note(s); const l = $('#log'), d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = s; else d.textContent = s; const atEnd = l.scrollHeight - l.scrollTop - l.clientHeight < 40; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); if (atEnd) l.scrollTop = l.scrollHeight; }
+function log(s: string, cls = '', html = false) { if (cls === 'sys') return note(s); const l = $('#log'), d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = s; else d.textContent = s; const atEnd = l.scrollHeight - l.scrollTop - l.clientHeight < 40; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); if (atEnd) l.scrollTop = l.scrollHeight; else document.getElementById('chatdown')?.classList.add('new'); }
 function snapshot(m: any) {
   const t = performance.now(), seen = new Set<number>();
   for (const n of m.n ?? []) {
@@ -601,7 +601,14 @@ $('#more').onclick = e => { e.stopPropagation(); $('.menu').classList.toggle('op
 document.querySelectorAll<HTMLElement>('.menu .extra').forEach(b => b.addEventListener('click', () => $('.menu').classList.remove('open')));
 { // chat: botão para aumentar/diminuir o quadro (fica salvo) e rolagem com o dedo
   const big = document.createElement('button'); big.type = 'button'; big.id = 'chatbig'; big.title = 'Aumentar ou diminuir o chat'; const set = (on: boolean) => { $('#chat').classList.toggle('big', on); big.textContent = on ? '⤡' : '⤢'; try { localStorage.setItem('em_chatbig', on ? '1' : '0'); } catch { /* */ } const l = $('#log'); l.scrollTop = l.scrollHeight; };
-  big.onclick = e => { e.stopPropagation(); set(!$('#chat').classList.contains('big')); }; $('#chat').prepend(big); let on = false; try { on = localStorage.getItem('em_chatbig') === '1'; } catch { /* */ } set(on);
+  big.onclick = e => { e.stopPropagation(); set(!$('#chat').classList.contains('big')); };
+  // barra de controles: aumentar, subir, descer (segurar ▼ vai direto para o fim)
+  const ctl = document.createElement('div'); ctl.id = 'chatctl'; const L = () => $('#log');
+  const mk = (t: string, tip: string, f: () => void) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = tip; b.onclick = e => { e.stopPropagation(); f(); }; return b; };
+  const up = mk('▲', 'Subir a conversa', () => L().scrollBy({ top: -L().clientHeight * .7, behavior: 'smooth' })), down = mk('▼', 'Descer a conversa (até as mensagens novas)', () => { const l = L(); if (l.scrollHeight - l.scrollTop - l.clientHeight < l.clientHeight * .8) l.scrollTo({ top: l.scrollHeight, behavior: 'smooth' }); else l.scrollBy({ top: l.clientHeight * .7, behavior: 'smooth' }); });
+  if (touch) $<HTMLInputElement>('#chati').placeholder = 'Escreva aqui para falar...';
+  down.id = 'chatdown'; ctl.append(big, up, down); $('#chat').prepend(ctl);
+  L().addEventListener('scroll', () => { const l = L(); if (l.scrollHeight - l.scrollTop - l.clientHeight < 30) down.classList.remove('new'); }); let on = false; try { on = localStorage.getItem('em_chatbig') === '1'; } catch { /* */ } set(on);
 }
 $('#chatb').onclick = () => { const c = $('#chat'), o = !c.classList.contains('open'); c.classList.toggle('open', o); if (o) $<HTMLInputElement>('#chati').focus(); };
 $('#chati').addEventListener('blur', () => { if (touch) setTimeout(() => { if (document.activeElement !== $('#chati') && !$<HTMLInputElement>('#chati').value) $('#chat').classList.remove('open'); }, 150); });
@@ -1022,7 +1029,7 @@ function hudLayout() {
   const q = (s: string) => document.querySelector<HTMLElement>(s), placed: DOMRect[] = [];
   { const mn = q('.menu'), b0 = q('#bar'); if (mn) { mn.style.maxHeight = ''; if (mn.classList.contains('open') && vis(b0)) { const mr = mn.getBoundingClientRect(), br = b0.getBoundingClientRect(); if (Math.min(mr.right, br.right) - Math.max(mr.left, br.left) > 4 && mr.bottom > br.top - 6) mn.style.maxHeight = `${Math.max(120, Math.round(br.top - mr.top - 8))}px`; } } }
   for (const s of ['#portrait', '#minimap', '.menu', '#lootc']) { const e = q(s); if (vis(e)) placed.push(e.getBoundingClientRect()); }
-  { const ch = q('#chat'), lg = q('#log'); if (ch && lg && !ch.classList.contains('big') && vis(lg) && lg.getBoundingClientRect().top < H * .5) placed.push(lg.getBoundingClientRect()); } // o chat normal empurra a missão e o grupo para baixo; o chat grande fica por cima de tudo
+  { const ch = q('#chat'), lg = q('#log'); if (ch && lg && !ch.classList.contains('big') && vis(lg) && lg.getBoundingClientRect().top < H * .5) { const a = lg.getBoundingClientRect(), b = ch.getBoundingClientRect(); placed.push(new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.max(a.right, b.right) - Math.min(a.left, b.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top))); } } // o chat normal empurra a missão e o grupo para baixo; o chat grande fica por cima de tudo
   const bar = q('#bar'), barR = vis(bar) ? bar.getBoundingClientRect() : null;
   for (const s of ['#tframe', '#bossbar', '#arenabar', '#duelbar', '#party', '#qtrack']) {
     const e = q(s); if (!e) continue; e.style.top = ''; if (!vis(e)) continue;
@@ -1044,7 +1051,7 @@ function hudLayout() {
   if (nt) { nt.style.cssText = '';
     if (barR) { const n0 = nt.getBoundingClientRect(); if (Math.min(barR.right, n0.right) - Math.max(barR.left, n0.left) > 4 && n0.bottom > barR.top - 4 && barR.top > H * .6 && W >= 700) nt.style.bottom = `${Math.round(H - barR.top + 6)}px`; }
     let r = nt.getBoundingClientRect();
-    for (const p of placed) if (p.top > H * .3 && p.top < r.bottom && p.bottom > r.bottom - 10 && p.left >= W * .2 && p.right <= W * .8 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 4) { nt.style.bottom = `${Math.round(H - p.top + 4)}px`; r = nt.getBoundingClientRect(); }
+    for (const p of placed) if (p.top > H * .3 && p.top < r.bottom && p.bottom > r.top + 4 && p.left >= W * .2 && p.right <= W * .8 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 4) { nt.style.bottom = `${Math.round(H - p.top + 4)}px`; r = nt.getBoundingClientRect(); }
     let L = r.left, R = r.right;
     for (const p of barR ? [...placed, barR] : placed) { if (!(p.top < r.bottom && p.bottom > r.top - 200)) continue; if (Math.min(p.right, R) - Math.max(p.left, L) <= 4) continue;
       if (p.bottom > r.bottom - 40 && p.right < W * .45) L = Math.max(L, p.right + 6); else if (p.bottom > r.bottom - 40 && p.left > W * .55) R = Math.min(R, p.left - 6); }

@@ -271,7 +271,7 @@ body.boss #tframe{display:none!important}
 #chat.big{width:min(560px,62vw)!important;z-index:5}#chat #log:empty{background:none!important;border-color:transparent}#chat.big #log{background:#0b0814ee!important}
 #chat.big #log{max-height:min(46vh,360px)!important;font-size:14px!important}
 #chat.open #log{max-height:min(40vh,300px)!important}
-#chatbig{pointer-events:auto;position:absolute;top:-2px;right:-2px;z-index:2;width:28px;height:28px;padding:0;border-radius:8px;font-size:15px;line-height:1;background:#1e1830ee;border:1px solid #8a6a32;color:#ffe08a}
+#chatctl{pointer-events:auto;position:absolute;top:2px;right:2px;z-index:2;display:flex;flex-direction:column;gap:3px}#chatctl button{width:30px;height:28px;padding:0;border-radius:8px;font-size:14px;line-height:1;background:#1e1830ee;border:1px solid #8a6a32;color:#ffe08a}#chatctl button.new{background:#c9a24f;color:#1a1208;box-shadow:0 0 8px #ffd76a}
 #chat #log{padding-right:30px!important}
 .touch #chat #log{font-size:14px!important}
 @media (min-width:700px) and (min-height:700px){.touch #chat #log{font-size:15px!important;max-height:120px!important}.touch #chat.big #log{max-height:min(46vh,420px)!important;font-size:16px!important}}
@@ -290,6 +290,13 @@ body.boss #tframe{display:none!important}
 #itemd .trow span{flex:1 1 100%;font-size:13px;color:#ffd76a}
 #itemd .trow button{flex:1 1 auto;min-height:38px;padding:6px 10px;font-size:13px}
 #itemd .trow button.danger{background:linear-gradient(180deg,#7a1f2a,#4a1018);border-color:#ff5a6a;color:#ffe0e4}
+
+/* 0.47.3: chat sempre aparente, campo de digitar visível no tablet */
+#chat #log{min-height:92px}
+#chat #log:empty{background:#0b0814b8!important;border-color:#ffffff1a!important}
+#chat #log:empty::before{content:'Nenhuma mensagem ainda.';color:#a89cc0;font-size:12px}
+@media (min-width:700px) and (min-height:600px){.touch .chatline{display:flex!important}}
+.touch #chat.open .chatline input,.touch .chatline input{font-size:16px;padding:7px 9px}
 </style>
 </head>
 <body>
