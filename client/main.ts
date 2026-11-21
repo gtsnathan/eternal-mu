@@ -159,7 +159,7 @@ function note(s: string) {
   while (box.children.length > 4) box.firstChild!.remove();
   setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 600); }, 5500 + Math.min(4000, s.length * 25));
 }
-function log(s: string, cls = '', html = false) { if (cls === 'sys') return note(s); const l = $('#log'), d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = s; else d.textContent = s; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); l.scrollTop = l.scrollHeight; }
+function log(s: string, cls = '', html = false) { if (cls === 'sys') return note(s); const l = $('#log'), d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = s; else d.textContent = s; const atEnd = l.scrollHeight - l.scrollTop - l.clientHeight < 40; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); if (atEnd) l.scrollTop = l.scrollHeight; }
 function snapshot(m: any) {
   const t = performance.now(), seen = new Set<number>();
   for (const n of m.n ?? []) {
@@ -572,6 +572,10 @@ $('#exit').onclick = () => leave();
 // celular/tablet: ☰ mostra o resto do menu; 💬 abre o campo do chat
 $('#more').onclick = e => { e.stopPropagation(); $('.menu').classList.toggle('open'); };
 document.querySelectorAll<HTMLElement>('.menu .extra').forEach(b => b.addEventListener('click', () => $('.menu').classList.remove('open')));
+{ // chat: botão para aumentar/diminuir o quadro (fica salvo) e rolagem com o dedo
+  const big = document.createElement('button'); big.type = 'button'; big.id = 'chatbig'; big.title = 'Aumentar ou diminuir o chat'; const set = (on: boolean) => { $('#chat').classList.toggle('big', on); big.textContent = on ? '⤡' : '⤢'; try { localStorage.setItem('em_chatbig', on ? '1' : '0'); } catch { /* */ } const l = $('#log'); l.scrollTop = l.scrollHeight; };
+  big.onclick = e => { e.stopPropagation(); set(!$('#chat').classList.contains('big')); }; $('#chat').prepend(big); let on = false; try { on = localStorage.getItem('em_chatbig') === '1'; } catch { /* */ } set(on);
+}
 $('#chatb').onclick = () => { const c = $('#chat'), o = !c.classList.contains('open'); c.classList.toggle('open', o); if (o) $<HTMLInputElement>('#chati').focus(); };
 $('#chati').addEventListener('blur', () => { if (touch) setTimeout(() => { if (document.activeElement !== $('#chati') && !$<HTMLInputElement>('#chati').value) $('#chat').classList.remove('open'); }, 150); });
 // Auto ataque e Auto coleta são separados: dá para ligar só um, os dois ou nenhum (fica lembrado neste aparelho)
@@ -718,7 +722,8 @@ function frame(ts: number) {
   for (const p of map.portals) draw.push({ y: p.y + .3, f: () => { const c = archSprite(); g.drawImage(c, p.x * 32 - 42, p.y * 32 - 84); } });
   for (const n of map.npcs) { if (n.x < x0 - 2 || n.x > x1 + 2 || n.y < y0 - 2 || n.y > y1 + 2) continue; draw.push({ y: n.y, f: () => drawNpc(n) }); }
   for (const e of ents.values()) if (e.k !== 'd') draw.push({ y: e.y, f: () => drawEnt(e, ts) });
-  draw.sort((p, q) => p.y - q.y).forEach(d => d.f());
+  meFrame = null; draw.sort((p, q) => p.y - q.y).forEach(d => d.f());
+  const mf = meFrame as { c: CanvasImageSource; x: number; y: number } | null; if (mf) { g.globalAlpha = .4; g.drawImage(mf.c, mf.x, mf.y); g.globalAlpha = 1; } // silhueta: você continua visível atrás de casas e árvores
   ghosts = ghosts.filter(z => (z.t += dt) < .5); for (const z of ghosts) { const u = z.t / .5; g.globalAlpha = 1 - u; g.drawImage(z.c, Math.round(z.x * 32 - z.c.width / 2), Math.round(z.y * 32 - z.c.height + 6 - u * 14)); g.globalCompositeOperation = 'lighter'; g.globalAlpha = (1 - u) * .7; g.drawImage(z.c, Math.round(z.x * 32 - z.c.width / 2), Math.round(z.y * 32 - z.c.height + 6 - u * 14)); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; }
   // efeitos
   rings = rings.filter(r => (r.t += dt) < r.max); for (const r of rings) { const u = r.t / r.max; g.strokeStyle = r.c; g.lineWidth = r.tele ? 2 : 4; g.globalAlpha = r.tele ? .9 : 1 - u; g.beginPath(); g.ellipse(r.x * 32, r.y * 32, (r.tele ? u : .3 + u * .7) * r.r * 32, (r.tele ? u : .3 + u * .7) * r.r * 22, 0, 0, 6.3); g.stroke(); if (!r.tele && quality > 0) { const R = (.3 + u * .7) * r.r; g.globalAlpha = (1 - u) * .14; g.fillStyle = r.c; g.beginPath(); g.ellipse(r.x * 32, r.y * 32, R * 32, R * 22, 0, 0, 6.3); g.fill(); g.globalAlpha = (1 - u) * .9; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(r.x * 32, r.y * 32, R * 30, R * 20.5, 0, 0, 6.3); g.stroke(); } if (r.tele) { g.globalAlpha = .18; g.fillStyle = r.c; g.beginPath(); g.ellipse(r.x * 32, r.y * 32, r.r * 32, r.r * 22, 0, 0, 6.3); g.fill(); } g.globalAlpha = 1; }
@@ -761,7 +766,7 @@ function frame(ts: number) {
   g.textAlign = 'center';
   for (const n of map.npcs) { label(n.x * 32, n.y * 32 - 50, n.name, '#ffe08a'); if (n.shop && n.id !== 'bau' && n.id !== 'prensa') label(n.x * 32, n.y * 32 - 62 + Math.sin(ts / 260) * 2, '$', '#ffd76a'); }
   for (const p of map.portals) label(p.x * 32, p.y * 32 - 92, p.mr ? `👑 ${p.label} (MR ${p.mr})` : `» ${p.label}${p.lvl ? ` (Nv ${p.lvl})` : ''}`, me && (p.lvl && me.level < p.lvl || p.mr && (me.mr ?? 0) < p.mr) ? '#ff9b8e' : p.mr ? '#ffd76a' : '#d6bcff');
-  for (const e of ents.values()) {
+  for (const e of [...ents.values()].filter(x => x.id !== you).concat(ents.get(you) ?? [])) { // o seu nome e sua vida por último: nunca ficam por baixo das barras dos monstros
     if (e.k === 's') continue;
     if (e.k === 'd') { label(e.x * 32, e.y * 32 - 22, e.info.key ? `${cmpItem({ key: e.info.key, rarity: e.info.rarity })?.arrow === '▲' ? '▲ ' : ''}${ITEMS[e.info.key].name}${e.info.pl ? ` +${e.info.pl}` : ''}${e.info.rarity >= 2 ? ` · ${RARITY[e.info.rarity].name}` : ''}` : `${e.info.gold} moedas`, e.info.key ? (ITEMS[e.info.key].set ? '#ffd76a' : e.info.rarity ? RARITY[e.info.rarity].color : (e.info.pl ?? 0) >= 9 ? '#ffb5f0' : (e.info.pl ?? 0) >= 5 ? '#bfe3ff' : RARITY[0].color) : '#f0d27a'); continue; }
     const h = e.k === 'p' ? 50 : mobSize(e.info.mob) * (e.info.wb ? 1.4 : 1) + 10, X = Math.round(e.x * 32), Y = Math.round(e.y * 32) - h, boss = e.k === 'm' && MOBS[e.info.mob].boss, bw = boss ? 72 : 32;
@@ -950,6 +955,7 @@ function autoPlay(a: Ent, ts: number) {
   }
 }
 function drawNpc(n: Npc) { if (n.id === 'prensa') { shadow(n.x * 32, n.y * 32 + 4, 28, 9); g.drawImage(pressSprite(), Math.round(n.x * 32) - 26, Math.round(n.y * 32) - 56); return; } if (n.id === 'bau') { shadow(n.x * 32, n.y * 32 + 4, 24, 8); g.drawImage(chestSprite(), Math.round(n.x * 32) - 22, Math.round(n.y * 32) - 34); return; } if (n.id === 'artifice') { const w = wingSprites('arcane_wizard', 1)[Math.floor(performance.now() / 135) % 6], fw = w.width / 2; g.imageSmoothingEnabled = true; g.drawImage(w, Math.round(n.x * 32 - fw / 2), Math.round(n.y * 32) - 27 - WING_ROOT, fw, w.height / 2); g.imageSmoothingEnabled = false; } shadow(n.x * 32, n.y * 32 + 2, 15, 6); g.drawImage(heroSprites(npcLooks[n.look])[0][0], Math.round(n.x * 32 - FRAME_W / 2), Math.round(n.y * 32 - FRAME_H + 6)); }
+let meFrame: { c: CanvasImageSource; x: number; y: number } | null = null;
 function drawEnt(e: Ent, ts: number) {
   const X = Math.round(e.x * 32), Y = Math.round(e.y * 32);
   if (e.k === 'p') {
@@ -967,7 +973,7 @@ function drawEnt(e: Ent, ts: number) {
       shadow(PX, PY + 3, fly ? 8 : 12, fly ? 3 : 5); petDraw = () => { g.drawImage(sp, PX - 20, PY - 37 - lift, 40, 40); };
       if (e.info.pet === 'pet_dragon' || e.info.pet === 'pet_fenrir') { if (Math.random() < .15) parts.push({ x: e.px + (Math.random() - .5) * .6, y: e.py! - .4 - lift / 32 - Math.random() * .4, vx: 0, vy: -.6, life: 0, max: .6, c: ITEMS[e.info.pet].blade!, s: 2 }); }
     }
-    shadow(X, Y + 3, 15, 6); const wd = e.info.wings ? ITEMS[e.info.wings] : null, wf2 = wd ? wingSprites(wd.cls!, wd.wtier!)[Math.floor(ts / (e.moving ? 75 : 135) + e.id) % 6] : null, drawW = () => { if (!wf2) return; const fw = wf2.width / 2, fh = wf2.height / 2, nw = e.dir === 2 || e.dir === 3 ? fw * .62 : fw; g.imageSmoothingEnabled = true; g.drawImage(wf2, Math.round(X - nw / 2), Yb - 27 - WING_ROOT, nw, fh); g.imageSmoothingEnabled = false; }; if (e.dir !== 1) drawW(); g.drawImage(e.look[e.dir][f], X - FRAME_W / 2, Yb - FRAME_H + 6); if (e.dir === 1) drawW(); { const tier = glowTier(e.info.plus ?? 0); if (tier) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = .11 + Math.sin(ts / 260) * .07; g.drawImage(tintFrame(e.look[e.dir][f], tier), X - FRAME_W / 2, Yb - FRAME_H + 6); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; if ((e.info.plus ?? 0) >= 13 && Math.random() < .3) parts.push({ x: e.x + (Math.random() - .5) * .8, y: e.y - Math.random(), vx: 0, vy: -1, life: 0, max: .6, c: tier, s: 2 }); } }
+    shadow(X, Y + 3, 15, 6); const wd = e.info.wings ? ITEMS[e.info.wings] : null, wf2 = wd ? wingSprites(wd.cls!, wd.wtier!)[Math.floor(ts / (e.moving ? 75 : 135) + e.id) % 6] : null, drawW = () => { if (!wf2) return; const fw = wf2.width / 2, fh = wf2.height / 2, nw = e.dir === 2 || e.dir === 3 ? fw * .62 : fw; g.imageSmoothingEnabled = true; g.drawImage(wf2, Math.round(X - nw / 2), Yb - 27 - WING_ROOT, nw, fh); g.imageSmoothingEnabled = false; }; if (e.dir !== 1) drawW(); g.drawImage(e.look[e.dir][f], X - FRAME_W / 2, Yb - FRAME_H + 6); if (e.id === you) meFrame = { c: e.look[e.dir][f], x: X - FRAME_W / 2, y: Yb - FRAME_H + 6 }; if (e.dir === 1) drawW(); { const tier = glowTier(e.info.plus ?? 0); if (tier) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = .11 + Math.sin(ts / 260) * .07; g.drawImage(tintFrame(e.look[e.dir][f], tier), X - FRAME_W / 2, Yb - FRAME_H + 6); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; if ((e.info.plus ?? 0) >= 13 && Math.random() < .3) parts.push({ x: e.x + (Math.random() - .5) * .8, y: e.y - Math.random(), vx: 0, vy: -1, life: 0, max: .6, c: tier, s: 2 }); } }
     if (ts < (e.flash ?? 0)) { g.globalCompositeOperation = 'lighter'; g.drawImage(e.look[e.dir][f], X - FRAME_W / 2, Yb - FRAME_H + 6); g.globalCompositeOperation = 'source-over'; } petDraw?.(); return;
   }
   if (e.info.g && Math.random() < .12) parts.push({ x: e.x + (Math.random() - .5) * 1.2, y: e.y - Math.random() * 1.4, vx: 0, vy: -1.2, life: 0, max: .7, c: Math.random() < .5 ? '#ffe08a' : '#fff8d0', s: 2 });
@@ -983,7 +989,9 @@ function hudLayout() {
   const W = innerWidth, H = innerHeight, vis = (e: HTMLElement | null): e is HTMLElement => !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
   const hit = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 4 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
   const q = (s: string) => document.querySelector<HTMLElement>(s), placed: DOMRect[] = [];
+  { const mn = q('.menu'), b0 = q('#bar'); if (mn) { mn.style.maxHeight = ''; if (mn.classList.contains('open') && vis(b0)) { const mr = mn.getBoundingClientRect(), br = b0.getBoundingClientRect(); if (Math.min(mr.right, br.right) - Math.max(mr.left, br.left) > 4 && mr.bottom > br.top - 6) mn.style.maxHeight = `${Math.max(120, Math.round(br.top - mr.top - 8))}px`; } } }
   for (const s of ['#portrait', '#minimap', '.menu', '#lootc']) { const e = q(s); if (vis(e)) placed.push(e.getBoundingClientRect()); }
+  { const ch = q('#chat'), lg = q('#log'); if (ch && lg && !ch.classList.contains('big') && vis(lg) && lg.getBoundingClientRect().top < H * .5) placed.push(lg.getBoundingClientRect()); } // o chat normal empurra a missão e o grupo para baixo; o chat grande fica por cima de tudo
   const bar = q('#bar'), barR = vis(bar) ? bar.getBoundingClientRect() : null;
   for (const s of ['#tframe', '#bossbar', '#arenabar', '#duelbar', '#party', '#qtrack']) {
     const e = q(s); if (!e) continue; e.style.top = ''; if (!vis(e)) continue;
@@ -1007,7 +1015,7 @@ function hudLayout() {
     let r = nt.getBoundingClientRect();
     for (const p of placed) if (p.top > H * .3 && p.top < r.bottom && p.bottom > r.bottom - 10 && p.left >= W * .2 && p.right <= W * .8 && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 4) { nt.style.bottom = `${Math.round(H - p.top + 4)}px`; r = nt.getBoundingClientRect(); }
     let L = r.left, R = r.right;
-    for (const p of placed) { if (!(p.top < r.bottom && p.bottom > r.top - 200)) continue; if (Math.min(p.right, R) - Math.max(p.left, L) <= 4) continue;
+    for (const p of barR ? [...placed, barR] : placed) { if (!(p.top < r.bottom && p.bottom > r.top - 200)) continue; if (Math.min(p.right, R) - Math.max(p.left, L) <= 4) continue;
       if (p.bottom > r.bottom - 40 && p.right < W * .45) L = Math.max(L, p.right + 6); else if (p.bottom > r.bottom - 40 && p.left > W * .55) R = Math.min(R, p.left - 6); }
     if (R - L < 170) { nt.style.maxHeight = '0px'; return; } // sem espaço: esconde as mensagens até sobrar lugar
     if (L !== r.left || R !== r.right) Object.assign(nt.style, { left: `${Math.round(L)}px`, width: `${Math.round(R - L)}px`, transform: 'none' });
