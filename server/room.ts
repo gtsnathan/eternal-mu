@@ -1028,6 +1028,7 @@ export class MapRoom {
   private moveTo(p: Player, to: unknown, now: number) {
     const d = travelList().find(x => x.to === to); if (!d || d.to === this.mapId) return;
     if (p.level < d.lvl) return this.sys(p, `${d.name} exige nível ${d.lvl}.`);
+    if (p.mr < d.mr) return this.sys(p, `${d.name} é um Reino Mestre: exige ${d.mr} Master Resets (você tem ${p.mr}).`);
     if (now < (p.nextMove ?? 0)) return this.sys(p, 'Aguarde alguns segundos para viajar de novo.');
     p.nextMove = now + 5000; this.travel(p, d.to, d.x, d.y);
   }
@@ -1276,6 +1277,7 @@ export class MapRoom {
     }
     for (const g of this.map.portals) if (Math.hypot(p.x - g.x, p.y - g.y) < .9) {
       if (g.lvl && p.level < g.lvl) { if (now - p.lastInvFull > 3000) { p.lastInvFull = now; this.sys(p, `Este portal exige nível ${g.lvl}.`); } continue; }
+      if (g.mr && p.mr < g.mr) { if (now - p.lastInvFull > 3000) { p.lastInvFull = now; this.sys(p, `${g.label} é um Reino Mestre: exige ${g.mr} Master Resets (você tem ${p.mr}).`); } continue; }
       this.travel(p, g.to, g.tx, g.ty); return;
     }
     if (p.meDirty) this.sendMe(p);

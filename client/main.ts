@@ -391,7 +391,7 @@ function paintMap(c: HTMLCanvasElement, sx: number, sy: number, wv: number, hv: 
   for (const e of ents.values()) if (e.k !== 'd') dot(e.x, e.y, e.id === you ? '#fff' : e.k === 'p' ? '#6fdc7e' : '#ff5a5a');
 }
 function renderMini() { const e = ents.get(you); if (!e || !map) return; const w = Math.min(map.w, 42), h = w * 112 / 146, sx = Math.max(0, Math.min(map.w - w, e.x - w / 2)), sy = Math.max(0, Math.min(map.h - h, e.y - h / 2)); paintMap($<HTMLCanvasElement>('#minimap'), sx, sy, w, h); $('#where').textContent = `${map.name} ${e.x | 0},${e.y | 0}`; }
-function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap'); c.width = map.w * 4; c.height = map.h * 4; $('#mapt').firstChild!.textContent = `${map.name} `; paintMap(c, 0, 0, map.w, map.h); const L = $('#moves'); L.replaceChildren(); for (const d of travelList()) { const b = document.createElement('button'), here = d.to === map.id, low = (me?.level ?? 1) < d.lvl; b.textContent = here ? `${d.name} · você está aqui` : d.lvl ? `${d.name} · Nv ${d.lvl}` : d.name; b.disabled = here || low; if (!b.disabled) b.onclick = () => { send({ t: 'mv', to: d.to }); closeWins(); }; L.append(b); } }
+function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap'); c.width = map.w * 4; c.height = map.h * 4; $('#mapt').firstChild!.textContent = `${map.name} `; paintMap(c, 0, 0, map.w, map.h); const L = $('#moves'); L.replaceChildren(); for (const d of travelList()) { const b = document.createElement('button'), here = d.to === map.id, low = (me?.level ?? 1) < d.lvl || (me?.mr ?? 0) < d.mr; b.textContent = here ? `${d.name} · você está aqui` : d.mr ? `👑 ${d.name} · Nv ${d.lvl} · ${d.mr} Master Resets` : d.lvl ? `${d.name} · Nv ${d.lvl}` : d.name; b.disabled = here || low; if (!b.disabled) b.onclick = () => { send({ t: 'mv', to: d.to }); closeWins(); }; L.append(b); } }
 
 // ---------- entrada ----------
 let joy = { x: 0, y: 0 }, lastInput = '';
@@ -760,7 +760,7 @@ function frame(ts: number) {
   // nomes, barras e números
   g.textAlign = 'center';
   for (const n of map.npcs) { label(n.x * 32, n.y * 32 - 50, n.name, '#ffe08a'); if (n.shop && n.id !== 'bau' && n.id !== 'prensa') label(n.x * 32, n.y * 32 - 62 + Math.sin(ts / 260) * 2, '$', '#ffd76a'); }
-  for (const p of map.portals) label(p.x * 32, p.y * 32 - 92, `» ${p.label}${p.lvl ? ` (Nv ${p.lvl})` : ''}`, me && p.lvl && me.level < p.lvl ? '#ff9b8e' : '#d6bcff');
+  for (const p of map.portals) label(p.x * 32, p.y * 32 - 92, p.mr ? `👑 ${p.label} (MR ${p.mr})` : `» ${p.label}${p.lvl ? ` (Nv ${p.lvl})` : ''}`, me && (p.lvl && me.level < p.lvl || p.mr && (me.mr ?? 0) < p.mr) ? '#ff9b8e' : p.mr ? '#ffd76a' : '#d6bcff');
   for (const e of ents.values()) {
     if (e.k === 's') continue;
     if (e.k === 'd') { label(e.x * 32, e.y * 32 - 22, e.info.key ? `${cmpItem({ key: e.info.key, rarity: e.info.rarity })?.arrow === '▲' ? '▲ ' : ''}${ITEMS[e.info.key].name}${e.info.pl ? ` +${e.info.pl}` : ''}${e.info.rarity >= 2 ? ` · ${RARITY[e.info.rarity].name}` : ''}` : `${e.info.gold} moedas`, e.info.key ? (ITEMS[e.info.key].set ? '#ffd76a' : e.info.rarity ? RARITY[e.info.rarity].color : (e.info.pl ?? 0) >= 9 ? '#ffb5f0' : (e.info.pl ?? 0) >= 5 ? '#bfe3ff' : RARITY[0].color) : '#f0d27a'); continue; }
@@ -897,6 +897,11 @@ const MAP_FX: Record<string, { amb: Amb; c: string[]; n?: number; night?: [numbe
   sombria: { amb: 'fireflies', c: ['#7dffd0', '#c6ff7a', '#8ad0ff'], n: .8, night: [74, 98, 140], fog: '#6a8ab8' },
   abismo: { amb: 'motes', c: ['#8ae8ff', '#c8f4ff', '#a08aff'], n: .55, night: [78, 128, 172] },
   caos: { amb: 'embers', c: ['#ff4a5a', '#ffb13d', '#ff2a6a'], n: 1.1, night: [166, 78, 92], glow: [[T.LAVA, '#ff3a2a', 118, .36, 4]] },
+  rubra: { amb: 'embers', c: ['#ff3a4a', '#ff8a8a', '#a01a2a'], n: .8, night: [150, 70, 80], fog: '#8a1a2a' },
+  jardim: { amb: 'motes', c: ['#fff1a8', '#ffffff', '#ffe08a'], n: .9, night: [255, 246, 220] },
+  forja: { amb: 'embers', c: ['#ff8a2a', '#ffd76a', '#ff4a1a'], n: 1.3, night: [176, 96, 70], glow: [[T.LAVA, '#ff5a1a', 118, .4, 4]] },
+  estrelas: { amb: 'void', c: ['#ffffff', '#b07aff', '#8ad0ff'], n: 1.2, night: [70, 70, 140], fog: '#5a4aff' },
+  criador: { amb: 'motes', c: ['#ffffff', '#ffd76a', '#fff8e0'], n: 1, night: [235, 228, 210], fog: '#ffe8a0' },
   vazio: { amb: 'void', c: ['#c58bff', '#8ad0ff', '#ffffff'], n: .9, night: [118, 88, 172], fog: '#8a6aff' },
 };
 let shakeUntil = 0, shakeAmp = 0;
