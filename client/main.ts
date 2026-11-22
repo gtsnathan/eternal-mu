@@ -134,7 +134,7 @@ function handle(m: any) {
     case 's': snapshot(m); break;
     case 'sys': log(m.m, 'sys'); if (String(m.m).startsWith('☠') || String(m.m).startsWith('🏅 Conquista') || String(m.m).startsWith('📅 Missão do dia concluída')) { const el = $('#toast'); el.textContent = String(m.m).split('! ')[0] + (String(m.m).includes('! ') ? '!' : ''); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); beep(90, 500, 'sawtooth', .05); } break;
     case 'wbr': { const el = $('#wbrank'); if (!m.top?.length) { el.innerHTML = ''; el.style.display = 'none'; break; } el.style.display = 'block'; el.innerHTML = `<b>Dano no Chefe Mundial</b>${m.top.map((r: [string, number], i: number) => `<div><span>${i + 1}. ${esc(r[0])}</span><span>${r[1]}%</span></div>`).join('')}${m.me && m.me[0] > 5 ? `<div class=me><span>${m.me[0]}. Você</span><span>${m.me[1]}%</span></div>` : ''}`; break; }
-    case 'c': if (m.from === '⚑') { note(`[Guilda] ${m.m}`); break; } log(`${m.ch === 'u' ? '[Guilda] ' : ''}<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : m.ch === 'u' ? 'gu' : '', true); break;
+    case 'c': if (m.from === '⚑') { note(`[Guilda] ${m.m}`); break; } log(`${chatTab === 'all' ? ({ g: '[Global] ', p: '[Grupo] ', u: '[Guilda] ' } as Record<string, string>)[m.ch] ?? '' : ''}<b>${esc(m.from)}:</b> ${esc(m.m)}`, m.ch === 'g' ? 'g' : m.ch === 'p' ? 'pt' : m.ch === 'u' ? 'gu' : '', true, ['g', 'p', 'u'].includes(m.ch) ? m.ch : 'l'); break;
     case 'cd': cds[m.n] = { until: performance.now() + m.ms, ms: m.ms }; break;
     case 'kick': log(m.m, 'sys'); break;
     case 'party': party = m.m ? m : null; renderParty(); break;
@@ -159,7 +159,7 @@ function note(s: string) {
   while (box.children.length > 4) box.firstChild!.remove();
   setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 600); }, 5500 + Math.min(4000, s.length * 25));
 }
-function log(s: string, cls = '', html = false) { if (cls === 'sys') return note(s); const l = $('#log'), d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = s; else d.textContent = s; const atEnd = l.scrollHeight - l.scrollTop - l.clientHeight < 40; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); if (atEnd) l.scrollTop = l.scrollHeight; else document.getElementById('chatdown')?.classList.add('new'); }
+function log(s: string, cls = '', html = false, ch = 'l') { if (cls === 'sys') return note(s); const l = $('#log'), d = document.createElement('div'); d.className = cls; d.dataset.ch = ch; if (chatTab !== 'all' && chatTab !== ch) { document.querySelector(`#chattabs [data-t="${ch}"]`)?.classList.add('unread'); document.querySelector('#chattabs [data-t="all"]')?.classList.remove('unread'); } if (html) d.innerHTML = s; else d.textContent = s; const atEnd = l.scrollHeight - l.scrollTop - l.clientHeight < 40; l.appendChild(d); while (l.children.length > 60) l.firstChild!.remove(); if (atEnd) l.scrollTop = l.scrollHeight; else document.getElementById('chatdown')?.classList.add('new'); }
 function snapshot(m: any) {
   const t = performance.now(), seen = new Set<number>();
   for (const n of m.n ?? []) {
@@ -253,20 +253,20 @@ function itemText(i: ItemInst) { const d = ITEMS[i.key], parts = [`${d.name}${i.
 function makeCell(i: ItemInst | undefined, click: () => void, label = '') {
   const c = document.createElement('button'); c.className = 'cell'; c.type = 'button';
   if (i) { c.style.borderColor = i.rarity ? RARITY[i.rarity].color : ''; const ic = cv(56, 56); ic.getContext('2d')!.drawImage(hdOf(icon(i.key)), 0, 0); c.appendChild(ic); if (i.qty > 1) { const s = document.createElement('s'); s.textContent = String(i.qty); c.appendChild(s); } if (i.plus) { const u = document.createElement('u'); u.textContent = `+${i.plus}`; u.style.color = glowTier(i.plus) ?? '#fff'; c.appendChild(u); } if (!i.equip) { const cm = cmpItem(i); if (cm) { const a = document.createElement('em'); a.textContent = cm.arrow; a.style.color = cm.needLevel && cm.arrow === '▲' ? '#f0cf65' : cm.color; c.appendChild(a); } } c.title = itemText(i); c.onclick = click; const info = $('#invinfo'); if (!touch) { c.onpointerenter = () => { info.dataset.hover = '1'; info.textContent = itemText(i); }; c.onpointerleave = () => { delete info.dataset.hover; info.textContent = `Moedas: ${(me?.gold ?? 0).toLocaleString('pt-BR')}`; }; } }
-  else c.textContent = label;
+  else { c.textContent = label; c.onclick = click; } // espaço vazio também recebe toque (destino ao mover item)
   return c;
 }
 function renderInv() {
   const gear = $('#gear'), grid = $('#grid'); gear.replaceChildren(); grid.replaceChildren();
   if (selItem && !items.some(x => x.id === selItem)) selItem = null; for (const id of [...trashSel]) if (!items.some(x => x.id === id && !x.equip)) trashSel.delete(id);
   for (const s of SLOTS) { const i = items.find(x => x.equip === s); const gc = makeCell(i, () => { if (jewelSlot >= 0 && i) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (trashMode || !i) return; if (touch && selItem !== i.id) { selItem = i.id; renderInv(); return; } selItem = null; send({ t: 'ue', eq: s }); }, SLOT_NAMES[s]); if (i && i.id === selItem) gc.classList.add('isel'); gear.appendChild(gc); }
-  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (!i || dragDone) return; if (trashMode) { if (trashSel.has(i.id)) trashSel.delete(i.id); else trashSel.add(i.id); renderInv(); return; } if (jewelSlot < 0 && touch && selItem !== i.id) { selItem = i.id; renderInv(); return; } selItem = null; if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (i) cel.addEventListener('pointerdown', e => dragToSell(e, i, cel)); if (n === jewelSlot) cel.classList.add('jsel'); if (i && i.id === selItem) cel.classList.add('isel'); if (i && trashSel.has(i.id)) cel.classList.add('tsel'); grid.appendChild(cel); }
+  for (let n = 0; n < CONFIG.invSize; n++) { const i = items.find(x => !x.equip && x.slot === n); const cel = makeCell(i, () => { if (dragDone) return; if (moveFrom >= 0) { if (moveFrom !== n) send({ t: 'mi', from: moveFrom, to: n }); moveFrom = -1; selItem = null; renderInv(); return; } if (!i) return; if (trashMode) { if (trashSel.has(i.id)) trashSel.delete(i.id); else trashSel.add(i.id); renderInv(); return; } if (jewelSlot < 0 && touch && selItem !== i.id) { selItem = i.id; renderInv(); return; } selItem = null; if (JEWELS[i.key]) { jewelSlot = jewelSlot === n ? -1 : n; renderInv(); return; } if (jewelSlot >= 0) { send({ t: 'up', j: jewelSlot, item: i.id }); jewelSlot = -1; renderInv(); return; } if (ITEMS[i.key].kind === 'potion' || ITEMS[i.key].kind === 'box') send({ t: 'u', slot: n }); else if (ITEMS[i.key].kind !== 'material') send({ t: 'e', slot: n }); }); if (i) cel.addEventListener('pointerdown', e => dragToSell(e, i, cel)); cel.dataset.slot = String(n); if (moveFrom === n) cel.classList.add('msel'); if (n === jewelSlot) cel.classList.add('jsel'); if (i && i.id === selItem) cel.classList.add('isel'); if (i && trashSel.has(i.id)) cel.classList.add('tsel'); grid.appendChild(cel); }
   renderItemPanel();
   if (jewelSlot >= 0 && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Joia selecionada: clique no item que quer melhorar.';
   grid.classList.toggle('trash', trashMode); $('#trash').classList.toggle('on', trashMode); if (trashMode && !$('#invinfo').dataset.hover) $('#invinfo').textContent = 'Modo descarte: toque nos itens para marcar (pode marcar vários) e depois em Apagar marcados. Toque de novo para desmarcar.';
 }
 /** Itens que pedem confirmação antes de descartar. */
-let selItem: string | null = null; const trashSel = new Set<string>();
+let selItem: string | null = null, moveFrom = -1; const trashSel = new Set<string>();
 /** Painel do item tocado (celular/tablet) e barra do descarte em grupo. */
 function renderItemPanel() {
   let pn = document.getElementById('itemd'); if (!pn) { pn = document.createElement('div'); pn.id = 'itemd'; $('#grid').after(pn); }
@@ -279,6 +279,7 @@ function renderItemPanel() {
       btn(`🗑 Apagar marcados${sel.length ? ` (${sel.length})` : ''}`, () => { if (!sel.length) return; const v = sel.filter(valuable); if (!confirm(`Apagar ${sel.length} item(ns)? Não dá para desfazer.${v.length ? `\n\nAtenção, ${v.length} deles parecem valiosos: ${v.map(i => itemText(i).split(' · ')[0]).join(', ')}` : ''}`)) return; send({ t: 'xa', slots: sel.map(i => i.slot) }); trashSel.clear(); }, 'danger'));
     pn.append(row); return;
   }
+  if (moveFrom >= 0) { const row = document.createElement('div'); row.className = 'trow'; pn.className = 'itemd'; const t = document.createElement('span'); t.textContent = '↔ Toque no espaço para onde quer levar o item (se tiver outro item lá, eles trocam de lugar).'; row.append(t, btn('Cancelar', () => { moveFrom = -1; renderInv(); })); pn.append(row); return; }
   const i = selItem ? items.find(x => x.id === selItem) : undefined; if (!i) return; const d = ITEMS[i.key];
   pn.className = 'itemd'; const parts = itemText(i).split(' · '), h = document.createElement('b'); h.textContent = parts[0]; h.style.color = i.rarity ? RARITY[i.rarity].color : d.set ? '#ffd76a' : '#f4efe2'; pn.append(h);
   const body = document.createElement('div'); body.className = 'idesc'; for (const l of parts.slice(1)) { const r = document.createElement('div'); r.textContent = l; body.append(r); }
@@ -288,6 +289,7 @@ function renderItemPanel() {
   else if (JEWELS[i.key]) row.append(btn('Usar joia: escolher item', () => { selItem = null; jewelSlot = i.slot; renderInv(); }));
   else if (d.kind === 'potion' || d.kind === 'box') row.append(btn(d.kind === 'box' ? 'Abrir' : 'Usar', () => send({ t: 'u', slot: i.slot })));
   else if (d.kind !== 'material' && d.kind !== 'pack') row.append(btn('Equipar', () => { selItem = null; send({ t: 'e', slot: i.slot }); }));
+  if (!i.equip) row.append(btn('↔ Mover', () => { moveFrom = i.slot; selItem = null; renderInv(); }));
   if (!i.equip) row.append(btn('🗑 Descartar', () => { if (!valuable(i) || confirm(`Descartar ${parts[0]}? Não dá para desfazer.`)) { selItem = null; send({ t: 'x', slot: i.slot }); } }, 'danger'));
   row.append(btn('Fechar', () => { selItem = null; renderInv(); })); pn.append(row);
 }
@@ -312,16 +314,18 @@ function sellAll(i: ItemInst) {
 /** Arrastar um item da bolsa até a janela da loja vende a pilha inteira (com confirmação). Funciona com mouse e com o dedo. */
 let dragDone = false;
 function dragToSell(e: PointerEvent, i: ItemInst, cel: HTMLElement) {
-  if (!canSellHere() || e.button > 0) return;
+  if (e.button > 0 || trashMode || jewelSlot >= 0) return; const sell = canSellHere();
   const sx = e.clientX, sy = e.clientY; let ghost: HTMLElement | null = null; dragDone = false;
   const move = (ev: PointerEvent) => {
-    if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { ghost = cel.cloneNode(true) as HTMLElement; ghost.style.cssText = 'position:fixed;z-index:999;pointer-events:none;opacity:.85;width:48px;height:48px;transform:translate(-50%,-50%)'; document.body.appendChild(ghost); $('#w-shop').classList.add('dropok'); }
+    if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { ghost = cel.cloneNode(true) as HTMLElement; ghost.style.cssText = 'position:fixed;z-index:999;pointer-events:none;opacity:.85;width:48px;height:48px;transform:translate(-50%,-50%)'; document.body.appendChild(ghost); if (sell) $('#w-shop').classList.add('dropok'); }
     if (ghost) { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; ev.preventDefault(); }
   };
   const up = (ev: PointerEvent) => {
     removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); $('#w-shop').classList.remove('dropok');
     if (!ghost) return; ghost.remove(); dragDone = true; setTimeout(() => { dragDone = false; }, 50);
-    if (ev.type === 'pointerup' && document.elementFromPoint(ev.clientX, ev.clientY)?.closest('#w-shop')) sellAll(i);
+    if (ev.type !== 'pointerup') return; const at = document.elementFromPoint(ev.clientX, ev.clientY);
+    if (sell && at?.closest('#w-shop')) { sellAll(i); return; }
+    const to = at?.closest<HTMLElement>('#grid .cell')?.dataset.slot; if (to != null && !i.equip && Number(to) !== i.slot) send({ t: 'mi', from: i.slot, to: Number(to) });
   };
   addEventListener('pointermove', move, { passive: false }); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
@@ -422,7 +426,13 @@ function renderBig() { if (!map) return; const c = $<HTMLCanvasElement>('#bigmap
 
 // ---------- entrada ----------
 let joy = { x: 0, y: 0 }, lastInput = '';
-function syncInput() { let x = joy.x, y = joy.y; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } x = Math.round(x * 10) / 10; y = Math.round(y * 10) / 10; const s = `${x},${y}`; if (s !== lastInput) { lastInput = s; send({ t: 'i', x, y }); if (x || y) { target = 0; pendingNpc = null; marker = null; const a = ents.get(you); if (a && !pred) pred = { x: a.x, y: a.y, path: null, stop: 0, tx: 0, ty: 0, hold: 0 }; } } }
+/** Joystick → 16 direções a toda velocidade (igual no servidor e na previsão local), no máximo ~12 envios por segundo; o "parar" sai na hora. */
+let joyQ = { x: 0, y: 0 }, inputTimer = 0, lastInputAt = 0;
+function quantJoy() { const l = Math.hypot(joy.x, joy.y); if (l < .18) return { x: 0, y: 0 }; const a = Math.round(Math.atan2(joy.y, joy.x) / (Math.PI / 8)) * (Math.PI / 8); return { x: Math.round(Math.cos(a) * 1000) / 1000, y: Math.round(Math.sin(a) * 1000) / 1000 }; }
+function syncInput() { const q = quantJoy(), s = `${q.x},${q.y}`; if (s === lastInput) return; const now = performance.now(), stop = !q.x && !q.y;
+  if (!stop && now - lastInputAt < 80) { if (!inputTimer) inputTimer = window.setTimeout(() => { inputTimer = 0; syncInput(); }, 80 - (now - lastInputAt)); return; }
+  if (inputTimer) { clearTimeout(inputTimer); inputTimer = 0; } lastInput = s; lastInputAt = now; joyQ = q; send({ t: 'i', x: q.x, y: q.y });
+  if (!stop) { target = 0; pendingNpc = null; marker = null; const a = ents.get(you); if (a && !pred) pred = { x: a.x, y: a.y, path: null, stop: 0, tx: 0, ty: 0, hold: 0 }; } }
 function nearestMob(r: number) { const a = ents.get(you); if (!a) return null; let b: Ent | null = null, bd = r; for (const e of ents.values()) if (e.k === 'm') { const d = Math.hypot(e.x - a.x, e.y - a.y); if (d < bd) { bd = d; b = e; } } return b; }
 function startPred(x: number, y: number, stop = 0) { const a = ents.get(you); if (!a || !map || me?.dead) return; const path = findPath(map, a.x, a.y, x, y); if (path) pred = { x: a.x, y: a.y, path, stop, tx: x, ty: y, hold: performance.now() + 700 }; }
 function attack(e: Ent) { target = e.id; send({ t: 'a', id: e.id }); const a = ents.get(you); if (!a) return; if (Math.hypot(a.x - e.x, a.y - e.y) <= myCls.range) { faceTo(a, e.x, e.y); a.atkUntil = performance.now() + 180; pred = null; } else startPred(e.x, e.y, myCls.range - .05); }
@@ -480,7 +490,11 @@ addEventListener('keydown', e => {
   if (k >= '1' && k <= '7' && k.length === 1) selectSkill(+k); else if (k === 'd') keyPlayerMenu(); else if (k === 'q') potion('pot_hp'); else if (k === 'e') potion('pot_mp'); else if (k === 'i') toggle('inv'); else if (k === 'c') toggle('char'); else if (k === 'm') toggle('map'); else if (k === 'k') toggle('ach'); else if (k === 'h') toggle('skills'); else if (k === 'n') { setSound(!soundOn); log(soundOn ? 'Som ligado.' : 'Som desligado.', 'sys'); } else if (k === ' ') { const m = nearestMob(10); if (m) attack(m); }
 });
 addEventListener('blur', () => { holding = false; joy = { x: 0, y: 0 }; if (running) syncInput(); });
-let chan: 'l' | 'g' | 'p' | 'u' = 'l';
+let chan: 'l' | 'g' | 'p' | 'u' = 'l', chatTab = 'all';
+const CHAN_NAME: Record<string, string> = { l: 'Local', g: 'Global', p: 'Grupo', u: 'Guilda' };
+function setChatTab(t: string) { if (!['all', 'l', 'g', 'p', 'u'].includes(t)) t = 'all'; chatTab = t; const l = $('#log'); l.className = t === 'all' ? '' : `f-${t}`;
+  for (const b of document.querySelectorAll<HTMLElement>('#chattabs button')) { b.classList.toggle('on', b.dataset.t === t); if (b.dataset.t === t) b.classList.remove('unread'); }
+  if (t !== 'all') { chan = t as typeof chan; $('#chan').textContent = CHAN_NAME[t]; } try { localStorage.setItem('em_chattab', t); } catch { /* */ } l.scrollTop = l.scrollHeight; }
 $('#chan').onclick = () => { chan = chan === 'l' ? 'g' : chan === 'g' ? 'p' : chan === 'p' ? 'u' : 'l'; $('#chan').textContent = ({ l: 'Local', g: 'Global', p: 'Grupo', u: 'Guilda' } as Record<string, string>)[chan]; };
 $('#inva').onclick = () => { send({ t: inviteKind === 'd' ? 'dua' : inviteKind === 't' ? 'ta' : inviteKind === 'g' ? 'ga' : 'pa' }); $('#invite').style.display = 'none'; };
 $('#invd').onclick = () => { send({ t: inviteKind === 'd' ? 'dud' : inviteKind === 't' ? 'td' : inviteKind === 'g' ? 'gx' : 'pd' }); $('#invite').style.display = 'none'; };
@@ -618,6 +632,11 @@ document.querySelectorAll<HTMLElement>('.menu .extra').forEach(b => b.addEventLi
     grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
     grip.addEventListener('dblclick', () => { try { localStorage.removeItem(key()); } catch { /* */ } apply(); });
   }
+  { // abas do chat: Geral mostra tudo; as outras filtram e já escolhem o canal para falar
+    const tabs = document.createElement('div'); tabs.id = 'chattabs'; const names: [string, string][] = [['all', 'Geral'], ['l', 'Local'], ['g', 'Global'], ['p', 'Grupo'], ['u', 'Guilda']];
+    for (const [t, n] of names) { const b = document.createElement('button'); b.type = 'button'; b.dataset.t = t; b.textContent = n; b.onclick = e => { e.stopPropagation(); setChatTab(t); }; tabs.append(b); }
+    $('#log').before(tabs); let saved = 'all'; try { saved = localStorage.getItem('em_chattab') || 'all'; } catch { /* */ } setChatTab(saved);
+  }
   down.id = 'chatdown'; ctl.append(big, up, down); $('#chat').prepend(ctl);
   L().addEventListener('scroll', () => { const l = L(); if (l.scrollHeight - l.scrollTop - l.clientHeight < 30) down.classList.remove('new'); }); let on = false; try { on = localStorage.getItem('em_chatbig') === '1'; } catch { /* */ } set(on);
 }
@@ -693,7 +712,7 @@ document.querySelectorAll<HTMLElement>('[data-pot]').forEach(b => { const c = cv
 // ---------- render ----------
 let chest: ItemInst[] = [], editId = 0;
 let jewelSlot = -1, gfxInit = false, trashMode = false, duelWith = 0, duelUntil = 0, duelName = '';
-$('#trash').onclick = () => { trashMode = !trashMode; jewelSlot = -1; selItem = null; trashSel.clear(); renderInv(); };
+$('#trash').onclick = () => { trashMode = !trashMode; jewelSlot = -1; selItem = null; moveFrom = -1; trashSel.clear(); renderInv(); };
 $('#stackb').onclick = () => send({ t: 'org' });
 $('#trashall').onclick = () => { const list = items.filter(junk); if (!list.length) return log('Nenhum item comum para descartar.', 'sys'); if (confirm(`Descartar ${list.length} item(ns) comum(ns)?\n\n${list.map(i => ITEMS[i.key].name).join(', ')}`)) send({ t: 'xa', slots: list.map(i => i.slot) }); };
 const bloomC = cv(16, 16), bloomX = bloomC.getContext('2d')!; noHd.add(bloomC);
@@ -718,7 +737,7 @@ function frame(ts: number) {
     const px = e.x, py = e.y; const s = e.snaps;
     if (e.id === you && pred && s.length) {
       const l = s[s.length - 1], sp = CONFIG.playerSpeed * dt; let active = false;
-      if (joy.x || joy.y) { step(map, pred, joy.x * sp, joy.y * sp); pred.path = null; active = true; }
+      if (joyQ.x || joyQ.y) { step(map, pred, joyQ.x * sp, joyQ.y * sp); pred.path = null; active = true; }
       else if (pred.path) { let left = sp; while (left > 0 && pred.path?.length) { if (pred.stop && Math.hypot(pred.x - pred.tx, pred.y - pred.ty) <= pred.stop) { pred.path = null; break; } const n = pred.path[0], d = Math.hypot(n.x - pred.x, n.y - pred.y); if (d <= left) { pred.x = n.x; pred.y = n.y; left -= d; pred.path.shift(); } else { pred.x += (n.x - pred.x) / d * left; pred.y += (n.y - pred.y) / d * left; left = 0; } } active = !!pred.path?.length; if (!active) pred.path = null; }
       if (active) pred.hold = ts + 700;
       const err = Math.hypot(l.x - pred.x, l.y - pred.y);

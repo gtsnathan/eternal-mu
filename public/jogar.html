@@ -312,6 +312,17 @@ body.boss #tframe{display:none!important}
   .touch #chatctl button{height:24px;width:28px;font-size:12px}
   .touch #chatgrip{height:14px;font-size:10px}
 }
+
+/* 0.47.7: abas do chat e mover itens */
+#chattabs{pointer-events:auto;display:flex;gap:3px;margin:0 34px 3px 0;overflow-x:auto;scrollbar-width:none}
+#chattabs::-webkit-scrollbar{display:none}
+#chattabs button{flex:0 0 auto;min-height:24px;padding:2px 9px;border-radius:8px 8px 0 0;font-size:12px;line-height:1.2;background:#1a1428dd;border:1px solid #4a3a6a;border-bottom:0;color:#c8bce0;position:relative}
+#chattabs button.on{background:#3a2a10;border-color:#c9a24f;color:#ffe08a;font-weight:700}
+#chattabs button.unread::after{content:'';position:absolute;top:2px;right:2px;width:7px;height:7px;border-radius:50%;background:#ff5a6a;box-shadow:0 0 4px #ff5a6a}
+#log.f-l div:not([data-ch=l]),#log.f-g div:not([data-ch=g]),#log.f-p div:not([data-ch=p]),#log.f-u div:not([data-ch=u]){display:none}
+.touch #chattabs button{min-height:26px;font-size:12px}
+@media (orientation:landscape) and (max-height:500px){.touch #chattabs button{min-height:20px;padding:1px 6px;font-size:10px}}
+.cell.msel{outline:2px dashed #7ad0ff;outline-offset:1px;box-shadow:0 0 10px #7ad0ff99}
 </style>
 </head>
 <body>

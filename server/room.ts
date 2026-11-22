@@ -244,8 +244,10 @@ export class MapRoom {
   // ---------- comandos do cliente: nada aqui confia em valores calculados pelo cliente ----------
   private onMessage(p: Player, raw: unknown) {
     if (p.gone || typeof raw !== 'string' || raw.length > 400) return;
-    if (--p.budget < -30) { try { p.ws.close(4002, 'flood'); } catch { /* */ } return; }
-    if (p.budget < 0) return;
+    // direção do joystick é leve e nunca pode ser descartada (perder o "parar" fazia o boneco andar sozinho e "teleportar")
+    const isInput = raw.length < 40 && raw.startsWith('{"t":"i"');
+    if (isInput) { p.budget -= .15; if (p.budget < -60) { try { p.ws.close(4002, 'flood'); } catch { /* */ } return; } }
+    else { if (--p.budget < -30) { try { p.ws.close(4002, 'flood'); } catch { /* */ } return; } if (p.budget < 0) return; }
     let m: any; try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m !== 'object') return;
     if (m.t === 'ping') return this.send(p, { t: 'pong', c: m.c });
@@ -273,6 +275,10 @@ export class MapRoom {
       case 'qx': if (p.quest) { p.quest = null; p.dirty = true; p.meDirty = true; this.sys(p, 'Missão abandonada.'); } return;
       case 'x': return this.discard(p, [m.slot]);
       case 'org': { const a = this.mergeStacks(p, false), b = this.mergeStacks(p, true); if (a || b) { p.dirty = true; this.sendInv(p); } return this.sys(p, a || b ? `Pilhas juntadas (até ${STACK_MAX} por espaço).` : 'Suas pilhas já estão organizadas.'); }
+      case 'mi': { // organizar a bolsa: move um item para qualquer espaço (se estiver ocupado, troca os dois de lugar)
+        const a = Number(m.from), b = Number(m.to); if (!Number.isInteger(a) || !Number.isInteger(b) || a === b || a < 0 || b < 0 || a >= CONFIG.invSize || b >= CONFIG.invSize) return;
+        const x = p.items.find(i => !i.equip && i.slot === a); if (!x) return; const y = p.items.find(i => !i.equip && i.slot === b);
+        x.slot = b; p.dirtyItems.add(x.id); if (y) { y.slot = a; p.dirtyItems.add(y.id); } p.dirty = true; this.sendInv(p); return; }
       case 'xa': return this.discard(p, Array.isArray(m.slots) ? m.slots.slice(0, CONFIG.invSize) : []);
       case 'ue': return this.unequip(p, m.eq);
       case 'st': return this.addStat(p, m.s, m.n);
