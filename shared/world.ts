@@ -66,7 +66,7 @@ function solmira() {
   obj(m, 'stall', 14, 18, 3, 2, 1); obj(m, 'stall', 33, 22, 3, 2, 0);
   for (let y = 2; y < 38; y++) for (let x = 2; x < 48; x++) if (!plaza(x, y) && !road(y) && !(y >= 2 && y <= 8) && !(y >= 32) && !m.solid[y * 50 + x] && r() < .07) obj(m, r() < .75 ? 'palm' : 'rock', x, y, 1, 1, r() * 2 | 0);
   m.spawn = { x: 25.5, y: 25 };
-  m.portals.push({ x: 3.5, y: 20.5, to: 'valoria', tx: 6, ty: 14.5, label: 'Valoria' }, { x: 46.5, y: 20.5, to: 'dunas', tx: 14, ty: 70, label: 'Dunas de Solmira', lvl: 70 }, ...HI_MAPS.map((h, i) => ({ x: h.px ?? HI_PORTAL_X[i], y: h.mr ? MR_PORTAL_Y : 4.5, to: h.id, tx: 18, ty: 70, label: h.name, lvl: h.lvl, ...(h.mr ? { mr: h.mr } : {}) })));
+  m.portals.push({ x: 3.5, y: 20.5, to: 'valoria', tx: 6, ty: 14.5, label: 'Valoria' }, { x: 46.5, y: 20.5, to: 'dunas', tx: 14, ty: 70, label: 'Dunas de Solmira', lvl: 70 }, ...HI_MAPS.map((h, i) => ({ x: h.px ?? HI_PORTAL_X[i], y: h.south ? MR_PORTAL_Y : 4.5, to: h.id, tx: 18, ty: 70, label: h.name, lvl: h.lvl, ...(h.mr ? { mr: h.mr } : {}) })));
   m.npcs.push({ id: 'alquimista', name: 'Zahra, Alquimista', x: 20.5, y: 25.5, shop: 'alquimista', line: 'Bebam antes de cruzar as dunas.', look: 1 },
     { id: 'ferreira', name: 'Kasim, Ferreiro', x: 30.5, y: 25.5, shop: 'ferreira', line: 'Lâminas temperadas ao sol do deserto.', look: 2 },
     { id: 'armeira', name: 'Samira, Armeira de Sets', x: 25.5, y: 14.5, shop: 'armeira', line: 'As armaduras mais raras do reino chegam aqui.', look: 4 },
@@ -178,7 +178,7 @@ function celestial() {
   return m;
 }
 // ---------- Mundos de alto nível: saem dos portais do norte de Solmira ----------
-interface HiMap { id: string; name: string; lvl: number; seed: number; style: 'open' | 'rooms' | 'islands'; floor: number; base: number; patch?: number; patchSolid?: boolean; objs: Obj['k'][]; dens: number; mobs: [string, string, string]; boss: string; traps?: boolean; mr?: number; px?: number }
+interface HiMap { id: string; name: string; lvl: number; seed: number; style: 'open' | 'rooms' | 'islands'; floor: number; base: number; patch?: number; patchSolid?: boolean; objs: Obj['k'][]; dens: number; mobs: [string, string, string]; boss: string; traps?: boolean; mr?: number; px?: number; south?: boolean }
 export const HI_MAPS: HiMap[] = [
   { id: 'pantano', name: 'Pântano Venenoso', lvl: 120, seed: 501, style: 'open', floor: T.MOSS, base: T.MOSS, patch: T.WATER, patchSolid: true, objs: ['deadtree', 'shroom', 'oak'], dens: .06, mobs: ['bogtoad', 'venomspider', 'swamphag'], boss: 'hydraqueen' },
   { id: 'cume', name: 'Cume Glacial', lvl: 150, seed: 502, style: 'open', floor: T.SNOW, base: T.SNOW, patch: T.ICE, objs: ['pine', 'rock', 'spire'], dens: .06, mobs: ['frostgolem', 'icewyrm', 'frostseraph'], boss: 'glacius' },
@@ -188,12 +188,12 @@ export const HI_MAPS: HiMap[] = [
   { id: 'abismo', name: 'Abismo Cristalino', lvl: 270, seed: 506, style: 'rooms', floor: T.ICE, base: T.DWALL, objs: ['spire', 'pillar'], dens: 0, mobs: ['crystalgolem', 'voidsprite', 'abyssknight'], boss: 'xalathar' },
   { id: 'caos', name: 'Trono do Caos', lvl: 300, seed: 507, style: 'islands', floor: T.ASH, base: T.LAVA, objs: ['spire', 'statue'], dens: 0, mobs: ['chaosimp', 'chaoshound', 'chaoslord'], boss: 'kaorth' },
   { id: 'vazio', name: 'Vazio Eterno', lvl: 340, seed: 508, style: 'islands', floor: T.MARBLE, base: T.DWALL, objs: ['pillar', 'statue'], dens: 0, mobs: ['voidseraph', 'starbeast', 'eternalarchon'], boss: 'nihilus' },
-  // Reinos Mestres: só para quem tem Master Reset (portais no sul de Solmira)
-  { id: 'rubra', name: 'Cidadela Rubra', lvl: 300, mr: 3, px: 9.5, seed: 601, style: 'rooms', floor: T.DUNGEON, base: T.DWALL, objs: ['pillar'], dens: 0, mobs: ['rubyknight', 'bloodmage', 'crimsonbeast'], boss: 'sanguis', traps: true },
-  { id: 'jardim', name: 'Jardim Celestial Caído', lvl: 300, mr: 5, px: 17.5, seed: 602, style: 'open', floor: T.CLOUD, base: T.MARBLE, patch: T.GRASS, objs: ['statue', 'pillar', 'oak'], dens: .05, mobs: ['fallenangel', 'goldgolem', 'skyserpent'], boss: 'azrael' },
-  { id: 'forja', name: 'Forja dos Titãs', lvl: 300, mr: 10, px: 25.5, seed: 603, style: 'islands', floor: T.ASH, base: T.LAVA, objs: ['spire', 'rock'], dens: 0, mobs: ['titansmith', 'magmawyrm', 'emberlord'], boss: 'vulkan' },
-  { id: 'estrelas', name: 'Mar de Estrelas', lvl: 300, mr: 15, px: 33.5, seed: 604, style: 'islands', floor: T.ICE, base: T.DWALL, objs: ['spire', 'statue'], dens: 0, mobs: ['astralknight', 'cometbeast', 'nebulawitch'], boss: 'cosmara' },
-  { id: 'criador', name: 'Trono do Criador', lvl: 300, mr: 20, px: 41.5, seed: 605, style: 'rooms', floor: T.MARBLE, base: T.DWALL, objs: ['pillar', 'statue'], dens: 0, mobs: ['primordial', 'genesisdragon', 'voidking'], boss: 'origem' },
+  // Reinos do nível 400: não pedem Master Reset, mas os monstros têm a força de quem tem uns 3 MR (portais no sul de Solmira)
+  { id: 'rubra', south: true, name: 'Cidadela Rubra', lvl: 400, px: 9.5, seed: 601, style: 'rooms', floor: T.DUNGEON, base: T.DWALL, objs: ['pillar'], dens: 0, mobs: ['rubyknight', 'bloodmage', 'crimsonbeast'], boss: 'sanguis', traps: true },
+  { id: 'jardim', south: true, name: 'Jardim Celestial Caído', lvl: 400, px: 17.5, seed: 602, style: 'open', floor: T.CLOUD, base: T.MARBLE, patch: T.GRASS, objs: ['statue', 'pillar', 'oak'], dens: .05, mobs: ['fallenangel', 'goldgolem', 'skyserpent'], boss: 'azrael' },
+  { id: 'forja', south: true, name: 'Forja dos Titãs', lvl: 400, px: 25.5, seed: 603, style: 'islands', floor: T.ASH, base: T.LAVA, objs: ['spire', 'rock'], dens: 0, mobs: ['titansmith', 'magmawyrm', 'emberlord'], boss: 'vulkan' },
+  { id: 'estrelas', south: true, name: 'Mar de Estrelas', lvl: 400, px: 33.5, seed: 604, style: 'islands', floor: T.ICE, base: T.DWALL, objs: ['spire', 'statue'], dens: 0, mobs: ['astralknight', 'cometbeast', 'nebulawitch'], boss: 'cosmara' },
+  { id: 'criador', south: true, name: 'Trono do Criador', lvl: 400, px: 41.5, seed: 605, style: 'rooms', floor: T.MARBLE, base: T.DWALL, objs: ['pillar', 'statue'], dens: 0, mobs: ['primordial', 'genesisdragon', 'voidking'], boss: 'origem' },
 ];
 const MR_PORTAL_Y = 35.5;
 /** Mesma planta de 9 áreas para todos: entrada à esquerda, chefe no fundo à direita. */
@@ -264,7 +264,7 @@ function arenaMap(id: string): GameMap {
   m.spawn = { x: 22.5, y: 24.5 };
   return m;
 }
-export function getMap(id: string): GameMap { if (id.startsWith('arena')) return cache[id] ??= arenaMap(id); const hi = HI_MAPS.findIndex(h => h.id === id); if (hi >= 0) { const h = HI_MAPS[hi]; return cache[id] ??= enlarge(hiMap(h, h.px ?? HI_PORTAL_X[hi], h.mr ? MR_PORTAL_Y - 2 : 6.5)); } return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
+export function getMap(id: string): GameMap { if (id.startsWith('arena')) return cache[id] ??= arenaMap(id); const hi = HI_MAPS.findIndex(h => h.id === id); if (hi >= 0) { const h = HI_MAPS[hi]; return cache[id] ??= enlarge(hiMap(h, h.px ?? HI_PORTAL_X[hi], h.south ? MR_PORTAL_Y - 2 : 6.5)); } return cache[id] ??= id === 'solmira' ? solmira() : id === 'dunas' ? enlarge(dunas()) : id === 'frostvale' ? enlarge(frostvale()) : id === 'infernal' ? enlarge(infernal()) : id === 'eldergrove' ? enlarge(eldergrove()) : id === 'ashen' ? enlarge(ashen()) : id === 'celestial' ? enlarge(celestial()) : valoria(); }
 
 export const isSolid = (m: GameMap, x: number, y: number) => { const i = Math.floor(x), j = Math.floor(y); return !(i >= 0 && j >= 0 && i < m.w && j < m.h) || m.solid[j * m.w + i] === 1; }; // NaN conta como parede
 const R = .3;

@@ -289,7 +289,7 @@ function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?
     : [...wep(wt, .006), ...wep(wp, .008), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...sets.flatMap(s => setDrops(s, .005)), ['box_mitico', L >= 200 ? .004 : .002], ['chaos_feather', L >= 150 ? .012 : .006], ...(L >= 210 ? [['void_crystal', L >= 300 ? .004 : .002] as [string, number]] : [])];
   return { key, name, level: L, hp, dmg, def, speed: b ? 3.2 : 3, detect: b ? 14 : 9, leash: b ? 20 : 14, attackMs: b ? 1400 : 1500, xp: Math.round(hp * (b ? 2.5 : 1.15)), respawnMs: b ? 3600000 : 42000, gold: b ? [L * 1400, L * 2400] : [L * 55, L * 95], drops, boss: b || undefined, reach: o.reach ?? (b ? 3.4 : undefined), bolt: o.bolt, nova: o.nova };
 }
-/** Monstros dos Reinos Mestres: base de nível alto multiplicada pela força média de quem tem `mr` Master Resets. */
+/** Monstros dos reinos do nível 400: base de nível alto multiplicada pela força média de quem tem `mr` Master Resets (≈3 a 4). */
 export const MR_MULT = (mr: number) => ({ hp: 1 + mr * .15, dmg: 1 + mr * .2, def: 1 + mr * .12, xp: (1 + mr * .2) * 1.3 });
 function mrMob(key: string, name: string, L: number, mr: number, o: { boss?: boolean; reach?: number; bolt?: string; nova?: string } = {}): MobDef {
   const m = hiMob(key, name, L, o), k = MR_MULT(mr), b = !!o.boss;
@@ -300,11 +300,11 @@ function mrMob(key: string, name: string, L: number, mr: number, o: { boss?: boo
   return m;
 }
 Object.assign(MOBS, Object.fromEntries([
-  mrMob('rubyknight', 'Cavaleiro Rubi', 400, 3), mrMob('bloodmage', 'Mago de Sangue', 405, 3, { reach: 7, bolt: '#ff3a4a' }), mrMob('crimsonbeast', 'Fera Carmesim', 410, 3), mrMob('sanguis', 'Sanguis, o Senhor Rubro', 420, 3, { boss: true, nova: '#ff3a4a' }),
-  mrMob('fallenangel', 'Anjo Caído', 430, 5, { reach: 7, bolt: '#ffe08a' }), mrMob('goldgolem', 'Golem Dourado', 435, 5), mrMob('skyserpent', 'Serpente Celeste', 440, 5), mrMob('azrael', 'Azrael, Anjo da Ruína', 450, 5, { boss: true, nova: '#fff1a8' }),
-  mrMob('titansmith', 'Ferreiro Titã', 460, 10), mrMob('magmawyrm', 'Serpe de Magma', 465, 10), mrMob('emberlord', 'Lorde das Brasas', 470, 10, { reach: 7, bolt: '#ff8a2a' }), mrMob('vulkan', 'Vulkan, o Titã da Forja', 480, 10, { boss: true, nova: '#ff8a2a' }),
-  mrMob('astralknight', 'Cavaleiro Astral', 490, 15), mrMob('cometbeast', 'Fera Cometa', 495, 15), mrMob('nebulawitch', 'Bruxa da Nebulosa', 500, 15, { reach: 7.5, bolt: '#b07aff' }), mrMob('cosmara', 'Cosmara, Rainha das Estrelas', 510, 15, { boss: true, nova: '#b07aff' }),
-  mrMob('primordial', 'Primordial', 520, 20), mrMob('genesisdragon', 'Dragão Gênese', 525, 20), mrMob('voidking', 'Rei do Nada', 530, 20, { reach: 7.5, bolt: '#ffffff' }), mrMob('origem', 'Origem, o Primeiro', 550, 20, { boss: true, nova: '#ffffff' }),
+  mrMob('rubyknight', 'Cavaleiro Rubi', 400, 3), mrMob('bloodmage', 'Mago de Sangue', 402, 3, { reach: 7, bolt: '#ff3a4a' }), mrMob('crimsonbeast', 'Fera Carmesim', 404, 3), mrMob('sanguis', 'Sanguis, o Senhor Rubro', 410, 3, { boss: true, nova: '#ff3a4a' }),
+  mrMob('fallenangel', 'Anjo Caído', 410, 3.25, { reach: 7, bolt: '#ffe08a' }), mrMob('goldgolem', 'Golem Dourado', 412, 3.25), mrMob('skyserpent', 'Serpente Celeste', 414, 3.25), mrMob('azrael', 'Azrael, Anjo da Ruína', 420, 3.25, { boss: true, nova: '#fff1a8' }),
+  mrMob('titansmith', 'Ferreiro Titã', 420, 3.5), mrMob('magmawyrm', 'Serpe de Magma', 422, 3.5), mrMob('emberlord', 'Lorde das Brasas', 424, 3.5, { reach: 7, bolt: '#ff8a2a' }), mrMob('vulkan', 'Vulkan, o Titã da Forja', 430, 3.5, { boss: true, nova: '#ff8a2a' }),
+  mrMob('astralknight', 'Cavaleiro Astral', 430, 3.75), mrMob('cometbeast', 'Fera Cometa', 432, 3.75), mrMob('nebulawitch', 'Bruxa da Nebulosa', 434, 3.75, { reach: 7.5, bolt: '#b07aff' }), mrMob('cosmara', 'Cosmara, Rainha das Estrelas', 440, 3.75, { boss: true, nova: '#b07aff' }),
+  mrMob('primordial', 'Primordial', 440, 4), mrMob('genesisdragon', 'Dragão Gênese', 442, 4), mrMob('voidking', 'Rei do Nada', 444, 4, { reach: 7.5, bolt: '#ffffff' }), mrMob('origem', 'Origem, o Primeiro', 450, 4, { boss: true, nova: '#ffffff' }),
 ].map(m => [m.key, m])));
 Object.assign(MOBS, Object.fromEntries([
   hiMob('bogtoad', 'Sapo do Pântano', 120), hiMob('venomspider', 'Aranha Peçonhenta', 128), hiMob('swamphag', 'Bruxa do Brejo', 135, { reach: 6, bolt: '#9dff6b' }), hiMob('hydraqueen', 'Rainha Hidra', 150, { boss: true, nova: '#9dff6b' }),
