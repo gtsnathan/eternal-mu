@@ -219,6 +219,9 @@ function hiMap(d: HiMap, solX: number, solY = 6.5) {
   m.spawn = { x: 9, y: 35 }; m.portals.push({ x: 4.5, y: 35.5, to: 'solmira', tx: solX, ty: solY, label: 'Solmira' });
   const [a, b, c] = d.mobs;
   m.zones.push({ mob: a, n: 12, cx: 27, cy: 20, r: 6 }, { mob: a, n: 12, cx: 27, cy: 50, r: 6 }, { mob: b, n: 9, cx: 47, cy: 12, r: 5 }, { mob: b, n: 9, cx: 47, cy: 59, r: 5 }, { mob: b, n: 8, cx: 47, cy: 35, r: 6 }, { mob: c, n: 8, cx: 67, cy: 22, r: 6 }, { mob: c, n: 8, cx: 67, cy: 50, r: 6 }, { mob: d.boss, n: 1, cx: 82, cy: 35, r: 1 });
+  // quanto mais difícil o mundo, menos monstros: 100% no nível 120, 80% no 340 e de 60% a 34% nos reinos do nível 400 (os chefes não mudam)
+  const south = ['rubra', 'jardim', 'forja', 'estrelas', 'criador'].indexOf(d.id), f = south >= 0 ? [.6, .52, .45, .4, .34][south] : 1 - Math.max(0, Math.min(1, (d.lvl - 120) / 220)) * .2;
+  for (const z of m.zones) if (z.n > 1) z.n = Math.max(2, Math.round(z.n * f));
   return m;
 }
 const HI_PORTAL_X = [5.5, 10.5, 15.5, 20.5, 29.5, 34.5, 39.5, 44.5];

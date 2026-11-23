@@ -12,7 +12,7 @@ export interface ItemDef {
   dmg?: number; def?: number; hp?: number; heal?: number; mana?: number; tint?: string; blade?: string; wtype?: WType; set?: string; cls?: string; wtier?: number; pet?: PetBonus;
 }
 // Sets: cada peça equipada do mesmo set soma bônus (2 peças: defesa, 3: vida, 4: ataque %)
-export interface SetDef { cls?: string; key: string; name: string; of: string; lvl: number; color: string; trim: string; cape: string; power: number; price: number; bonus: { def: number; hp: number; atk: number } }
+export interface SetDef { cls?: string; key: string; name: string; of: string; lvl: number; color: string; trim: string; cape: string; power: number; price: number; bonus: { def: number; hp: number; atk: number }; /** protege do golpe de % de vida dos monstros do nível 400 (25% por peça) */ ward?: boolean }
 export const SETS: Record<string, SetDef> = {
   boar: { key: 'boar', name: 'Javali de Ferro', of: 'do', lvl: 12, color: '#6a5a4e', trim: '#c9b48a', cape: '#3e332a', power: 1.3, price: 1800, bonus: { def: 5, hp: 45, atk: .06 } },
   minotaur: { key: 'minotaur', name: 'Minotauro Implacável', of: 'do', lvl: 58, color: '#5a2a1e', trim: '#e0a03a', cape: '#2e120c', power: 7.2, price: 600000, bonus: { def: 62, hp: 620, atk: .4 } },
@@ -85,6 +85,12 @@ Object.assign(SETS, {
   cacador: { cls: 'mystic_archer', key: 'cacador', name: 'Caçador Estelar', of: 'do', lvl: 340, color: '#1e3a24', trim: '#e8c36a', cape: '#2e2410', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
   celestial: { cls: 'spell_knight', key: 'celestial', name: 'Guardião Celestial', of: 'do', lvl: 340, color: '#e4e8f4', trim: '#5ad0ff', cape: '#2a3a6a', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
   rainhavazio: { cls: 'shadow_summoner', key: 'rainhavazio', name: 'Rainha do Vazio', of: 'da', lvl: 340, color: '#1a0a2a', trim: '#ff6af0', cape: '#0c0418', power: 39.0, price: 190000000, bonus: { def: 365, hp: 3850, atk: 1.45 } },
+  // Sets Supremos (400): o último set de cada classe; cada peça anula 25% do golpe mínimo dos monstros do nível 400 (as 4 peças anulam tudo)
+  titarubro: { cls: 'dark_warrior', key: 'titarubro', name: 'Titã Rubro', of: 'do', lvl: 400, color: '#3a0608', trim: '#ffe08a', cape: '#8a0a10', power: 43.0, price: 300000000, bonus: { def: 420, hp: 4400, atk: 1.55 }, ward: true },
+  oraculo: { cls: 'arcane_wizard', key: 'oraculo', name: 'Oráculo Celestial', of: 'do', lvl: 400, color: '#0e2a6a', trim: '#e8f4ff', cape: '#061a4a', power: 43.0, price: 300000000, bonus: { def: 420, hp: 4400, atk: 1.55 }, ward: true },
+  falcaoreal: { cls: 'mystic_archer', key: 'falcaoreal', name: 'Falcão Real', of: 'do', lvl: 400, color: '#24401e', trim: '#ffd27a', cape: '#3a2a0e', power: 43.0, price: 300000000, bonus: { def: 420, hp: 4400, atk: 1.55 }, ward: true },
+  divino: { cls: 'spell_knight', key: 'divino', name: 'Paladino Divino', of: 'do', lvl: 400, color: '#f4f0e4', trim: '#ffcf4a', cape: '#7a1a1a', power: 43.0, price: 300000000, bonus: { def: 420, hp: 4400, atk: 1.55 }, ward: true },
+  imperatriz: { cls: 'shadow_summoner', key: 'imperatriz', name: 'Imperatriz Astral', of: 'da', lvl: 400, color: '#1e0a3a', trim: '#c8a2ff', cape: '#0e0420', power: 43.0, price: 300000000, bonus: { def: 420, hp: 4400, atk: 1.55 }, ward: true },
 } as Record<string, SetDef>);
 export const SET_PIECES = ['helm', 'armor', 'pants', 'boots'] as const;
 const PIECE = { helm: ['Elmo', 11, 40, 1], armor: ['Couraça', 20, 90, 1.6], pants: ['Grevas', 14, 50, 1.1], boots: ['Botas', 8, 30, .9] } as const;
@@ -284,7 +290,7 @@ function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?
   const dmg = Math.round(lerpT(L, [[120, 1810], [150, 2006], [180, 2660], [210, 2940], [240, 3620], [270, 3995], [300, 4678], [340, 5240], [380, 5585], [400, 5800]]) * (b ? 1.5 : 1));
   const def = Math.round(lerpT(L, [[120, 675], [150, 925], [180, 1250], [210, 1575], [240, 2050], [270, 2500], [300, 3125], [340, 3875], [380, 4375], [400, 4600]]) * (b ? 1.2 : 1));
   // arma/acessório do nível do mundo (e o anterior); set do nível mais alto que o monstro alcança
-  const wt = HI_TIERS.filter(t => t <= L).pop() ?? 110, wp = HI_TIERS[HI_TIERS.indexOf(wt) - 1] ?? 110, ST = [120, 180, 240, 300, 340], st = ST.filter(t => t <= L).pop(), sets = st ? Object.values(SETS).filter(s => s.lvl === st).map(s => s.key) : TOP_SETS,
+  const wt = HI_TIERS.filter(t => t <= L).pop() ?? 110, wp = HI_TIERS[HI_TIERS.indexOf(wt) - 1] ?? 110, ST = [120, 180, 240, 300, 340, 400], st = ST.filter(t => t <= L).pop(), sets = st ? Object.values(SETS).filter(s => s.lvl === st).map(s => s.key) : TOP_SETS,
     prevSets = st && b ? Object.values(SETS).filter(s => s.lvl === ST[ST.indexOf(st) - 1]).map(s => s.key) : []; // chefes também soltam o set do mundo anterior
   const drops: [string, number][] = b ? [...wep(wt, .5), ...wep(wp, .6), ['ancient_scale', 1], ['jewel_eclipse', 1], ['jewel_destiny', 1], ['magma_heart', 1], ...sets.flatMap(s => setDrops(s, .2)), ...prevSets.flatMap(s => setDrops(s, .1)), ['box_mitico', L >= 200 ? .5 : .25], ['chaos_feather', 1], ['chaos_feather', L >= 240 ? 1 : .6], ...(L >= 210 ? [['void_crystal', L >= 300 ? 1 : .5] as [string, number]] : [])]
     : [...wep(wt, .006), ...wep(wp, .008), ['jewel_eclipse', .1], ['ancient_scale', .05], ['magma_heart', .05], ...sets.flatMap(s => setDrops(s, .005)), ['box_mitico', L >= 200 ? .004 : .002], ['chaos_feather', L >= 150 ? .012 : .006], ...(L >= 210 ? [['void_crystal', L >= 300 ? .004 : .002] as [string, number]] : [])];
@@ -440,8 +446,10 @@ export function derive(b: Base, items: ItemInst[]) {
   let wa = 0, wabs = 0, pdef = 0, pgold = 0, pcrit = 0; const O: Record<string, number> = {}; for (const i of items) if (i.equip) { const d = ITEMS[i.key]; if (d.kind === 'wings') { wa += WING_TIER[d.wtier!].atk; wabs += WING_TIER[d.wtier!].abs; } if (d.pet) { wa += d.pet.atk ?? 0; wabs += d.pet.abs ?? 0; pdef += d.pet.def ?? 0; pgold += d.pet.gold ?? 0; pcrit += d.pet.crit ?? 0; hp += d.pet.hp ?? 0; } for (const o of i.opts ?? []) O[o] = (O[o] ?? 0) + 1; }
   const q0 = (k: string) => O[k] ?? 0;
   const mt = b.mtree ?? {}, mv = (k: string) => mt[k] ?? 0;
+  let ward = 0; for (const [k, n] of Object.entries(setCounts(items))) if (SETS[k].ward) ward += n * .25;
   let pct = mv('atk') * .01; for (const [k, n] of Object.entries(setCounts(items))) { const q = SETS[k].bonus; if (n >= 2) def += q.def; if (n >= 3) hp += q.hp; if (n >= 4) pct += q.atk; }
   return {
+    ward: Math.min(1, ward),
     maxHp: Math.floor((70 + b.level * 3 + b.vit * 3 + hp) * (1 + q0('hp') * .04 + mv('hp') * .01)), maxMp: Math.floor((20 + b.level + b.ene * 2) * (1 + q0('mp') * .04)),
     atk: Math.floor((b.str * w[0] + b.agi * w[1] + b.ene * w[2] + dmg) * (1 + pct + wa + q0('atk') * .06)), def: Math.floor((b.agi / 5 + def) * (1 + mv('def') * .01 + pdef)),
     attackMs: Math.max(280, (1000 - b.agi * 3) * (1 - q0('speed') * .07)), crit: Math.min(.6, .05 + b.agi * .0007 + q0('crit') * .08 + mv('crit') * .003 + pcrit), dodge: Math.min(.4, b.agi * .0008 + q0('dodge') * .03),

@@ -1188,7 +1188,7 @@ export class MapRoom {
     const s = this.stats(p);
     if (Math.random() < s.dodge) { this.fx.push({ k: 'miss', x: p.x, y: p.y, id: p.eid }); return; }
     let dmg = Math.max(1, Math.round(rollDamage(raw, s.def, Math.random()) * (1 - s.absorb)));
-    if (mob?.def.pct) dmg = Math.max(dmg, Math.round(s.maxHp * mob.def.pct * k * (.95 + Math.random() * .15))); // reinos do nível 400: todo golpe dói de verdade
+    if (mob?.def.pct && s.ward < 1) dmg = Math.max(dmg, Math.round(s.maxHp * mob.def.pct * (1 - s.ward) * k * (.95 + Math.random() * .15))); // Sets Supremos: cada peça anula 25% // reinos do nível 400: todo golpe dói de verdade
     if (mob && s.reflect && mob.hp > 0) { mob.hp -= Math.ceil(dmg * s.reflect); if (mob.hp <= 0) this.killMob(mob, p); }
     p.hp -= dmg; p.dirty = true; p.meDirty = true;
     this.fx.push({ k: 'hit', x: p.x, y: p.y, id: p.eid, v: dmg, c: 0, p: 1 });
