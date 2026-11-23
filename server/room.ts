@@ -1183,11 +1183,12 @@ export class MapRoom {
     while (p.level < CONFIG.maxLevel && p.xp >= xpToNext(p.level)) { p.xp -= xpToNext(p.level); p.level++; p.points += CONFIG.pointsPerLevel; up = true; }
     if (up) { const s = this.stats(p); p.hp = s.maxHp; p.mp = s.maxMp; this.fx.push({ k: 'lvl', x: p.x, y: p.y, id: p.eid }); this.sys(p, `Você alcançou o nível ${p.level}! +${CONFIG.pointsPerLevel} pontos (tecla C).`); for (const o of this.players.values()) o.known.delete(p.eid); }
   }
-  private hurt(p: Player, raw: number, now: number, mob?: Mob) {
+  private hurt(p: Player, raw: number, now: number, mob?: Mob, k = 1) {
     if (p.deadUntil || p.gone) return;
     const s = this.stats(p);
     if (Math.random() < s.dodge) { this.fx.push({ k: 'miss', x: p.x, y: p.y, id: p.eid }); return; }
-    const dmg = Math.max(1, Math.round(rollDamage(raw, s.def, Math.random()) * (1 - s.absorb)));
+    let dmg = Math.max(1, Math.round(rollDamage(raw, s.def, Math.random()) * (1 - s.absorb)));
+    if (mob?.def.pct) dmg = Math.max(dmg, Math.round(s.maxHp * mob.def.pct * k * (.95 + Math.random() * .15))); // reinos do nível 400: todo golpe dói de verdade
     if (mob && s.reflect && mob.hp > 0) { mob.hp -= Math.ceil(dmg * s.reflect); if (mob.hp <= 0) this.killMob(mob, p); }
     p.hp -= dmg; p.dirty = true; p.meDirty = true;
     this.fx.push({ k: 'hit', x: p.x, y: p.y, id: p.eid, v: dmg, c: 0, p: 1 });
@@ -1313,7 +1314,7 @@ export class MapRoom {
       this.follow(m, def.speed * dt * (now < m.slowUntil ? .5 : 1));
     } else if (now >= m.nextAtk) {
       m.nextAtk = now + def.attackMs; this.fx.push(def.bolt ? { k: 'bolt', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y, b: def.bolt } : { k: 'bite', x: m.x, y: m.y, id: m.eid, tx: t.x, ty: t.y });
-      this.hurt(t, def.dmg * (m.phase === 2 ? 1.35 : 1) * (now < m.curseUntil ? .7 : 1), now, m);
+      this.hurt(t, def.dmg * (m.phase === 2 ? 1.35 : 1) * (now < m.curseUntil ? .7 : 1), now, m, m.phase === 2 ? 1.35 : 1);
     }
   }
   private bossLogic(m: Mob, now: number) {
@@ -1323,7 +1324,7 @@ export class MapRoom {
     m.nextNova = now + (m.phase === 2 ? 5000 : 8000);
     const at = { x: m.x, y: m.y }, r = 5, delay = 1300;
     this.fx.push({ k: 'nova', x: at.x, y: at.y, r, d: delay, b: m.def.nova });
-    setTimeout(() => { const n = Date.now(); for (const p of this.players.values()) if (dist(p, at) <= r) this.hurt(p, m.def.dmg * 1.5, n); }, delay);
+    setTimeout(() => { const n = Date.now(); for (const p of this.players.values()) if (dist(p, at) <= r) this.hurt(p, m.def.dmg * 1.5, n, m, 1.5); }, delay);
   }
   private snapshot(p: Player) {
     const R = CONFIG.aoiRadius, seen = new Set<number>(), news: unknown[] = [], e: unknown[] = [];

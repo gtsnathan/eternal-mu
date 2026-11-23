@@ -231,6 +231,7 @@ export const SHOPS: Record<string, string[]> = {
 export interface MobDef {
   key: string; name: string; level: number; hp: number; dmg: number; def: number; speed: number; detect: number; leash: number;
   attackMs: number; xp: number; respawnMs: number; gold: [number, number]; drops: [string, number][]; boss?: boolean; reach?: number; bolt?: string; nova?: string;
+  /** dano mínimo por golpe, em fração da vida máxima do jogador (reinos do nível 400) */ pct?: number;
 }
 const EMBER: [string, number][] = [['ember_blade', 1], ['ember_axe', 1], ['ember_staff', 1], ['ember_bow', 1]];
 const ember = (ch: number) => EMBER.map(([k]) => [k, ch] as [string, number]);
@@ -293,6 +294,7 @@ function hiMob(key: string, name: string, L: number, o: { boss?: boolean; reach?
 export const MR_MULT = (mr: number) => ({ hp: 1 + mr * .15, dmg: 1 + mr * .2, def: 1 + mr * .12, xp: (1 + mr * .2) * 1.3 });
 function mrMob(key: string, name: string, L: number, mr: number, o: { boss?: boolean; reach?: number; bolt?: string; nova?: string } = {}): MobDef {
   const m = hiMob(key, name, L, o), k = MR_MULT(mr), b = !!o.boss;
+  m.pct = Math.round((.11 + (mr - 3) * .04) * (b ? 1.6 : 1) * 1000) / 1000; // cada golpe tira no mínimo 11% (1º reino) a 15% (5º) da vida máxima; chefes 1,6×
   m.hp = Math.round(m.hp * k.hp / 1000) * 1000; m.dmg = Math.round(m.dmg * k.dmg); m.def = Math.round(m.def * k.def); m.xp = Math.round(m.xp * k.xp); m.gold = [Math.round(m.gold[0] * k.hp), Math.round(m.gold[1] * k.hp)];
   // drops melhores: mais Eclipse, Baú Mítico, penas e cristais; o chefe garante joias e baús
   m.drops = [...m.drops, ...(b ? [['jewel_eclipse', 1], ['jewel_eclipse', .3 + mr * .03], ['box_mitico', 1], ['box_mitico', Math.min(1, .2 + mr * .03)], ['void_crystal', 1], ['chaos_feather', 1]] as [string, number][]
