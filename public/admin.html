@@ -55,8 +55,9 @@ function render(){const S=C.settings,tabs={rates:'Taxas',mobs:'Monstros',jew:'Jo
  const tabBar=el('div',{class:'tabs'});for(const k in tabs){bs[k]=el('button',{text:tabs[k],onclick:()=>show(k)});tabBar.append(bs[k])}
  app.replaceChildren(el('div',{class:'top'},el('h1',{text:'Eternal MU · Admin'}),el('a',{href:'/jogar',style:'color:#e9c46a',text:'Voltar ao jogo'})),tabBar,...Object.values(P));show('rates')}
 /* ---------- criador de itens (usado no editor e nos presentes) ---------- */
-function itemForm(){const I=C.defaults.items,byLabel=new Map(),dl=el('datalist',{id:'itl'+Math.random().toString(36).slice(2)});
- for(const d of I){const lb=d.n+(d.lvl>1?' · Nv '+d.lvl:'')+' · '+d.k;byLabel.set(lb,d);dl.append(el('option',{value:lb}))}
+function itemForm(cls){const I=C.defaults.items,byLabel=new Map(),dl=el('datalist',{id:'itl'+Math.random().toString(36).slice(2)}),CN=C.defaults.classes;
+ // com um personagem escolhido, só aparecem os itens que a classe dele pode usar (itens de todas as classes continuam: poções, joias, anéis...)
+ for(const d of I){const cl=d.cl||[];if(cls&&cl.length&&!cl.includes(cls))continue;const lb=d.n+(cl.length?' · '+cl.map(k=>CN[k]||k).join('/'):'')+(d.lvl>1?' · Nv '+d.lvl:'')+' · '+d.k;byLabel.set(lb,d);dl.append(el('option',{value:lb}))}
  const name=el('input',{list:dl.id,placeholder:'Digite o nome do item (ex.: Asas, Joia, Espada, Dragão...)'}),qty=el('input',{type:'number',min:1,value:1}),rar=el('select'),plus=el('input',{type:'number',min:0,max:15,value:0}),optBox=el('div',{class:'grid',style:'grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px;margin-top:6px'}),hint=el('small');
  C.defaults.rarity.forEach((r,i)=>rar.append(el('option',{value:i,text:r})));
  const W=['atk','crit','speed','lifek','manak'],A=['hp','mp','absorb','reflect','goldx','dodge'];
@@ -76,12 +77,12 @@ async function editor(id,host){host.replaceChildren(el('p',{text:'Carregando...'
  const save=async()=>{const set={};for(const[k]of F)if(String(c[k]??0)!==inp[k].value)set[k]=+inp[k].value;if(!Object.keys(set).length&&!+add.value)return say('err','Nada mudou.');try{const r=await api('admin/char',{charId:c.id,set,addGold:+add.value||0});add.value='';say('msg','Salvo'+(r.online?' e aplicado na hora (jogador online).':' (jogador offline: vale quando ele entrar).'));setTimeout(()=>editor(id,host),900)}catch(e){say('err',e.message)}};
  const where=i=>i.equip?'Equipado ('+i.equip+')':i.slot>=1000?'Baú':'Bolsa',name=k=>(C.defaults.items.find(d=>d.k===k)||{n:k}).n;
  const tb=el('tbody');for(const i of D.items)tb.append(el('tr',{},el('td',{text:name(i.key)+(i.plus?' +'+i.plus:'')}),el('td',{text:i.qty}),el('td',{text:C.defaults.rarity[i.rarity]||''}),el('td',{text:(i.opts||[]).map(o=>C.defaults.opts[o]||o).join(' · ')}),el('td',{text:where(i)}),el('td',{},el('button',{text:'Remover',onclick:async()=>{if(!confirm('Remover '+name(i.key)+' de '+c.name+'?'))return;try{await api('admin/take',{charId:c.id,itemId:i.id});editor(id,host)}catch(e){say('err',e.message)}}}))));
- const f=itemForm(),note=el('input',{placeholder:'Recado para o jogador (opcional)',maxlength:80});
+ const f=itemForm(c.cls),note=el('input',{placeholder:'Recado para o jogador (opcional)',maxlength:80});
  const give=async()=>{const it=f.get();if(!it)return;try{const r=await api('admin/give',{charId:c.id,item:it,note:note.value});say('msg','Item entregue'+(r.online?' (já apareceu na bolsa).':' (aparece quando ele entrar).'));setTimeout(()=>editor(id,host),900)}catch(e){say('err',e.message)}};
  host.replaceChildren(el('div',{class:'editor'},
   el('div',{class:'top'},el('h2',{text:c.name+' · '+(C.defaults.classes[c.cls]||c.cls)+(c.online?' · 🟢 online em '+c.map:' · offline')}),el('button',{text:'Fechar',onclick:()=>host.replaceChildren()})),
   el('h3',{text:'Valores'}),grid,el('div',{class:'grid',style:'margin-top:10px'},el('div',{},el('label',{text:'Somar ou tirar moedas'}),add)),el('div',{class:'bar'},el('button',{class:'main',text:'Salvar valores',onclick:save}),st),
-  el('h3',{text:'Criar item e dar para '+c.name}),f.box,el('div',{class:'grid',style:'margin-top:10px'},el('div',{style:'grid-column:1/-1'},el('label',{text:'Recado'}),note)),el('div',{class:'bar'},el('button',{class:'main',text:'Dar item',onclick:give})),
+  el('h3',{text:'Criar item e dar para '+c.name+' (só itens de '+(C.defaults.classes[c.cls]||c.cls)+')'}),f.box,el('div',{class:'grid',style:'margin-top:10px'},el('div',{style:'grid-column:1/-1'},el('label',{text:'Recado'}),note)),el('div',{class:'bar'},el('button',{class:'main',text:'Dar item',onclick:give})),
   el('h3',{text:'Itens ('+D.items.length+')'}),el('div',{class:'scroll'},el('table',{},el('thead',{},el('tr',{},...['Item','Qtd','Raridade','Opções','Onde',''].map(x=>el('th',{text:x})))),tb))));
  host.scrollIntoView({behavior:'smooth'})}
 boot();
